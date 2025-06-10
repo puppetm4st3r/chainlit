@@ -1,4 +1,5 @@
-import { Maximize, Minimize } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Maximize, Minimize, X } from 'lucide-react';
 
 import AudioPresence from '@chainlit/app/src/components/AudioPresence';
 import { Logo } from '@chainlit/app/src/components/Logo';
@@ -10,13 +11,28 @@ import { useAudio, useConfig } from '@chainlit/react-client';
 interface Props {
   expanded: boolean;
   setExpanded: (expanded: boolean) => void;
+  onClose?: () => void;
 }
 
-const Header = ({ expanded, setExpanded }: Props): JSX.Element => {
+const Header = ({ expanded, setExpanded, onClose }: Props): JSX.Element => {
   const { config } = useConfig();
   const { audioConnection } = useAudio();
 
   const hasChatProfiles = !!config?.chatProfiles.length;
+  
+  // Check if we're on mobile with reactive detection
+  const [isMobile, setIsMobile] = useState(false);
+  
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 640);
+    };
+    
+    checkMobile(); // Check on mount
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   return (
     <div className="flex align-center justify-between p-4 pb-0">
@@ -37,9 +53,19 @@ const Header = ({ expanded, setExpanded }: Props): JSX.Element => {
         <Button
           size="icon"
           variant="ghost"
-          onClick={() => setExpanded(!expanded)}
+          onClick={() => {
+            if (isMobile && onClose) {
+              // En móvil, cerrar el widget
+              onClose();
+            } else {
+              // En desktop, expandir/contraer
+              setExpanded(!expanded);
+            }
+          }}
         >
-          {expanded ? (
+          {isMobile ? (
+            <X className="!size-5 text-muted-foreground" />
+          ) : expanded ? (
             <Minimize className="!size-5 text-muted-foreground" />
           ) : (
             <Maximize className="!size-5 text-muted-foreground" />

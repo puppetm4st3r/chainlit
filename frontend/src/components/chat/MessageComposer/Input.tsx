@@ -112,11 +112,28 @@ const Input = forwardRef<InputMethods, Props>(
       reset
     }));
 
-    // Set up mutation observer to detect command span removal
+    // Handle initial focus
     useEffect(() => {
       if (!contentEditableRef.current) return;
 
-      contentEditableRef.current.focus();
+      // Only focus if not copilot mobile
+      const isCopilot = !!window.cl_shadowRootElement;
+      const isMobile = window.innerWidth <= 640;
+      const shouldFocus = autoFocus && !(isCopilot && isMobile);
+      
+      if (shouldFocus) {
+        // Use requestAnimationFrame to ensure DOM is ready
+        requestAnimationFrame(() => {
+          if (contentEditableRef.current) {
+            contentEditableRef.current.focus();
+          }
+        });
+      }
+    }, [autoFocus]); // Depend on autoFocus prop
+
+    // Set up mutation observer to detect command span removal
+    useEffect(() => {
+      if (!contentEditableRef.current) return;
 
       mutationObserverRef.current = new MutationObserver((mutations) => {
         if (isUpdatingRef.current) return;
@@ -340,7 +357,6 @@ const Input = forwardRef<InputMethods, Props>(
       <div className="relative w-full">
         <div
           id={id}
-          autoFocus={autoFocus}
           ref={contentEditableRef}
           contentEditable
           data-placeholder={placeholder}

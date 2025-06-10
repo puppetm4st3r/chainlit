@@ -16,11 +16,11 @@ export default function ElementSideView() {
 
   return (
     <Dialog open onOpenChange={(open) => !open && setSideView(undefined)}>
-      <DialogContent className="sm:max-w-md md:max-w-lg lg:max-w-xl">
+      <DialogContent className="sm:max-w-md md:max-w-lg lg:max-w-xl copilot-dialog">
         <DialogHeader>
           <DialogTitle>{sideView.title}</DialogTitle>
         </DialogHeader>
-        <div className="mt-4 overflow-y-auto min-h-[50vh] max-h-[80vh] flex flex-col gap-4">
+        <div className="mt-4 overflow-y-auto min-h-[50vh] max-h-[70vh] flex flex-col gap-4 pr-2">
           {sideView.elements.map((e) => (
             <Element key={e.id} element={e} />
           ))}

@@ -1,5 +1,6 @@
 import os
-from typing import Literal, Optional, cast
+from typing import Literal, Optional, cast, List
+from urllib.parse import urlparse
 
 from fastapi import Request, Response
 from fastapi.exceptions import HTTPException
@@ -27,6 +28,34 @@ _cookie_secure = _cookie_samesite == "none"
 _state_cookie_lifetime = 3 * 60  # 3m
 _auth_cookie_name = os.environ.get("CHAINLIT_AUTH_COOKIE_NAME", "access_token")
 _state_cookie_name = "oauth_state"
+
+
+def _get_cookie_domain() -> Optional[str]:
+    """
+    Extract domain from CHAINLIT_URL for cookie domain restriction.
+    Returns None if CHAINLIT_COOKIE_SAMESITE is not 'none' (same-origin cookies don't need domain).
+    Only sets domain for cross-domain cookies (SameSite=None).
+    """
+    # Only set domain for cross-domain cookies
+    if _cookie_samesite != "none":
+        return None
+        
+    chainlit_url = os.environ.get("CHAINLIT_URL")
+    if not chainlit_url:
+        return None
+    
+    try:
+        parsed_url = urlparse(chainlit_url)
+        domain = parsed_url.hostname
+        
+        # Only return domain if it's not localhost/IP for security
+        if domain and domain not in ["localhost", "127.0.0.1", "0.0.0.0"]:
+            # Ensure no leading dot for security (restrict to exact domain only)
+            return domain.lstrip('.')
+    except Exception:
+        pass
+    
+    return None
 
 
 class OAuth2PasswordBearerWithCookie(SecurityBase):
@@ -113,6 +142,7 @@ def set_auth_cookie(request: Request, response: Response, token: str):
     """
 
     _chunk_size = 3000
+    _cookie_domain = _get_cookie_domain()
 
     existing_cookies = {
         k for k in request.cookies.keys() if k.startswith(_auth_cookie_name)
@@ -131,6 +161,7 @@ def set_auth_cookie(request: Request, response: Response, token: str):
                 secure=_cookie_secure,
                 samesite=_cookie_samesite,
                 max_age=config.project.user_session_timeout,
+                domain=_cookie_domain,
             )
 
             existing_cookies.discard(k)
@@ -143,6 +174,7 @@ def set_auth_cookie(request: Request, response: Response, token: str):
             secure=_cookie_secure,
             samesite=_cookie_samesite,
             max_age=config.project.user_session_timeout,
+            domain=_cookie_domain,
         )
 
         existing_cookies.discard(_auth_cookie_name)
@@ -154,22 +186,46 @@ def set_auth_cookie(request: Request, response: Response, token: str):
         )
 
 
+def _get_domain_variants() -> List[Optional[str]]:
+    """
+    Get list of domain variants to try when deleting cookies.
+    Ensures comprehensive cleanup regardless of previous domain settings.
+    """
+    domain_variants = [
+        None,                    # No domain (browser default)
+        _get_cookie_domain(),    # Current domain setting
+    ]
+    
+    return domain_variants
+
+
 def clear_auth_cookie(request: Request, response: Response):
     """
-    Helper function to clear the authentication cookie
+    Helper function to clear the authentication cookie.
+    Attempts to clear cookies with multiple domain configurations to handle
+    cases where domain settings have changed.
     """
-
     existing_cookies = {
         k for k in request.cookies.keys() if k.startswith(_auth_cookie_name)
     }
 
     for k in existing_cookies:
-        response.delete_cookie(
-            key=k, path="/", secure=_cookie_secure, samesite=_cookie_samesite
-        )
+        for domain in _get_domain_variants():
+            try:
+                response.delete_cookie(
+                    key=k, 
+                    path="/", 
+                    secure=_cookie_secure, 
+                    samesite=_cookie_samesite, 
+                    domain=domain
+                )
+            except Exception:
+                # Continue trying other domain variants if one fails
+                pass
 
 
 def set_oauth_state_cookie(response: Response, token: str):
+    _cookie_domain = _get_cookie_domain()
     response.set_cookie(
         _state_cookie_name,
         token,
@@ -177,18 +233,25 @@ def set_oauth_state_cookie(response: Response, token: str):
         samesite=_cookie_samesite,
         secure=_cookie_secure,
         max_age=_state_cookie_lifetime,
+        domain=_cookie_domain,
     )
 
 
 def validate_oauth_state_cookie(request: Request, state: str):
     """Check the state from the oauth provider against the browser cookie."""
-
     oauth_state = request.cookies.get(_state_cookie_name)
-
     if oauth_state != state:
         raise Exception("oauth state does not correspond")
 
 
 def clear_oauth_state_cookie(response: Response):
-    """Oauth complete, delete state token."""
-    response.delete_cookie(_state_cookie_name)  # Do we set path here?
+    """
+    OAuth complete, delete state token.
+    Attempts multiple domain configurations to ensure proper cleanup.
+    """
+    for domain in _get_domain_variants():
+        try:
+            response.delete_cookie(_state_cookie_name, domain=domain)
+        except Exception:
+            # Continue trying other domain variants if one fails
+            pass

@@ -23,13 +23,16 @@ class UserDict(TypedDict):
     display_name: Optional[str]
     metadata: Dict
 
-
-# Used when logging-in a user
 @dataclass
-class User(DataClassJsonMixin):
+class UserBase():
     identifier: str
     display_name: Optional[str] = None
     metadata: Dict = Field(default_factory=dict)
+
+# Used when logging-in a user
+@dataclass
+class User(UserBase, DataClassJsonMixin):
+    extra: Dict = Field(default_factory=dict)
 
 
 @dataclass
@@ -39,5 +42,5 @@ class PersistedUserFields:
 
 
 @dataclass
-class PersistedUser(User, PersistedUserFields):
+class PersistedUser(UserBase, PersistedUserFields):
     pass

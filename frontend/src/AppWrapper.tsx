@@ -48,7 +48,9 @@ export default function AppWrapper() {
     window.location.pathname !== getRouterBasename() + '/login' &&
     window.location.pathname !== getRouterBasename() + '/login/callback'
   ) {
-    window.location.href = getRouterBasename() + '/login';
+    // Preserve the current URL with query parameters for OAuth flow
+    const currentUrl = encodeURIComponent(window.location.pathname + window.location.search);
+    window.location.href = getRouterBasename() + `/login?redirect_to=${currentUrl}`;
   }
   return <App />;
 }

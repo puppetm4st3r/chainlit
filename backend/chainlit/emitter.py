@@ -146,6 +146,10 @@ class BaseChainlitEmitter:
         """Stub method to send a toast message to the UI."""
         pass
 
+    async def set_chat_profile(self, profile_name: str):
+        """Stub method to send a chat profile selection to the UI."""
+        pass
+
 
 class ChainlitEmitter(BaseChainlitEmitter):
     """
@@ -435,3 +439,7 @@ class ChainlitEmitter(BaseChainlitEmitter):
         if type not in get_args(ToastType):
             raise ValueError(f"Invalid toast type: {type}")
         return self.emit("toast", {"message": message, "type": type})
+
+    async def set_chat_profile(self, profile_name: str):
+        """Send a chat profile selection to the UI."""
+        await self.emit("set_chat_profile", profile_name)

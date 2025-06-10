@@ -9,10 +9,27 @@ export function makeApiClient(
   const httpEndpoint = chainlitServer;
 
   const on401 = () => {
+    console.warn('Copilot authentication failed - 401 Unauthorized');
     toast.error('Unauthorized');
   };
 
   const onError = (error: ClientError) => {
+    // Log CSRF-related errors with context
+    if (error.status === 403) {
+      console.warn('Access denied - possible CSRF protection:', {
+        status: error.status,
+        message: error.message,
+        serverUrl: chainlitServer,
+        currentOrigin: typeof window !== 'undefined' ? window.location.origin : 'unknown'
+      });
+    } else {
+      console.warn('API error:', {
+        status: error.status,
+        message: error.message,
+        serverUrl: chainlitServer
+      });
+    }
+    
     toast.error(error.toString());
   };
 

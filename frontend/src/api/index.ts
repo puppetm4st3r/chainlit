@@ -14,7 +14,9 @@ const httpEndpoint = serverUrl.toString();
 const on401 = () => {
   if (window.location.pathname !== getRouterBasename() + '/login') {
     // The credentials aren't correct, remove the token and redirect to login
-    window.location.href = getRouterBasename() + '/login';
+    // Preserve the current URL with query parameters for OAuth flow
+    const currentUrl = encodeURIComponent(window.location.pathname + window.location.search);
+    window.location.href = getRouterBasename() + `/login?redirect_to=${currentUrl}`;
   }
 };
 

@@ -78,6 +78,8 @@ user_session_timeout = 1296000  # 15 days
 cache = false
 
 # Authorized origins
+# Can be overridden with CHAINLIT_ALLOW_ORIGINS environment variable
+# Example: CHAINLIT_ALLOW_ORIGINS="https://example.com,https://another.com"
 allow_origins = ["*"]
 
 [features]
@@ -518,6 +520,24 @@ def load_settings():
         toml_dict = tomli.load(f)
         # Load project settings
         project_config = toml_dict.get("project", {})
+
+                # Clean origins from config file too (consistent behavior)
+        if "allow_origins" in project_config:
+            project_config["allow_origins"] = [
+                origin.strip() for origin in project_config["allow_origins"] if origin.strip()
+            ]
+        
+        # Override allow_origins with environment variable if provided
+        # Expected format: comma-separated list of origins
+        # Example: CHAINLIT_ALLOW_ORIGINS="https://example.com,https://another.com"
+        if allow_origins_env := os.environ.get("CHAINLIT_ALLOW_ORIGINS"):
+            # Clean up origins: strip whitespace and filter empty ones
+            project_config["allow_origins"] = [
+                origin.strip() for origin in allow_origins_env.split(",") if origin.strip()
+            ]
+        
+
+        
         features_settings = toml_dict.get("features", {})
         ui_settings = toml_dict.get("UI", {})
         meta = toml_dict.get("meta")

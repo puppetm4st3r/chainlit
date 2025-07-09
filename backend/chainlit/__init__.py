@@ -103,6 +103,17 @@ def sleep(duration: int):
     return asyncio.sleep(duration)
 
 
+async def set_chat_profile(profile_name: str):
+    """
+    Programmatically set the active chat profile in the UI.
+    This allows the backend to control which chat profile is selected.
+    
+    Args:
+        profile_name (str): The name of the chat profile to select.
+    """
+    await context.emitter.set_chat_profile(profile_name)
+
+
 @dataclass()
 class CopilotFunction:
     name: str
@@ -192,6 +203,7 @@ __all__ = [
     "password_auth_callback",
     "run_sync",
     "send_window_message",
+    "set_chat_profile",
     "set_chat_profiles",
     "set_starters",
     "sleep",

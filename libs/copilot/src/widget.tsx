@@ -32,55 +32,6 @@ const Widget = ({ config, error }: Props) => {
     };
   }, []);
 
-  // Prevent background scroll when widget is open and hide background on mobile
-  useEffect(() => {
-    const injectMobileStyles = () => {
-      const styleId = 'chainlit-copilot-mobile-styles';
-      if (!document.getElementById(styleId)) {
-        const style = document.createElement('style');
-        style.id = styleId;
-        style.textContent = `
-          @media (max-width: 640px) {
-            body.copilot-open > *:not([data-radix-portal]):not(script):not(style):not(noscript):not(#chainlit-copilot) {
-              display: none !important;
-            }
-            
-            body.copilot-open {
-              overflow: hidden !important;
-              position: fixed !important;
-              width: 100% !important;
-              height: 100% !important;
-              top: 0 !important;
-              left: 0 !important;
-              margin: 0 !important;
-              padding: 0 !important;
-            }
-          }
-        `;
-        document.head.appendChild(style);
-      }
-    };
-
-    if (isOpen) {
-      // Disable scroll on body
-      document.body.style.overflow = 'hidden';
-      // Add class to body for additional styling
-      document.body.classList.add('copilot-open');
-      // Inject mobile styles to hide background
-      injectMobileStyles();
-    } else {
-      // Re-enable scroll on body
-      document.body.style.overflow = '';
-      document.body.classList.remove('copilot-open');
-    }
-
-    // Cleanup on unmount
-    return () => {
-      document.body.style.overflow = '';
-      document.body.classList.remove('copilot-open');
-    };
-  }, [isOpen]);
-
   const customClassName = config?.button?.className || '';
 
   return (
@@ -89,11 +40,8 @@ const Widget = ({ config, error }: Props) => {
         <Button
           id="chainlit-copilot-button"
           className={cn(
-            'fixed h-16 w-16 rounded-full bottom-8 right-8 z-copilot-button',
+            'fixed h-16 w-16 rounded-full bottom-8 right-8 z-[20]',
             'transition-transform duration-300 ease-in-out',
-            // Mobile: slightly larger and better positioned
-            'sm:h-16 sm:w-16 h-14 w-14',
-            'sm:bottom-8 sm:right-8 bottom-6 right-6',
             customClassName
           )}
         >
@@ -129,32 +77,17 @@ const Widget = ({ config, error }: Props) => {
         onInteractOutside={(e) => {
           e.preventDefault();
         }}
-        onWheel={(e) => {
-          // Prevent wheel events from bubbling to the document
-          e.stopPropagation();
-        }}
-        onTouchMove={(e) => {
-          // Prevent touch scroll events from bubbling
-          e.stopPropagation();
-        }}
         side="top"
         align="end"
         sideOffset={12}
-        alignOffset={0}
-        avoidCollisions={false}
         className={cn(
           'flex flex-col p-0',
           'transition-all duration-300 ease-in-out bg-background',
-          // Mobile: full screen
-          'sm:w-[min(400px,80vw)] w-full',
-          expanded && 'sm:w-[80vw] w-full',
-          // Mobile: full height
-          'sm:h-[min(730px,calc(100vh-150px))] h-screen',
-          // Mobile: no border radius, desktop: rounded
-          'sm:rounded-xl rounded-none',
-          'overflow-hidden',
+          expanded ? 'w-[80vw]' : 'w-[min(400px,80vw)]',
+          'h-[min(730px,calc(100vh-150px))]',
+          'overflow-hidden rounded-xl',
           'shadow-lg',
-          'z-copilot-popup',
+          'z-50',
           'animate-in fade-in-0 zoom-in-95',
           'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95',
           expanded
@@ -167,13 +100,9 @@ const Widget = ({ config, error }: Props) => {
             <Alert variant="error">{error}</Alert>
           ) : (
             <>
-              <Header 
-                expanded={expanded} 
-                setExpanded={setExpanded}
-                onClose={() => setIsOpen(false)}
-              />
+              <Header expanded={expanded} setExpanded={setExpanded} />
               <div className="flex flex-grow overflow-y-auto">
-                <ChatWrapper isOpen={isOpen} />
+                <ChatWrapper />
               </div>
             </>
           )}

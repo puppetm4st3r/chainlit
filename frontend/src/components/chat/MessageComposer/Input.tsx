@@ -99,12 +99,20 @@ const Input = forwardRef<InputMethods, Props>(
     const reset = () => {
       if (!selectedCommand?.persistent) {
         setSelectedCommand(undefined);
+        if (contentEditableRef.current) {
+          contentEditableRef.current.innerHTML = '';
+        }
+      }else if(contentEditableRef.current){
+        // if selectedCommand?.persistent is true , keep .command-span tag and clear content
+        const commandSpan = contentEditableRef.current.querySelector('.command-span');
+        if (commandSpan) {
+          contentEditableRef.current.innerHTML = commandSpan.outerHTML;
+          // Zero-width space
+          contentEditableRef.current.appendChild(document.createTextNode('\u200B'));
+        }
       }
       setSelectedIndex(0);
       setCommandInput('');
-      if (contentEditableRef.current) {
-        contentEditableRef.current.innerHTML = '';
-      }
       onChange('');
     };
 
@@ -112,28 +120,11 @@ const Input = forwardRef<InputMethods, Props>(
       reset
     }));
 
-    // Handle initial focus
-    useEffect(() => {
-      if (!contentEditableRef.current) return;
-
-      // Only focus if not copilot mobile
-      const isCopilot = !!window.cl_shadowRootElement;
-      const isMobile = window.innerWidth <= 640;
-      const shouldFocus = autoFocus && !(isCopilot && isMobile);
-      
-      if (shouldFocus) {
-        // Use requestAnimationFrame to ensure DOM is ready
-        requestAnimationFrame(() => {
-          if (contentEditableRef.current) {
-            contentEditableRef.current.focus();
-          }
-        });
-      }
-    }, [autoFocus]); // Depend on autoFocus prop
-
     // Set up mutation observer to detect command span removal
     useEffect(() => {
       if (!contentEditableRef.current) return;
+
+      contentEditableRef.current.focus();
 
       mutationObserverRef.current = new MutationObserver((mutations) => {
         if (isUpdatingRef.current) return;
@@ -260,10 +251,12 @@ const Input = forwardRef<InputMethods, Props>(
         const textData = event.clipboardData?.getData('text/plain');
         if (textData) {
           const escapedText = escapeHtml(textData);
-
-          const htmlToInsert = escapedText.replace(/\n/g, '<br>');
-
-          document.execCommand('insertHTML', false, htmlToInsert);
+          
+          // Remove trailing newlines to prevent extra line breaks
+          const trimmedText = escapedText.replace(/\n+$/, '');
+          
+          // Insert as plain text to avoid browser adding extra formatting
+          document.execCommand('insertText', false, trimmedText);
 
           textarea.focus();
 
@@ -357,6 +350,7 @@ const Input = forwardRef<InputMethods, Props>(
       <div className="relative w-full">
         <div
           id={id}
+          autoFocus={autoFocus}
           ref={contentEditableRef}
           contentEditable
           data-placeholder={placeholder}

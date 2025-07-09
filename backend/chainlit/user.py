@@ -32,7 +32,7 @@ class UserBase():
 # Used when logging-in a user
 @dataclass
 class User(UserBase, DataClassJsonMixin):
-    extra: Dict = Field(default_factory=dict)
+    extra: Dict = Field(default_factory=dict) # dict for extra token data (not persisted in user DAL)
 
 
 @dataclass

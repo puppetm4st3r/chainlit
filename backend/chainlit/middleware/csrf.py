@@ -53,11 +53,16 @@ class CSRFMiddleware(BaseHTTPMiddleware):
             return True
             
         # Protect sensitive API endpoints for POST/PUT/DELETE only
+        # Management frontend now sends CSRF headers automatically
+        # TODO: MANAGEMENTE FRONT mande los headers en request de API PARCIAL (FALTA LA API DE VALIDACI'ON DE AUTH AL PARECER)
+        # TODO instead of sensitive paths, use a list of endpoints for exclusions
         if request.method in ["POST", "PUT", "DELETE"]:
-            sensitive_paths = ['/project', '/user', '/auth']
+            sensitive_paths = ['/project', '/user', '/auth', '/automata']
             if any(path.startswith(sensitive_path) for sensitive_path in sensitive_paths):
                 return True
-        
+            else:
+                return False
+
         # Everything else - no protection (default)
         return False
     

@@ -193,12 +193,12 @@ export default function ScrollContainer({
   };
 
   return (
-    <div className="relative flex flex-col flex-grow overflow-y-auto">
-      <div
-        ref={ref}
-        className={cn('flex flex-col flex-grow overflow-y-auto', className)}
-        onScroll={handleScroll}
-      >
+    <div
+      ref={ref}
+      className="relative flex flex-col flex-grow overflow-y-auto"
+      onScroll={handleScroll}
+    >
+      <div className={cn('flex flex-col', className)}>
         {children}
         {/* Dynamic spacer to position the last user message at the top */}
         <div ref={spacerRef} className="flex-shrink-0" />

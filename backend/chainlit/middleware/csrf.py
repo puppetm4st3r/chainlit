@@ -48,6 +48,12 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         if request.method == "OPTIONS":
             return False
         
+        # TODO ALL Frontend Chainlit acitivity must be protected with CSRF
+        # Check ignore paths first - these are explicitly excluded from CSRF protection
+        ignore_paths = ['/project/file'] 
+        if any(path.startswith(ignore_path) for ignore_path in ignore_paths):
+            return False
+        
         # Protect WebSocket connections - always need protection
         if path.startswith('/ws/'):
             return True

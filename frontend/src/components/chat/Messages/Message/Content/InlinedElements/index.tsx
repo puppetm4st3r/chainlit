@@ -45,7 +45,7 @@ const InlinedElements = ({ elements, className }: Props) => {
   );
 
   return (
-    <div className={cn('flex flex-col gap-4', className)}>
+    <div className={cn('gap-4', className)}>
       {elementsByType.custom?.length ? (
         <InlinedCustomElementList items={elementsByType.custom} />
       ) : null}

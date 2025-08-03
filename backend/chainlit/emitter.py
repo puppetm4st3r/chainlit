@@ -344,8 +344,10 @@ class ChainlitEmitter(BaseChainlitEmitter):
                     ]
                     final_res = files
                     interaction = ",".join([file["name"] for file in files])
+                    
                     if get_data_layer():
-                        coros = [
+                        # Create File elements
+                        elements = [
                             File(
                                 id=file["id"],
                                 name=file["name"],
@@ -353,10 +355,62 @@ class ChainlitEmitter(BaseChainlitEmitter):
                                 mime=file["type"],
                                 chainlit_key=file["id"],
                                 for_id=step_dict["id"],
-                            )._create()
+                            )
                             for file in files
                         ]
-                        await asyncio.gather(*coros)
+                        
+                        # Send elements and construct URLs efficiently
+                        async def send_elements_with_urls():
+                            for element in elements:
+                                await element.send(for_id=step_dict["id"])
+                            
+                            # Execute flush to persist elements immediately
+                            await self.session.flush_method_queue()
+                            
+                            # Get data layer and storage provider for direct URL construction
+                            data_layer = get_data_layer()
+                            if data_layer and hasattr(data_layer, 'storage_provider') and data_layer.storage_provider:
+                                for element in elements:
+                                    try:
+                                        # Construct object_key directly (same pattern as in create_element)
+                                        user_id = "unknown"  # Default user_id as used in data_layer
+                                        if hasattr(data_layer, '_get_user_id_by_thread'):
+                                            try:
+                                                user_id = await data_layer._get_user_id_by_thread(element.thread_id) or "unknown"
+                                            except:
+                                                pass
+                                        
+                                        # Build object_key matching the pattern from create_element
+                                        object_key = f"{user_id}/{element.id}"
+                                        if element.name:
+                                            object_key += f"/{element.name}"
+                                        
+                                        # Get SAS token directly from storage provider
+                                        sas_token = await data_layer.storage_provider.get_read_url(object_key)
+                                        
+                                        # Construct base URL (matching the pattern from AzureBlobStorageClient)
+                                        storage_provider = data_layer.storage_provider
+                                        if hasattr(storage_provider, 'blob_endpoint') and storage_provider.blob_endpoint:
+                                            base_url = f"{storage_provider.blob_endpoint}/{storage_provider.container_name}/{object_key}"
+                                        elif hasattr(storage_provider, 'storage_account') and hasattr(storage_provider, 'container_name'):
+                                            base_url = f"https://{storage_provider.storage_account}.blob.core.windows.net/{storage_provider.container_name}/{object_key}"
+                                        else:
+                                            # Fallback - this should not happen with the custom data layer
+                                            logger.warning(f"Could not construct base URL for element {element.id}")
+                                            continue
+                                        
+                                        # Combine base URL with SAS token
+                                        complete_url = f"{base_url}?{sas_token}"
+                                        
+                                        # Update element URL and send to frontend
+                                        element.url = complete_url
+                                        await element.send(for_id=step_dict["id"])
+                                        logger.info(f"Updated element {element.id} with direct SAS token URL")
+                                        
+                                    except Exception as e:
+                                        logger.error(f"Failed to construct URL for element {element.id}: {e}")
+                        
+                        await send_elements_with_urls()
                 elif spec.type == "action":
                     action_res = cast(AskActionResponse, user_res)
                     final_res = action_res

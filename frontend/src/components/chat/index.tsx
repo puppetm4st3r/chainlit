@@ -41,25 +41,45 @@ const Chat = () => {
   const uploadFileRef = useRef(uploadFile);
   const navigate = useNavigate();
 
-  // Update file upload MIME types to use standard format following Mozilla's guidelines: @see https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input/file#unique_file_type_specifiers
-  // Instead of using '*/*' which may cause MIME type warnings, we specify exact MIME type categories:
-  // - 'application/*' - for general files
-  // - 'audio/*' - for audio files
-  // - 'image/*' - for image files
-  // - 'text/*' - for text files
-  // - 'video/*' - for video files
-  // This provides better type safety and clearer file type expectations.
+  // Use specific MIME types instead of wildcards for better browser compatibility
+  // react-dropzone requires specific MIME types, not wildcards like 'application/*'
   const fileSpec = useMemo(
     () => ({
       max_size_mb:
         config?.features?.spontaneous_file_upload?.max_size_mb || 500,
       max_files: config?.features?.spontaneous_file_upload?.max_files || 20,
       accept: config?.features?.spontaneous_file_upload?.accept || {
-        'application/*': [], // All application files
-        'audio/*': [], // All audio files
-        'image/*': [], // All image files
-        'text/*': [], // All text files
-        'video/*': [] // All video files
+        // Common document types
+        'application/pdf': ['.pdf'],
+        'application/msword': ['.doc'],
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+        'application/vnd.ms-excel': ['.xls'],
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+        'application/vnd.ms-powerpoint': ['.ppt'],
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation': ['.pptx'],
+        'application/json': ['.json'],
+        'application/zip': ['.zip'],
+        // Text types
+        'text/plain': ['.txt'],
+        'text/csv': ['.csv'],
+        'text/html': ['.html', '.htm'],
+        'text/css': ['.css'],
+        'text/javascript': ['.js'],
+        'text/markdown': ['.md'],
+        // Image types
+        'image/jpeg': ['.jpg', '.jpeg'],
+        'image/png': ['.png'],
+        'image/gif': ['.gif'],
+        'image/svg+xml': ['.svg'],
+        'image/webp': ['.webp'],
+        // Audio types
+        'audio/mpeg': ['.mp3'],
+        'audio/wav': ['.wav'],
+        'audio/ogg': ['.ogg'],
+        // Video types
+        'video/mp4': ['.mp4'],
+        'video/webm': ['.webm'],
+        'video/quicktime': ['.mov']
       }
     }),
     [config]

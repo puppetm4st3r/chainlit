@@ -43,7 +43,28 @@ const Messages = memo(
     const messageContext = useContext(MessageContext);
     return (
       <>
-        {messages.map((m) => {
+        {messages.map((m, index) => {
+          // Get previous message for grouping logic
+          const previousMessage = index > 0 ? messages[index - 1] : null;
+          const getMessageAuthor = (message: IStep) => 
+            message.metadata?.avatarName || message.name;
+          
+          // Determine if current or previous message is a step
+          const isCurrentStep = !m.type.includes('message');
+          const isPreviousStep = previousMessage && !previousMessage.type.includes('message');
+          
+          // Group consecutive messages from same author, but never group steps
+          const shouldGroup = Boolean(
+            previousMessage &&
+            !isCurrentStep &&
+            !isPreviousStep &&
+            !CL_RUN_NAMES.includes(m.name) &&
+            !CL_RUN_NAMES.includes(previousMessage.name) &&
+            getMessageAuthor(m) === getMessageAuthor(previousMessage)
+          );
+
+
+
           // Handle chainlit runs
           if (CL_RUN_NAMES.includes(m.name)) {
             const isRunning = !m.end && !m.isError && messageContext.loading;
@@ -105,6 +126,7 @@ const Messages = memo(
                 isRunning={isRunning}
                 scorableRun={_scorableRun}
                 isScorable={isScorable}
+                shouldGroup={shouldGroup}
               />
             );
           }

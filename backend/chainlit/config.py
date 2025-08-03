@@ -110,7 +110,17 @@ edit_message = true
     # 3. For specific file extensions:
     #    accept = {{ "application/octet-stream" = [".xyz", ".pdb"] }}
     # Note: Using "*/*" is not recommended as it may cause browser warnings
-    accept = ["*/*"]
+    # Use specific MIME types for better browser compatibility with react-dropzone
+    accept = [
+        "application/pdf",
+        "application/msword", 
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "text/plain",
+        "text/csv", 
+        "image/jpeg",
+        "image/png",
+        "image/gif"
+    ]
     max_files = 20
     max_size_mb = 500
 

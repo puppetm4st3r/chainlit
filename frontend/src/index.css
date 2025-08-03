@@ -16,7 +16,7 @@ code {
 
 @layer base {
   :root {
-    --font-sans: 'Inter', sans-serif;
+    --font-sans: 'Play', sans-serif;
     --font-mono: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
       monospace;
     --background: 0 0% 100%;

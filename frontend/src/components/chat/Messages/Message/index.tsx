@@ -27,6 +27,7 @@ interface Props {
   isRunning?: boolean;
   isScorable?: boolean;
   scorableRun?: IStep;
+  shouldGroup?: boolean;
 }
 
 const Message = memo(
@@ -37,12 +38,15 @@ const Message = memo(
     isRunning,
     indent,
     isScorable,
-    scorableRun
+    scorableRun,
+    shouldGroup = false
   }: Props) => {
     const { allowHtml, cot, latex, onError } = useContext(MessageContext);
     const layoutMaxWidth = useLayoutMaxWidth();
     const isUserMessage = message.type === 'user_message';
     const isStep = !message.type.includes('message');
+
+
     // Only keep tool calls if Chain of Thought is tool_call
     const toolCallSkip =
       isStep && cot === 'tool_call' && message.type !== 'tool';
@@ -69,7 +73,7 @@ const Message = memo(
 
     return (
       <>
-        <div data-step-type={message.type} className="step py-2">
+        <div data-step-type={message.type} className={cn("step", shouldGroup ? "py-1" : "py-2")}>
           <div
             className="flex flex-col"
             style={{
@@ -77,7 +81,7 @@ const Message = memo(
             }}
           >
             <div
-              className={cn('flex flex-grow pb-2')}
+              className={cn('flex flex-grow', shouldGroup ? 'pb-2' : 'pb-2')}
               id={`step-${message.id}`}
             >
               {/* User message is displayed differently */}
@@ -94,12 +98,15 @@ const Message = memo(
                 </div>
               ) : (
                 <div className="ai-message flex gap-4 w-full">
-                  {!isStep || !indent ? (
+                  {shouldGroup ? (
+                    <div className="shrink-0" style={{ width: '48px', height: '0' }} />
+                  ) : (
                     <MessageAvatar
                       author={message.metadata?.avatarName || message.name}
                       isError={message.isError}
+                      isStep={isStep}
                     />
-                  ) : null}
+                  )}
                   {/* Display the step and its children */}
                   {isStep ? (
                     <Step step={message} isRunning={isRunning}>

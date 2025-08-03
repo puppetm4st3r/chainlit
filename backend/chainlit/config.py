@@ -80,6 +80,8 @@ user_session_timeout = 1296000  # 15 days
 cache = false
 
 # Authorized origins
+# Can be overridden with CHAINLIT_ALLOW_ORIGINS environment variable
+# Example: CHAINLIT_ALLOW_ORIGINS="https://example.com,https://another.com"
 allow_origins = ["*"]
 
 [features]
@@ -114,7 +116,17 @@ reaction_on_message_received = false
     # 3. For specific file extensions:
     #    accept = {{ "application/octet-stream" = [".xyz", ".pdb"] }}
     # Note: Using "*/*" is not recommended as it may cause browser warnings
-    accept = ["*/*"]
+    # Use specific MIME types for better browser compatibility with react-dropzone
+    accept = [
+        "application/pdf",
+        "application/msword", 
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "text/plain",
+        "text/csv", 
+        "image/jpeg",
+        "image/png",
+        "image/gif"
+    ]
     max_files = 20
     max_size_mb = 500
 
@@ -541,6 +553,24 @@ def load_settings():
         toml_dict = tomli.load(f)
         # Load project settings
         project_config = toml_dict.get("project", {})
+
+                # Clean origins from config file too (consistent behavior)
+        if "allow_origins" in project_config:
+            project_config["allow_origins"] = [
+                origin.strip() for origin in project_config["allow_origins"] if origin.strip()
+            ]
+        
+        # Override allow_origins with environment variable if provided
+        # Expected format: comma-separated list of origins
+        # Example: CHAINLIT_ALLOW_ORIGINS="https://example.com,https://another.com"
+        if allow_origins_env := os.environ.get("CHAINLIT_ALLOW_ORIGINS"):
+            # Clean up origins: strip whitespace and filter empty ones
+            project_config["allow_origins"] = [
+                origin.strip() for origin in allow_origins_env.split(",") if origin.strip()
+            ]
+        
+
+        
         features_settings = toml_dict.get("features", {})
         ui_settings = toml_dict.get("UI", {})
         meta = toml_dict.get("meta")

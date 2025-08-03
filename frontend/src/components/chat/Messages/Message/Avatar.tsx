@@ -21,9 +21,10 @@ interface Props {
   author?: string;
   hide?: boolean;
   isError?: boolean;
+  isStep?: boolean;
 }
 
-const MessageAvatar = ({ author, hide, isError }: Props) => {
+const MessageAvatar = ({ author, hide, isError, isStep }: Props) => {
   const apiClient = useContext(ChainlitContext);
   const { chatProfile } = useChatSession();
   const { config } = useConfig();
@@ -33,14 +34,17 @@ const MessageAvatar = ({ author, hide, isError }: Props) => {
   }, [config, chatProfile]);
 
   const avatarUrl = useMemo(() => {
-    if (config?.ui?.default_avatar_file_url)
-      return config?.ui?.default_avatar_file_url;
+    // If it's a step, use the gear avatar that exists in backend/public/avatars/
+    if (isStep) {
+      return apiClient?.buildEndpoint('/avatars/gear') || '/avatars/gear';
+    }
+    if (config?.ui?.default_avatar_file_url) return config?.ui?.default_avatar_file_url;
     const isAssistant = !author || author === config?.ui.name;
     if (isAssistant && selectedChatProfile?.icon) {
       return selectedChatProfile.icon;
     }
     return apiClient?.buildEndpoint(`/avatars/${author || 'default'}`);
-  }, [apiClient, selectedChatProfile, config, author]);
+  }, [apiClient, selectedChatProfile, config, author, isStep]);
 
   if (isError) {
     return (

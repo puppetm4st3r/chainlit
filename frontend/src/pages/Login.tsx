@@ -21,6 +21,9 @@ export default function Login() {
   const navigate = useNavigate();
   const { variant } = useTheme();
   const isDarkMode = variant === 'dark';
+  
+  // Get the original redirect URL from query parameters
+  const redirectTo = query.get('redirect_to');
 
   const handleCookieAuth = (json: any): void => {
     if (json?.success != true) throw LoginError;
@@ -97,7 +100,12 @@ export default function Login() {
                 config?.passwordAuth ? handlePasswordLogin : undefined
               }
               onOAuthSignIn={async (provider: string) => {
-                window.location.href = apiClient.getOAuthEndpoint(provider);
+                let oauthUrl = apiClient.getOAuthEndpoint(provider);
+                // Include redirect_to parameter if present
+                if (redirectTo) {
+                  oauthUrl += `?redirect_to=${encodeURIComponent(redirectTo)}`;
+                }
+                window.location.href = oauthUrl;
               }}
             />
           </div>

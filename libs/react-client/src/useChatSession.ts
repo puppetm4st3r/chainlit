@@ -114,10 +114,21 @@ const useChatSession = () => {
         console.error(`Failed to set sticky session cookie: ${err}`);
       }
 
+      // Add CSRF headers when protections are active
+      const extraHeaders: Record<string, string> = {};
+      extraHeaders['X-Requested-With'] = 'XMLHttpRequest';
+      
+      // Add origin validation
+      const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+      if (currentOrigin) {
+        extraHeaders['X-Client-Origin'] = currentOrigin;
+      }
+
       const socket = io(uri, {
         path,
         withCredentials: true,
         transports,
+        extraHeaders,
         auth: {
           clientType: client.type,
           sessionId,
@@ -345,6 +356,10 @@ const useChatSession = () => {
 
       socket.on('set_commands', (commands: ICommand[]) => {
         setCommands(commands);
+      });
+
+      socket.on('set_chat_profile', (profileName: string) => {
+        setChatProfile(profileName);
       });
 
       socket.on('set_sidebar_title', (title: string) => {

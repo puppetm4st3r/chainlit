@@ -10,7 +10,7 @@ import urllib.parse
 import webbrowser
 from contextlib import AsyncExitStack, asynccontextmanager
 from pathlib import Path
-from typing import List, Optional, Union, cast
+from typing import List, Optional, Union, cast, Any
 
 import socketio
 from fastapi import (
@@ -34,12 +34,16 @@ from typing_extensions import Annotated
 from watchfiles import awatch
 
 from chainlit.auth import create_jwt, decode_jwt, get_configuration, get_current_user
+from chainlit.middleware.csrf import CSRFMiddleware
 from chainlit.auth.cookie import (
     clear_auth_cookie,
     clear_oauth_state_cookie,
     set_auth_cookie,
     set_oauth_state_cookie,
     validate_oauth_state_cookie,
+    _get_cookie_domain,
+    _cookie_samesite,
+    _cookie_secure,
 )
 from chainlit.config import (
     APP_ROOT,
@@ -73,6 +77,8 @@ from chainlit.types import (
 from chainlit.user import PersistedUser, User
 
 from ._utils import is_path_inside
+import json
+import base64
 
 mimetypes.add_type("application/javascript", ".js")
 mimetypes.add_type("text/css", ".css")
@@ -202,12 +208,42 @@ copilot_build_dir = get_build_dir(os.path.join("libs", "copilot"), "copilot")
 
 app = FastAPI(lifespan=lifespan)
 
-sio = socketio.AsyncServer(cors_allowed_origins=[], async_mode="asgi")
+# Validate CORS origins configuration for FastAPI middleware
+if not config.project.allow_origins:
+    logger.error("CRITICAL: No CORS origins configured (allow_origins is empty)")
+    raise ValueError("allow_origins cannot be empty")
+
+# Validate origins format (already cleaned in config.py)
+for origin in config.project.allow_origins:
+    if origin == "*":
+        logger.warning("CORS configured with wildcard (*) - only use in development")
+        continue
+        
+    # Validate format
+    if not origin.startswith(('http://', 'https://')):
+        logger.error(f"Invalid origin format: '{origin}' (must start with http:// or https://)")
+        raise ValueError(f"Invalid origin format: '{origin}'")
+
+try:
+    # Disable Socket.IO CORS since FastAPI CORSMiddleware handles it
+    # This prevents duplicate CORS headers
+    sio = socketio.AsyncServer(
+        cors_allowed_origins=[], 
+        async_mode="asgi",
+        logger=False,
+        engineio_logger=False
+    )
+except Exception as e:
+    logger.error(f"CRITICAL: Failed to create Socket.IO server: {e}")
+    raise RuntimeError(f"Socket.IO server configuration failed: {e}") from e
 
 asgi_app = socketio.ASGIApp(socketio_server=sio, socketio_path="")
 
 # config.run.root_path is only set when started with --root-path. Not on submounts.
-app.mount(f"{config.run.root_path}/ws/socket.io", asgi_app)
+socket_mount_path = f"{config.run.root_path}/ws/socket.io"
+app.mount(socket_mount_path, asgi_app)
+
+logger.info(f"CORS allowed origins: {config.project.allow_origins}")
 
 app.add_middleware(
     CORSMiddleware,
@@ -218,6 +254,9 @@ app.add_middleware(
 )
 
 app.add_middleware(GZipMiddleware)
+
+# Add CSRF protection middleware for copilot widget
+app.add_middleware(CSRFMiddleware)
 
 # config.run.root_path is only set when started with --root-path. Not on submounts.
 router = APIRouter(prefix=config.run.root_path)
@@ -427,7 +466,7 @@ def _get_response_dict(access_token: str) -> dict:
     return {"success": True}
 
 
-def _get_auth_response(access_token: str, redirect_to_callback: bool) -> Response:
+def _get_auth_response(access_token: str, redirect_to_callback: bool, original_redirect_to: Optional[str] = None) -> Response:
     """Get the redirect params for the OAuth callback."""
 
     response_dict = _get_response_dict(access_token)
@@ -435,6 +474,11 @@ def _get_auth_response(access_token: str, redirect_to_callback: bool) -> Respons
     if redirect_to_callback:
         root_path = os.environ.get("CHAINLIT_ROOT_PATH", "")
         root_path = "" if root_path == "/" else root_path
+        
+        # Include the original redirect URL if present
+        if original_redirect_to:
+            response_dict["redirect_to"] = original_redirect_to
+        
         redirect_url = (
             f"{root_path}/login/callback?{urllib.parse.urlencode(response_dict)}"
         )
@@ -459,9 +503,7 @@ def _get_oauth_redirect_error(request: Request, error: str) -> Response:
     return response
 
 
-async def _authenticate_user(
-    request: Request, user: Optional[User], redirect_to_callback: bool = False
-) -> Response:
+async def _authenticate_user(request: Request, user: Optional[User], redirect_to_callback: bool = False, original_redirect_to: Optional[str] = None) -> Response:
     """Authenticate a user and return the response."""
 
     if not user:
@@ -470,18 +512,17 @@ async def _authenticate_user(
             detail="credentialssignin",
         )
 
-    # If a data layer is defined, attempt to persist user.
+    """# If a data layer is defined, attempt to persist user.
     if data_layer := get_data_layer():
         try:
             await data_layer.create_user(user)
         except Exception as e:
             # Catch and log exceptions during user creation.
             # TODO: Make this catch only specific errors and allow others to propagate.
-            logger.error(f"Error creating user: {e}")
+            logger.error(f"Error creating user: {e}")"""
 
     access_token = create_jwt(user)
-
-    response = _get_auth_response(access_token, redirect_to_callback)
+    response = _get_auth_response(access_token, redirect_to_callback, original_redirect_to)
 
     set_auth_cookie(request, response, access_token)
 
@@ -510,7 +551,7 @@ async def login(
 
 
 @router.post("/logout")
-async def logout(request: Request, response: Response):
+async def logout(request: Request, response: Response) -> Any | dict[str, bool]:
     """Logout the user by calling the on_logout callback."""
     clear_auth_cookie(request, response)
 
@@ -544,7 +585,11 @@ async def jwt_auth(request: Request):
 
     try:
         user = decode_jwt(token)
-        return await _authenticate_user(request, user)
+        # this method must be used only in DEXA Navigator mode
+        if not user.extra.get("navigator"):
+            raise HTTPException(status_code=401, detail="Invalid token (DEXA Navigator mode only)")
+        response = await _authenticate_user(request, user)
+        return response
     except InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
@@ -564,7 +609,7 @@ async def header_auth(request: Request):
 
 
 @router.get("/auth/oauth/{provider_id}")
-async def oauth_login(provider_id: str, request: Request):
+async def oauth_login(provider_id: str, request: Request, redirect_to: Optional[str] = None):
     """Redirect the user to the oauth provider login page."""
     if config.code.oauth_callback is None:
         raise HTTPException(
@@ -580,12 +625,22 @@ async def oauth_login(provider_id: str, request: Request):
         )
 
     random = random_secret(32)
+    
+    # Include redirect_to in the state to preserve it through OAuth flow
+    state_data = {"random": random}
+    if redirect_to:
+        state_data["redirect_to"] = redirect_to
+    
+    # Encode the state as JSON and then base64 to preserve structure
+    import json
+    import base64
+    state_encoded = base64.urlsafe_b64encode(json.dumps(state_data).encode()).decode()
 
     params = urllib.parse.urlencode(
         {
             "client_id": provider.client_id,
             "redirect_uri": f"{get_user_facing_url(request.url)}/callback",
-            "state": random,
+            "state": state_encoded,
             **provider.authorize_params,
         }
     )
@@ -604,7 +659,7 @@ async def oauth_callback(
     request: Request,
     error: Optional[str] = None,
     code: Optional[str] = None,
-    state: Optional[str] = None,
+    state: Optional[str] = None
 ):
     """Handle the oauth callback and login the user."""
 
@@ -630,8 +685,18 @@ async def oauth_callback(
             detail="Missing code or state",
         )
 
+    # Decode the state to extract random and redirect_to
     try:
-        validate_oauth_state_cookie(request, state)
+        state_data = json.loads(base64.urlsafe_b64decode(state.encode()).decode())
+        random_value = state_data.get("random")
+        redirect_to = state_data.get("redirect_to")
+    except Exception:
+        # Fallback for old-style state (just the random string)
+        random_value = state
+        redirect_to = None
+
+    try:
+        validate_oauth_state_cookie(request, random_value)
     except Exception as e:
         logger.exception("Unable to validate oauth state: %1", e)
 
@@ -649,7 +714,7 @@ async def oauth_callback(
         provider_id, token, raw_user_data, default_user
     )
 
-    response = await _authenticate_user(request, user, redirect_to_callback=True)
+    response = await _authenticate_user(request, user, redirect_to_callback=True, original_redirect_to=redirect_to)
 
     clear_oauth_state_cookie(response)
 
@@ -725,14 +790,16 @@ async def set_session_cookie(request: Request, response: Response):
     session_id = body.get("session_id")
 
     is_local = request.client and request.client.host in ["127.0.0.1", "localhost"]
+    cookie_domain = _get_cookie_domain()
 
     response.set_cookie(
         key="X-Chainlit-Session-id",
         value=session_id,
         path="/",
         httponly=True,
-        secure=not is_local,
-        samesite="lax" if is_local else "none",
+        secure=_cookie_secure if not is_local else False,
+        samesite=_cookie_samesite,
+        domain=cookie_domain,
     )
 
     return {"message": "Session cookie set"}

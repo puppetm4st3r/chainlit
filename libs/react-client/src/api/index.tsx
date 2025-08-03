@@ -129,6 +129,16 @@ export class APIBase {
         body = data ? JSON.stringify(data) : null;
       }
 
+      // Add CSRF protection headers when protections are active
+      // These headers are always added to ensure compatibility when CSRF is enabled
+      headers['X-Requested-With'] = 'XMLHttpRequest';
+      
+      // Add origin validation
+      const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+      if (currentOrigin) {
+        headers['X-Client-Origin'] = currentOrigin;
+      }
+
       const res = await fetch(this.buildEndpoint(path), {
         method,
         credentials: 'include',
@@ -139,6 +149,22 @@ export class APIBase {
 
       if (!res.ok) {
         const detail = await this.getDetailFromErrorResponse(res);
+
+        // Log CSRF-related errors without exposing sensitive data
+        if (res.status === 403) {
+          const errorInfo = {
+            method,
+            path,
+            status: res.status,
+            statusText: res.statusText,
+            origin: typeof window !== 'undefined' ? window.location.origin : 'unknown',
+            hasCustomHeader: !!headers['X-Requested-With'],
+            hasClientOrigin: !!headers['X-Client-Origin'],
+            userAgent: typeof navigator !== 'undefined' ? navigator.userAgent.substring(0, 100) : 'unknown'
+          };
+          
+          console.warn('CSRF protection failed:', errorInfo);
+        }
 
         throw new ClientError(res.statusText, res.status, detail);
       }

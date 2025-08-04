@@ -589,7 +589,7 @@ class AskElementMessage(AskMessageBase):
 
         step_dict = await self._create()
 
-        await self.element.send(for_id=str(step_dict["id"]))
+        await self.element.send(for_id=str(step_dict["id"]), persist=False)
 
         spec = AskElementSpec(
             type="element",

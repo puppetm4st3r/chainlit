@@ -111,7 +111,7 @@
         "settings": {
             "title": "Panneau des paramètres"
         },
-        "watermark": "Construit avec"
+        "watermark": "Les LLM peuvent faire des erreurs. Vérifiez les informations importantes."
     },
     "threadHistory": {
         "sidebar": {

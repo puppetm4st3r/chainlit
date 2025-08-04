@@ -29,13 +29,13 @@ const Attachment: React.FC<AttachmentProps> = ({ name, mime, children }) => {
     <TooltipProvider delayDuration={100}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <div className="relative h-[58px]">
+          <div className="relative h-[70px]">
             {children}
             <Card className="h-full p-2 flex flex-row items-center gap-3 rounded-lg w-full max-w-[200px] border">
               <div className="w-10">
                 <FileIcon {...defaultStyles[extension]} extension={extension} />
               </div>
-              <span className="truncate w-[80%] font-medium text-sm font-medium">
+              <span className="w-[80%] text-xs font-medium line-clamp-2 leading-tight">
                 {name}
               </span>
             </Card>

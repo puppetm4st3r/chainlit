@@ -8,8 +8,10 @@ import {
 } from '@chainlit/react-client';
 
 import BlinkingCursor from '@/components/BlinkingCursor';
+import { useLayoutMaxWidth } from 'hooks/useLayoutMaxWidth';
 
 import { Message } from './Message';
+import { MessageAvatar } from './Message/Avatar';
 
 interface Props {
   messages: IStep[];
@@ -44,6 +46,7 @@ const hasAssistantMessage = (step: IStep): boolean => {
 const Messages = memo(
   ({ messages, elements, actions, indent, isRunning, scorableRun }: Props) => {
     const messageContext = useContext(MessageContext);
+    const layoutMaxWidth = useLayoutMaxWidth();
     return (
       <>
         {messages.map((m, index) => {
@@ -81,6 +84,9 @@ const Messages = memo(
             const showHiddenCoTLoader = isHiddenCoT
               ? isRunning && !hasAssistantMessage(m)
               : false;
+
+            // Show avatar for any COT that is running, regardless of steps
+            const showCoTAvatar = isRunning && (isToolCallCoT || isHiddenCoT);
             // Ignore on_chat_start for scorable run
             const scorableRun =
               !isRunning && m.name !== 'on_chat_start' ? m : undefined;
@@ -96,9 +102,29 @@ const Messages = memo(
                     scorableRun={scorableRun}
                   />
                 ) : null}
-                {(showToolCoTLoader || showHiddenCoTLoader) &&
-                m.name !== 'on_chat_start' ? (
-                  <BlinkingCursor />
+                {showCoTAvatar && m.name !== 'on_chat_start' && !m.steps?.length ? (
+                  <div className="step py-2">
+                    <div className="flex flex-col" style={{ maxWidth: layoutMaxWidth }}>
+                      <div className="flex flex-grow pb-2">
+                        <div className="ai-message flex gap-4 w-full">
+                          <MessageAvatar
+                            author={m.metadata?.avatarName || m.name}
+                            isError={m.isError}
+                            isStep={true}
+                          />
+                          <div className="flex flex-col flex-grow w-0">
+                            {(showToolCoTLoader || showHiddenCoTLoader) ? (
+                              <BlinkingCursor />
+                            ) : (
+                              <p className="flex items-center gap-1 font-medium loading-shimmer">
+                                Usando {m.name}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 ) : null}
               </React.Fragment>
             );

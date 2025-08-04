@@ -29,7 +29,7 @@ export default function Step({
   const isError = step.isError;
   const stepName = step.name;
 
-  // If there's no content, just render the status without accordion
+  // If there's no content, render just the status text without accordion
   if (!hasContent) {
     return (
       <div className="flex flex-col flex-grow w-0">

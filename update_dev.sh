@@ -60,9 +60,21 @@ if [[ $DEV_AHEAD -eq 0 && $DEV_BEHIND -eq 0 ]]; then
 fi
 
 if [[ $DEV_AHEAD -eq 0 && $DEV_BEHIND -gt 0 ]]; then
-    echo -e "${GREEN}🎯 Situación ideal: Fast-forward posible${NC}"
-    echo -e "${GREEN}dev puede actualizarse limpiamente con main${NC}"
-    STRATEGY="fast-forward"
+    echo -e "${GREEN}🎯 Situación ideal: dev puede actualizarse limpiamente${NC}"
+    echo -e "${CYAN}📊 dev está $DEV_BEHIND commits atrás de main${NC}"
+    echo ""
+    echo -e "${YELLOW}🤔 ¿Cómo prefieres actualizar dev?${NC}"
+    echo -e "${CYAN}1) Fast-forward (conservar toda la historia de commits)${NC}"
+    echo -e "${CYAN}2) Squash (UN SOLO commit limpio con todos los cambios)${NC}"
+    echo -e "${CYAN}3) Cancelar${NC}"
+    read -p "Selecciona (1-3): " ff_choice
+    
+    case $ff_choice in
+        1) STRATEGY="fast-forward" ;;
+        2) STRATEGY="squash" ;;
+        3) echo -e "${YELLOW}❌ Operación cancelada${NC}"; exit 0 ;;
+        *) echo -e "${YELLOW}Opción inválida, usando fast-forward por defecto${NC}"; STRATEGY="fast-forward" ;;
+    esac
 elif [[ $DEV_AHEAD -gt 0 && $DEV_BEHIND -gt 0 ]]; then
     echo -e "${YELLOW}⚠️  Situación compleja: dev tiene commits nuevos${NC}"
     echo -e "${PURPLE}📋 Commits en dev que no están en main:${NC}"
@@ -74,15 +86,17 @@ elif [[ $DEV_AHEAD -gt 0 && $DEV_BEHIND -gt 0 ]]; then
     echo -e "${YELLOW}🤔 ¿Qué estrategia prefieres?${NC}"
     echo -e "${CYAN}1) Fast-forward (PERDER commits nuevos de dev)${NC}"
     echo -e "${CYAN}2) Merge (conservar commits + crear merge commit)${NC}"
-    echo -e "${CYAN}3) Rebase (reescribir commits sobre main)${NC}"
-    echo -e "${CYAN}4) Cancelar y revisar manualmente${NC}"
-    read -p "Selecciona (1-4): " choice
+    echo -e "${CYAN}3) Squash (UN SOLO commit limpio con todos los cambios)${NC}"
+    echo -e "${CYAN}4) Rebase (reescribir commits sobre main)${NC}"
+    echo -e "${CYAN}5) Cancelar y revisar manualmente${NC}"
+    read -p "Selecciona (1-5): " choice
     
     case $choice in
         1) STRATEGY="reset" ;;
         2) STRATEGY="merge" ;;
-        3) STRATEGY="rebase" ;;
-        4) echo -e "${YELLOW}❌ Operación cancelada${NC}"; exit 0 ;;
+        3) STRATEGY="squash" ;;
+        4) STRATEGY="rebase" ;;
+        5) echo -e "${YELLOW}❌ Operación cancelada${NC}"; exit 0 ;;
         *) echo -e "${RED}❌ Opción inválida${NC}"; exit 1 ;;
     esac
 else
@@ -142,6 +156,63 @@ case $STRATEGY in
                 find . -name "*.orig" -delete 2>/dev/null || true
                 git commit --no-edit
                 echo -e "${GREEN}✅ Conflictos resueltos y merge completado${NC}"
+                SUCCESS=true
+            else
+                echo -e "${RED}❌ Error resolviendo conflictos${NC}"
+                SUCCESS=false
+            fi
+        fi
+        ;;
+        
+    "squash")
+        echo -e "${BLUE}🔄 Haciendo squash merge de main en dev...${NC}"
+        
+        # Squash merge no hace commit automático
+        if git merge main --squash; then
+            echo -e "${GREEN}✅ Squash merge exitoso${NC}"
+            
+            # Contar cambios
+            CHANGED_FILES=$(git diff --staged --name-only | wc -l)
+            INSERTIONS=$(git diff --staged --shortstat | grep -o '[0-9]\+ insertion' | grep -o '[0-9]\+' || echo "0")
+            DELETIONS=$(git diff --staged --shortstat | grep -o '[0-9]\+ deletion' | grep -o '[0-9]\+' || echo "0")
+            
+            echo -e "${CYAN}📊 Cambios preparados: $CHANGED_FILES archivos, +$INSERTIONS/-$DELETIONS líneas${NC}"
+            echo -e "${YELLOW}💬 Ingresa mensaje para el commit squash:${NC}"
+            read -r commit_message
+            
+            if [[ -n "$commit_message" ]]; then
+                git commit -m "$commit_message"
+                echo -e "${GREEN}✅ Commit squash creado exitosamente${NC}"
+                SUCCESS=true
+            else
+                echo -e "${YELLOW}❌ Mensaje vacío, usando mensaje por defecto${NC}"
+                git commit -m "Sync with main: $CHANGED_FILES files updated"
+                echo -e "${GREEN}✅ Commit squash creado con mensaje por defecto${NC}"
+                SUCCESS=true
+            fi
+        else
+            echo -e "${RED}🚨 Conflictos detectados en el squash merge${NC}"
+            echo -e "${YELLOW}🔧 Abriendo Meld para resolver conflictos...${NC}"
+            
+            # Configurar merge tool
+            git config merge.tool meld 2>/dev/null || true
+            
+            if git mergetool; then
+                # Limpiar archivos .orig
+                find . -name "*.orig" -delete 2>/dev/null || true
+                
+                # Después de resolver conflictos, hacer el commit squash
+                CHANGED_FILES=$(git diff --staged --name-only | wc -l)
+                echo -e "${YELLOW}💬 Ingresa mensaje para el commit squash:${NC}"
+                read -r commit_message
+                
+                if [[ -n "$commit_message" ]]; then
+                    git commit -m "$commit_message"
+                else
+                    git commit -m "Sync with main: $CHANGED_FILES files updated (conflicts resolved)"
+                fi
+                
+                echo -e "${GREEN}✅ Conflictos resueltos y commit squash creado${NC}"
                 SUCCESS=true
             else
                 echo -e "${RED}❌ Error resolviendo conflictos${NC}"

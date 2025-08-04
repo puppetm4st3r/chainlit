@@ -77,11 +77,14 @@ export default function UserMessage({
         )}
         <div
           className={cn(
-            'px-5 py-2.5 relative bg-accent rounded-3xl',
+            'px-5 py-2.5 relative bg-accent dark:bg-card rounded-2xl border',
             inlineElements.length ? 'rounded-tr-lg' : '',
             isEditing ? 'w-full flex-grow' : 'max-w-[70%] flex-grow-0',
             editable ? '' : 'ml-auto'
           )}
+          style={{
+            borderColor: 'hsl(var(--accent-border))'
+          }}
         >
           {isEditing ? (
             <div className="bg-accent flex flex-col">

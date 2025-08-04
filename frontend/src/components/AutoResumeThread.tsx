@@ -1,10 +1,11 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useRecoilState } from 'recoil';
+import { useRecoilState, useRecoilValue } from 'recoil';
 import { toast } from 'sonner';
 
 import {
   resumeThreadErrorState,
+  threadHistoryState,
   useChatInteract,
   useChatSession,
   useConfig
@@ -19,18 +20,29 @@ export default function AutoResumeThread({ id }: Props) {
   const { config } = useConfig();
   const { clear, setIdToResume } = useChatInteract();
   const { session, idToResume } = useChatSession();
+  const threadHistory = useRecoilValue(threadHistoryState);
   const [resumeThreadError, setResumeThreadError] = useRecoilState(
     resumeThreadErrorState
   );
 
   useEffect(() => {
     if (!config?.threadResumable) return;
+    
+    // Check if thread exists in history before attempting to resume
+    const threadExists = threadHistory?.threads?.some(t => t.id === id);
+    
+    if (!threadExists && threadHistory?.threads) {
+      // Thread doesn't exist (likely deleted), redirect to home
+      navigate('/');
+      return;
+    }
+    
     clear();
     setIdToResume(id);
     if (!config?.dataPersistence) {
       navigate('/');
     }
-  }, [config?.threadResumable, id]);
+  }, [config?.threadResumable, id, threadHistory]);
 
   useEffect(() => {
     if (id !== idToResume) {

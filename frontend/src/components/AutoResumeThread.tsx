@@ -29,9 +29,8 @@ export default function AutoResumeThread({ id }: Props) {
     if (!config?.threadResumable) return;
     
     // Check if thread exists in history before attempting to resume
-    const threadExists = threadHistory?.threads?.some(t => t.id === id);
-    
-    if (!threadExists && threadHistory?.threads) {
+    // Only redirect away if we have loaded threads and this thread is not among them
+    if (threadHistory?.threads && !threadHistory.threads.some(t => t.id === id)) {
       // Thread doesn't exist (likely deleted), redirect to home
       navigate('/');
       return;

@@ -15,6 +15,7 @@ import { ChainlitContext, type IMessageElement } from '@chainlit/react-client';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { Card } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   Table,
   TableBody,
@@ -140,10 +141,66 @@ const Markdown = ({
         pre({ children, ...props }: any) {
           return <CodeSnippet {...props} />;
         },
-        a({ children, ...props }) {
+        a({ children, href, ...props }) {
           const name = children as string;
-          const element = refElements?.find((e) => e.name === name);
+          // Try match by name; if href looks like #link:KEY, try to match by chainlitKey
+          let element = refElements?.find((e) => e.name === name);
+          if (!element && typeof href === 'string' && href.startsWith('#link:')) {
+            const key = href.replace('#link:', '');
+            element = refElements?.find((e: any) => e.type === 'link' && e.chainlitKey === key);
+          }
           if (element) {
+            if ((element as any).type === 'link') {
+              const anyEl = element as any;
+              const href = anyEl.url || (anyEl as any).props?.url || '#';
+              const title = (anyEl as any).props?.tooltip || name;
+              const showIcon = (anyEl as any).props?.show_icon === true;
+              const contentNode = showIcon ? (
+                <span
+                  className="chainlink inline-flex items-center justify-center rounded-full bg-primary/20 dark:bg-primary/30 text-primary align-middle leading-none"
+                  style={{ width: 18, height: 18, verticalAlign: 'middle' }}
+                >
+                  {/* Lucide link icon, rotated ~25deg */}
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.1"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="h-3.5 w-3.5 block"
+                    style={{ transform: 'rotate(30deg)' }}
+                  >
+                    {/* Lucide "link-2" simplified */}
+                    <path d="M15 7h3a5 5 0 0 1 5 5v0a5 5 0 0 1-5 5h-3" />
+                    <path d="M9 17H6a5 5 0 0 1-5-5v0a5 5 0 0 1 5-5h3" />
+                    <path d="M8 12h8" />
+                  </svg>
+                </span>
+              ) : (
+                <span className="chainlink text-primary hover:underline">{children}</span>
+              );
+
+              return (
+                <TooltipProvider>
+                  <Tooltip delayDuration={150}>
+                    <TooltipTrigger asChild>
+                      <a
+                        href={href}
+                        aria-label={title}
+                        className=""
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {contentNode}
+                      </a>
+                    </TooltipTrigger>
+                    <TooltipContent>{title}</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              );
+            }
             return <ElementRef element={element} />;
           } else {
             return (

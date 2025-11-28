@@ -142,6 +142,7 @@ export function ThreadList({
       threadIdToDelete === currentThreadId
     ) {
       clear();
+      await new Promise((resolve) => setTimeout(resolve, 300));
     }
 
     toast.promise(apiClient.deleteThread(threadIdToDelete), {

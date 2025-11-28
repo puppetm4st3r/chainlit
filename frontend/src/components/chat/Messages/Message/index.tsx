@@ -47,6 +47,7 @@ const Message = memo(
   }: Props) => {
     const { allowHtml, cot, latex, onError } = useContext(MessageContext);
     const layoutMaxWidth = useLayoutMaxWidth();
+    const contentRef = useRef<HTMLDivElement>(null);
     const isUserMessage = message.type === 'user_message';
     const isStep = !message.type.includes('message');
 

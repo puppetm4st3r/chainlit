@@ -15,6 +15,7 @@ from chainlit.step import StepDict
 from chainlit.types import (
     AskActionResponse,
     AskElementResponse,
+    AskFileSpec,
     AskSpec,
     CommandDict,
     FileDict,
@@ -312,8 +313,11 @@ class ChainlitEmitter(BaseChainlitEmitter):
         self, step_dict: StepDict, spec: AskSpec, raise_on_timeout=False
     ):
         """Send a prompt to the UI and wait for a response."""
-
+        parent_id = str(step_dict["parentId"])
         try:
+            if spec.type == "file":
+                self.session.files_spec[parent_id] = cast(AskFileSpec, spec)
+
             # Send the prompt to the UI
             user_res = await self.emit_call(
                 "ask", {"msg": step_dict, "spec": spec.to_dict()}, spec.timeout
@@ -431,6 +435,8 @@ class ChainlitEmitter(BaseChainlitEmitter):
             if raise_on_timeout:
                 raise e
         finally:
+            if parent_id in self.session.files_spec:
+                del self.session.files_spec[parent_id]
             await self.task_start()
 
     async def send_call_fn(

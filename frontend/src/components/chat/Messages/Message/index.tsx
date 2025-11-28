@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils';
 import { MessageContext } from 'contexts/MessageContext';
-import { memo, useContext } from 'react';
+import { memo, useContext, useRef } from 'react';
 
 import {
   type IAction,
@@ -43,6 +43,7 @@ const Message = memo(
   }: Props) => {
     const { allowHtml, cot, latex, onError } = useContext(MessageContext);
     const layoutMaxWidth = useLayoutMaxWidth();
+    const contentRef = useRef<HTMLDivElement>(null);
     const isUserMessage = message.type === 'user_message';
     const isStep = !message.type.includes('message');
 
@@ -54,6 +55,8 @@ const Message = memo(
     const hiddenSkip = isStep && cot === 'hidden';
 
     const skip = toolCallSkip || hiddenSkip;
+    const showInputSection = Boolean(message.input && message.showInput);
+    const shouldRenderOutput = !showInputSection || Boolean(message.output);
 
     if (skip) {
       if (!message.steps) {
@@ -110,6 +113,15 @@ const Message = memo(
                   {/* Display the step and its children */}
                   {isStep ? (
                     <Step step={message} isRunning={isRunning}>
+                      {showInputSection ? (
+                        <MessageContent
+                          elements={elements}
+                          message={message}
+                          allowHtml={allowHtml}
+                          latex={latex}
+                          sections={['input']}
+                        />
+                      ) : null}
                       {message.steps ? (
                         <Messages
                           messages={message.steps.filter(
@@ -121,18 +133,27 @@ const Message = memo(
                           isRunning={isRunning}
                         />
                       ) : null}
-                      <MessageContent
-                        elements={elements}
+                      {shouldRenderOutput ? (
+                        <MessageContent
+                          ref={contentRef}
+                          elements={elements}
+                          message={message}
+                          allowHtml={allowHtml}
+                          latex={latex}
+                          sections={showInputSection ? ['output'] : undefined}
+                        />
+                      ) : null}
+                      <MessageButtons
                         message={message}
-                        allowHtml={allowHtml}
-                        latex={latex}
+                        actions={actions}
+                        contentRef={contentRef}
                       />
-                      <MessageButtons message={message} actions={actions} />
                     </Step>
                   ) : (
                     // Display an assistant message
                     <div className="flex flex-col items-start min-w-[150px] flex-grow gap-2">
                       <MessageContent
+                        ref={contentRef}
                         elements={elements}
                         message={message}
                         allowHtml={allowHtml}
@@ -151,6 +172,7 @@ const Message = memo(
                         run={
                           scorableRun && isScorable ? scorableRun : undefined
                         }
+                        contentRef={contentRef}
                       />
                     </div>
                   )}

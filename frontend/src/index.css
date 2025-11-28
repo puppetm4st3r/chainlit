@@ -131,3 +131,50 @@ code {
   background-repeat: no-repeat;
   background-size: 50% 200%;
 }
+
+/* Custom scrollbar styles for command lists */
+@layer utilities {
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--muted-foreground) / 0.3);
+    border-radius: 2px;
+  }
+
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+  }
+}
+
+/* Task highlight animation */
+
+
+.task-highlight {
+  animation: task-highlight-blink 0.6s linear 0s 2;
+  background-color: hsl(var(--background));
+}
+
+@keyframes task-highlight-blink {
+  0% {
+    background-color: hsl(var(--foreground));
+  }
+  25% {
+    background-color: hsl(var(--foreground));
+  }
+  50% {
+    background-color: transparent;
+  }
+  75% {
+    background-color: hsl(var(--foreground));
+  }
+  100% {
+    background-color: transparent;
+  }
+}

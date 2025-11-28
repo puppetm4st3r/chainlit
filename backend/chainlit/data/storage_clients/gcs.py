@@ -83,6 +83,7 @@ class GCSStorageClient(BaseStorageClient):
         data: Union[bytes, str],
         mime: str = "application/octet-stream",
         overwrite: bool = True,
+        content_disposition: str | None = None,
     ) -> Dict[str, Any]:
         return await make_async(self.sync_upload_file)(
             object_key, data, mime, overwrite
@@ -98,3 +99,6 @@ class GCSStorageClient(BaseStorageClient):
 
     async def delete_file(self, object_key: str) -> bool:
         return await make_async(self.sync_delete_file)(object_key)
+
+    async def close(self) -> None:
+        self.client.close()

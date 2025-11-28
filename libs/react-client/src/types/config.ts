@@ -9,6 +9,7 @@ export interface ChatProfile {
   default: boolean;
   icon?: string;
   name: string;
+  display_name?: string;
   markdown_description: string;
   starters?: IStarter[];
 }
@@ -32,7 +33,6 @@ export interface IChainlitConfig {
   ui: {
     name: string;
     description?: string;
-    font_family?: string;
     default_theme?: 'light' | 'dark';
     layout?: 'default' | 'wide';
     default_sidebar_state?: 'open' | 'closed';
@@ -53,6 +53,7 @@ export interface IChainlitConfig {
       display_name: string;
       icon_url: string;
       url: string;
+      target?: '_blank' | '_self' | '_parent' | '_top';
     }[];
   };
   features: {
@@ -82,8 +83,10 @@ export interface IChainlitConfig {
   };
   debugUrl?: string;
   userEnv: string[];
+  maskUserEnv?: boolean;
   dataPersistence: boolean;
   threadResumable: boolean;
+  threadSharing?: boolean;
   chatProfiles: ChatProfile[];
   starters?: IStarter[];
   translation: object;

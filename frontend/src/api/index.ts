@@ -25,9 +25,25 @@ const onError = (error: ClientError) => {
 };
 
 class ExtendedChainlitAPI extends ChainlitAPI {
-  connectStreamableHttpMCP(sessionId: string, name: string, url: string) {
+  async shareThread(
+    threadId: string,
+    isShared: boolean
+  ): Promise<{ success: boolean }> {
+    const res = await this.put(`/project/thread/share`, {
+      threadId,
+      isShared
+    });
+    return res.json();
+  }
+
+  connectStreamableHttpMCP(
+    sessionId: string,
+    name: string,
+    url: string,
+    headers?: Record<string, string>
+  ) {
     // Assumes the backend expects { clientType, name, url }
-    return fetch(`${this.httpEndpoint}mcp`, {
+    return fetch(new URL("mcp", this.httpEndpoint.endsWith("/") ? this.httpEndpoint : `${this.httpEndpoint}/`), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -37,7 +53,8 @@ class ExtendedChainlitAPI extends ChainlitAPI {
         clientType: 'streamable-http',
         name,
         url,
-        sessionId
+        sessionId,
+        ...(headers ? { headers } : {})
       })
     }).then(async (res) => {
       const data = await res.json();

@@ -15,6 +15,7 @@ class BaseStorageClient(ABC):
         data: Union[bytes, str],
         mime: str = "application/octet-stream",
         overwrite: bool = True,
+        content_disposition: str | None = None,
     ) -> Dict[str, Any]:
         pass
 
@@ -24,4 +25,8 @@ class BaseStorageClient(ABC):
 
     @abstractmethod
     async def get_read_url(self, object_key: str) -> str:
+        pass
+
+    @abstractmethod
+    async def close(self) -> None:
         pass

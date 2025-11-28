@@ -1,7 +1,4 @@
-import asyncio
-import atexit
 import json
-import signal
 import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
@@ -26,7 +23,14 @@ from chainlit.types import (
 )
 from chainlit.user import PersistedUser, User
 
+# Import for runtime usage (isinstance checks)
+try:
+    from chainlit.data.storage_clients.gcs import GCSStorageClient
+except ImportError:
+    GCSStorageClient = None  # type: ignore[assignment,misc]
+
 if TYPE_CHECKING:
+    from chainlit.data.storage_clients.gcs import GCSStorageClient
     from chainlit.element import Element, ElementDict
     from chainlit.step import StepDict
 
@@ -44,11 +48,6 @@ class ChainlitDataLayer(BaseDataLayer):
         self.pool: Optional[asyncpg.Pool] = None
         self.storage_client = storage_client
         self.show_logger = show_logger
-
-        # Register cleanup handlers for application termination
-        atexit.register(self._sync_cleanup)
-        for sig in (signal.SIGINT, signal.SIGTERM):
-            signal.signal(sig, self._signal_handler)
 
     async def connect(self):
         if not self.pool:
@@ -79,14 +78,13 @@ class ChainlitDataLayer(BaseDataLayer):
             asyncpg.exceptions.InterfaceError,
         ) as e:
             # Handle connection issues by cleaning up and rethrowing
-            logger.error(f"Connection error: {e!s}, cleaning up pool")
+            logger.error(f"Connection error: {e!s}")
             await self.cleanup()
-            self.pool = None
             raise
 
     async def get_user(self, identifier: str) -> Optional[PersistedUser]:
         query = """
-        SELECT * FROM "User" 
+        SELECT * FROM "User"
         WHERE identifier = $1
         """
         result = await self.execute_query(query, {"identifier": identifier})
@@ -155,12 +153,6 @@ class ChainlitDataLayer(BaseDataLayer):
 
     @queue_until_user_message()
     async def create_element(self, element: "Element"):
-        if not self.storage_client:
-            logger.warning(
-                "Data Layer: create_element error. No cloud storage configured!"
-            )
-            return
-
         if not element.for_id:
             return
 
@@ -183,29 +175,51 @@ class ChainlitDataLayer(BaseDataLayer):
                         "end_time": await self.get_current_timestamp(),
                     }
                 )
-        content: Optional[Union[bytes, str]] = None
 
-        if element.path:
-            async with aiofiles.open(element.path, "rb") as f:
-                content = await f.read()
-        elif element.content:
-            content = element.content
-        elif not element.url:
-            raise ValueError("Element url, path or content must be provided")
+        # Handle file uploads only if storage_client is configured
+        path = None
+        if self.storage_client:
+            content: Optional[Union[bytes, str]] = None
 
-        if element.thread_id:
-            path = f"threads/{element.thread_id}/files/{element.id}"
+            if element.path:
+                async with aiofiles.open(element.path, "rb") as f:
+                    content = await f.read()
+            elif element.content:
+                content = element.content
+            elif not element.url:
+                raise ValueError("Element url, path or content must be provided")
+
+            if content is not None:
+                if element.thread_id:
+                    path = f"threads/{element.thread_id}/files/{element.id}"
+                else:
+                    path = f"files/{element.id}"
+
+                content_disposition = (
+                    f'attachment; filename="{element.name}"'
+                    if not (
+                        GCSStorageClient is not None
+                        and isinstance(self.storage_client, GCSStorageClient)
+                    )
+                    else None
+                )
+                await self.storage_client.upload_file(
+                    object_key=path,
+                    data=content,
+                    mime=element.mime or "application/octet-stream",
+                    overwrite=True,
+                    content_disposition=content_disposition,
+                )
+
         else:
-            path = f"files/{element.id}"
+            # Log warning only if element has file content that needs uploading
+            if element.path or element.url or element.content:
+                logger.warning(
+                    "Data Layer: No storage client configured. "
+                    "File will not be uploaded."
+                )
 
-        if content is not None:
-            await self.storage_client.upload_file(
-                object_key=path,
-                data=content,
-                mime=element.mime or "application/octet-stream",
-                overwrite=True,
-            )
-
+        # Always persist element metadata to database
         query = """
         INSERT INTO "Element" (
             id, "threadId", "stepId", metadata, mime, name, "objectKey", url,
@@ -292,7 +306,7 @@ class ChainlitDataLayer(BaseDataLayer):
                     object_key=elements[0]["objectKey"]
                 )
         query = """
-        DELETE FROM "Element" 
+        DELETE FROM "Element"
         WHERE id = $1
         """
         params = {"id": element_id}
@@ -338,15 +352,15 @@ class ChainlitDataLayer(BaseDataLayer):
         ON CONFLICT (id) DO UPDATE SET
             "parentId" = COALESCE(EXCLUDED."parentId", "Step"."parentId"),
             input = COALESCE(EXCLUDED.input, "Step".input),
-            metadata = CASE 
-                WHEN EXCLUDED.metadata <> '{}' THEN EXCLUDED.metadata 
-                ELSE "Step".metadata 
+            metadata = CASE
+                WHEN EXCLUDED.metadata <> '{}' THEN EXCLUDED.metadata
+                ELSE "Step".metadata
             END,
             name = COALESCE(EXCLUDED.name, "Step".name),
             output = COALESCE(EXCLUDED.output, "Step".output),
-            type = CASE 
-                WHEN EXCLUDED.type = 'run' THEN "Step".type 
-                ELSE EXCLUDED.type 
+            type = CASE
+                WHEN EXCLUDED.type = 'run' THEN "Step".type
+                ELSE EXCLUDED.type
             END,
             "threadId" = COALESCE(EXCLUDED."threadId", "Step"."threadId"),
             "endTime" = COALESCE(EXCLUDED."endTime", "Step"."endTime"),
@@ -396,7 +410,7 @@ class ChainlitDataLayer(BaseDataLayer):
 
     async def get_thread_author(self, thread_id: str) -> str:
         query = """
-        SELECT u.identifier 
+        SELECT u.identifier
         FROM "Thread" t
         JOIN "User" u ON t."userId" = u.id
         WHERE t.id = $1
@@ -408,7 +422,7 @@ class ChainlitDataLayer(BaseDataLayer):
 
     async def delete_thread(self, thread_id: str):
         elements_query = """
-        SELECT * FROM "Element" 
+        SELECT * FROM "Element"
         WHERE "threadId" = $1
         """
         elements_results = await self.execute_query(
@@ -428,8 +442,8 @@ class ChainlitDataLayer(BaseDataLayer):
         self, pagination: Pagination, filters: ThreadFilter
     ) -> PaginatedResponse[ThreadDict]:
         query = """
-        SELECT 
-            t.*, 
+        SELECT
+            t.*,
             u.identifier as user_identifier,
             (SELECT COUNT(*) FROM "Thread" WHERE "userId" = t."userId") as total
         FROM "Thread" t
@@ -450,11 +464,11 @@ class ChainlitDataLayer(BaseDataLayer):
             param_count += 1
 
         if pagination.cursor:
-            query += f' AND t."createdAt" < (SELECT "createdAt" FROM "Thread" WHERE id = ${param_count})'
+            query += f' AND t."updatedAt" < (SELECT "updatedAt" FROM "Thread" WHERE id = ${param_count})'
             params["cursor"] = pagination.cursor
             param_count += 1
 
-        query += f' ORDER BY t."createdAt" DESC LIMIT ${param_count}'
+        query += f' ORDER BY t."updatedAt" DESC LIMIT ${param_count}'
         params["limit"] = pagination.first + 1
 
         results = await self.execute_query(query, params)
@@ -468,7 +482,7 @@ class ChainlitDataLayer(BaseDataLayer):
         for thread in threads:
             thread_dict = ThreadDict(
                 id=str(thread["id"]),
-                createdAt=thread["createdAt"].isoformat(),
+                createdAt=thread["updatedAt"].isoformat(),
                 name=thread["name"],
                 userId=str(thread["userId"]) if thread["userId"] else None,
                 userIdentifier=thread["user_identifier"],
@@ -504,9 +518,9 @@ class ChainlitDataLayer(BaseDataLayer):
 
         # Get steps and related feedback
         steps_query = """
-        SELECT  s.*, 
-                f.id feedback_id, 
-                f.value feedback_value, 
+        SELECT  s.*,
+                f.id feedback_id,
+                f.value feedback_value,
                 f."comment" feedback_comment
         FROM "Step" s left join "Feedback" f on s.id = f."stepId"
         WHERE s."threadId" = $1
@@ -516,7 +530,7 @@ class ChainlitDataLayer(BaseDataLayer):
 
         # Get elements
         elements_query = """
-        SELECT * FROM "Element" 
+        SELECT * FROM "Element"
         WHERE "threadId" = $1
         """
         elements_results = await self.execute_query(
@@ -561,12 +575,34 @@ class ChainlitDataLayer(BaseDataLayer):
             else (metadata.get("name") if metadata and "name" in metadata else None)
         )
 
+        # Merge incoming metadata with existing metadata, deleting incoming keys with None values
+        if metadata is not None:
+            existing = await self.execute_query(
+                'SELECT "metadata" FROM "Thread" WHERE id = $1',
+                {"thread_id": thread_id},
+            )
+            base = {}
+            if isinstance(existing, list) and existing:
+                raw = existing[0].get("metadata") or {}
+                if isinstance(raw, str):
+                    try:
+                        base = json.loads(raw)
+                    except json.JSONDecodeError:
+                        base = {}
+                elif isinstance(raw, dict):
+                    base = raw
+            to_delete = {k for k, v in metadata.items() if v is None}
+            incoming = {k: v for k, v in metadata.items() if v is not None}
+            base = {k: v for k, v in base.items() if k not in to_delete}
+            metadata = {**base, **incoming}
+
         data = {
             "id": thread_id,
             "name": thread_name,
             "userId": user_id,
             "tags": tags,
             "metadata": json.dumps(metadata or {}),
+            "updatedAt": datetime.now(),
         }
 
         # Remove None values
@@ -650,29 +686,14 @@ class ChainlitDataLayer(BaseDataLayer):
     async def cleanup(self):
         """Cleanup database connections"""
         if self.pool:
+            logger.debug("Cleaning up connection pool")
             await self.pool.close()
+            self.pool = None
 
-    def _sync_cleanup(self):
-        """Cleanup database connections in a synchronous context."""
-        if self.pool and not self.pool.is_closing():
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                loop.create_task(self.cleanup())
-            else:
-                try:
-                    cleanup_loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(cleanup_loop)
-                    cleanup_loop.run_until_complete(self.cleanup())
-                    cleanup_loop.close()
-                except Exception as e:
-                    logger.error(f"Error during sync cleanup: {e}")
-
-    def _signal_handler(self, sig, frame):
-        """Handle signals for graceful shutdown."""
-        logger.info(f"Received signal {sig}, cleaning up connection pool.")
-        self._sync_cleanup()
-        # Re-raise the signal after cleanup
-        signal.default_int_handler(sig, frame)
+    async def close(self) -> None:
+        if self.storage_client:
+            await self.storage_client.close()
+        await self.cleanup()
 
 
 def truncate(text: Optional[str], max_length: int = 255) -> Optional[str]:

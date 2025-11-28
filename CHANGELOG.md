@@ -4,6 +4,196 @@ All notable changes to Chainlit will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [2.9.2] - 2025-11-22
+
+### Added
+- Add tests for socket, chat context, cache, translations & oauth providers
+
+### Fixed
+- Fix copilot breaking change introduced in 2.8.5
+
+## [2.9.1] - 2025-11-20
+
+### Added
+- Add support for tabs in chat settings
+- Support markdown in watermark
+- Add italian translation to translations folder
+- Add query param prefill for chat
+- Add tests for utils, markdown, sidebar, chat settings, mcp, input widget, langchain, elements, steps, and actions
+
+
+## [2.9.0] - 2025-11-06
+
+### Added
+- Add better support for Multi-Agent implementations
+  - Nested steps are now step.input -> child step -> step.output
+  - Improved formatting and styling of Tasklist
+
+
+## [2.8.5] - 2025-11-07
+
+### Added
+- Add display_name to ChatProfile
+- Add slack reaction event callback
+- Add raw response from OAuth providers
+
+### Fixed
+- Security vulnerability in Chainlint: added missed ACL check for session initialization
+
+### Changed
+- Remove FastAPI version restrictions
+
+## [2.8.4] - 2025-10-29
+
+### Added
+- Add support for GitHub Enterprise OAuth provider
+- Explicit disable on input widgets
+
+
+### Fixed
+- Tasklist tasks are now properly reconnected to their steps/messages
+- ci: fix pnpm publish checks
+- fix: missing / in url with base path when connecting Streamable HTTP MCP
+- fix - persist custom_elements to data layer without cloud storage
+- fix: propagate IME composition events in AutoResizeTextarea
+- fix: confirm when enter
+- Fix(translation): correct French translation of chat watermark 
+- fix(ui): add fallback logo if custom logo is missing
+
+## [2.8.3] - 2025-10-06
+
+### Added
+- Support for the `target` attribute in header links, which can be configured through the configuration options
+
+### Changed
+- `@chainlit/react-client` automatic publishing
+
+## [2.8.2] - 2025-10-01
+
+### Changed
+- Remove autofocus in mobile message composer
+- Improve error handling in sqlalchemy data layer `get_read_url()`
+
+### Fixed
+- Fix voice hotkey (P) triggering when typing in chat input
+- Properly finalize data layers
+- Fix `on_chat_start` not always firing
+
+## [2.8.1] - 2025-09-24
+
+### Added
+- Add German and Korean translations
+- Add support for custom_meta_url in config.toml
+
+### Changed
+- `cl.on_thread_share_view` will allow shared thread viewing if it returns `True` to enable custom/admin viewing.
+
+### Fixed
+- Removed redundant message sending in Slack when images are present.
+- Generate signed url when loading elements using SQLAlchemy data layer.
+
+## [2.8.0] - 2025-09-12
+
+### Added
+- Add ability to share threads. See documentation for how to enable it.
+  - https://docs.chainlit.io/api-reference/lifecycle-hooks/on-shared-thread-view
+- Add new chat settings: multi-select, radio-group, and checkbox
+- Add optional language parameter to set_starters
+- Add neutral Spanish translation
+- Allow sending commands from custom elements
+
+### Changed
+- Reordered message composer elements
+
+### Fixed
+- Default to plaintext code blocks for unsupported languages like CSV
+- Sort threads by updated_at field
+- Replace hardcoded strings with translation keys
+- GCP storage provider dependency is now optional
+- CI/CD fixes
+- Fixed issues with hot-reloading in dev mode (`-w` flag)
+- Take overridden config into account in audio handlers
+
+## [2.7.2] - 2025-08-26
+
+### Added
+- Added LiteralAI data layer deprecation warning
+- Added context to `@cl.on_feedback` callback
+- Added Traditional Chinese (Taiwan) translations
+- Added configurable user_env persistence to database
+  - New `persist_user_env` and `mask_user_env` field in `config.toml`
+- Added new command translations to all languages
+- Added CODEOWNERS
+
+### Fixed
+- Improved dynamic config overrides for chat profiles
+- Import GCSStorageClient only when needed to avoid requiring optional dependencies
+- Updated CONTRIBUTING.md for `uv` usage
+
+## [2.7.1.1] - 2025-08-21
+
+- Fix publishing to include frontend and copilot folders
+
+## [2.7.1] - 2025-08-20
+
+- Fix publishing to work with uv
+
+## [2.7.0] - 2025-08-20
+
+### Added
+- New ChatGPT-style command selection and improve message input handling
+- Added the ability to override certain config.toml settings for Chat Profiles, so some profiles can have MCP and some can't for example. [Documentation Updated](https://docs.chainlit.io/api-reference/chat-profiles#dynamic-configuration).
+  - You must now explicity enable audio and MCP as these are no longer inferred by the presence of `on_audio_start` or `on_mcp_connect` callbacks
+  - Delete your `config.toml`, run `chainlit init`, and update your settings
+- Added copilot setup instructions for GitHub Copilot SWE Agent
+- Added Slack socket mode support
+- AskFileButton can now upload file with proper checking and it's own limits
+- Added content-disposition metadata to azure blob uploads to persist download file name
+- Migrated from poetry to uv
+
+### Fixed
+- Changed thread sorting to use updated time instead of creation time
+- Add missing headers when connecting Streamable HTTP MCP
+- Remove undocumented `CHAINLIT_CUSTOM_AUTH` environment variable used in Copilot
+
+## [2.6.9] - 2025-08-14
+
+### Added
+- Add GitHub Copilot instructions for automated PRs
+- (Slack) Add threadId for user feedback
+- (Copilot) Add new optional opened property has been added to the widget config
+
+### Fixed
+- Fix blinking cursor indicator
+- (Copilot) Rename copilot inner div id `chainlit-copilot` to `chainlit-copilot-chat` due to naming conflict with the outer div
+- Disable gzip for websocket-relaed http endpoint (Safari compatibility)
+- Prevent constant refresh on the login screen when using custom authenication
+- Fix MCP type hints
+
+## [2.6.8] - 2025-08-08
+
+### Other
+
+- Reverted PR with newline preservation in messages due to incorrect rendering in child components like lists
+
+## [2.6.7] - 2025-08-07
+
+### Fixed
+- Formatting when pasting HTML code and newlines in received messages
+
+## [2.6.6] - 2025-08-05
+
+### Added
+- Add support for emoji reaction on message received in Slack
+- Add Greek translation
+- Copy both plain text and rich text to clipboard, if available (rich text pasting to editors like Word)
+- Rename `CHAINLIT_COOKIE_PATH` to `CHAINLIT_AUTH_COOKIE_PATH` and now espect CHAINLIT_ROOT_PATH
+- Add language parameter to Copilot widget configuration
+
+### Fixed
+- Prevent HTML code in user message to be rendered as HTML instead of displaying as code
+- Properly parse `user_env` when `config.project.user_env` is empty
+
 ## [2.6.5] - 2025-08-02
 
 ### Fixed

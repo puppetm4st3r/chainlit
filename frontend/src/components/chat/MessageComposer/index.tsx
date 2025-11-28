@@ -1,5 +1,10 @@
-import { MutableRefObject, useCallback, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import {
+  MutableRefObject,
+  useCallback,
+  useEffect,
+  useRef,
+  useState
+} from 'react';
 import { useRecoilState, useSetRecoilState } from 'recoil';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -13,6 +18,10 @@ import {
 
 import { Settings } from '@/components/icons/Settings';
 import { Button } from '@/components/ui/button';
+import { useTranslation } from 'components/i18n/Translator';
+
+import { useQuery } from '@/hooks/query';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 import { chatSettingsOpenState } from '@/state/project';
 import {
@@ -58,21 +67,36 @@ export default function MessageComposer({
 
   const disabled = _disabled || !!attachments.find((a) => !a.uploaded);
 
-  const onPaste = useCallback((event: ClipboardEvent) => {
-    if (event.clipboardData && event.clipboardData.items) {
-      const items = Array.from(event.clipboardData.items);
+  const isMobile = useIsMobile();
 
-      // If no text data, check for files (e.g., images)
-      items.forEach((item) => {
-        if (item.kind === 'file') {
-          const file = item.getAsFile();
-          if (file) {
-            onFileUpload([file]);
+  let promptValue = '';
+  try {
+    const query = useQuery();
+    promptValue = query.get('prompt') || '';
+  } catch {
+    console.warn('Could not parse query parameters');
+  }
+
+  const [promptUsed, setPromptUsed] = useState(false);
+
+  const onPaste = useCallback(
+    (event: ClipboardEvent) => {
+      if (event.clipboardData && event.clipboardData.items) {
+        const items = Array.from(event.clipboardData.items);
+
+        // If no text data, check for files (e.g., images)
+        items.forEach((item) => {
+          if (item.kind === 'file') {
+            const file = item.getAsFile();
+            if (file) {
+              onFileUpload([file]);
+            }
           }
-        }
-      });
-    }
-  }, []);
+        });
+      }
+    },
+    [onFileUpload]
+  );
 
   const onSubmit = useCallback(
     async (
@@ -100,7 +124,7 @@ export default function MessageComposer({
       }
       sendMessage(message, fileReferences);
     },
-    [user, sendMessage]
+    [user, sendMessage, autoScrollRef]
   );
 
   const onReply = useCallback(
@@ -120,33 +144,50 @@ export default function MessageComposer({
         autoScrollRef.current = true;
       }
     },
-    [user, replyMessage]
+    [user, replyMessage, autoScrollRef]
   );
 
   const submit = useCallback(() => {
     if (
       disabled ||
-      (value === '' && attachments.length === 0 && !selectedCommand)
+      (value.trim() === '' && attachments.length === 0 && !selectedCommand)
     ) {
       return;
     }
+
     if (askUser) {
       onReply(value);
     } else {
       onSubmit(value, attachments, selectedCommand?.id);
     }
+
     setAttachments([]);
+    setValue(''); // Clear the value state
     inputRef.current?.reset();
   }, [
     value,
     disabled,
-    setValue,
     askUser,
     attachments,
     selectedCommand,
     setAttachments,
-    onSubmit
+    onSubmit,
+    onReply
   ]);
+
+  useEffect(() => {
+    if (inputRef.current && promptValue && !promptUsed) {
+      const prompt = promptValue;
+      if (prompt) {
+        if (prompt.length > 1000) {
+          inputRef.current?.setValueExtern(prompt.slice(0, 1000));
+        } else {
+          inputRef.current?.setValueExtern(prompt);
+        }
+        setPromptUsed(true);
+      }
+    }
+  }, [promptValue, promptUsed]);
 
   return (
     <div
@@ -161,7 +202,7 @@ export default function MessageComposer({
       <Input
         ref={inputRef}
         id="chat-input"
-        autoFocus
+        autoFocus={!isMobile}
         selectedCommand={selectedCommand}
         setSelectedCommand={setSelectedCommand}
         onChange={setValue}
@@ -171,22 +212,19 @@ export default function MessageComposer({
       />
       <div className="flex items-center justify-between">
         <div className="flex items-center -ml-1.5">
+          <VoiceButton disabled={disabled} />
           <UploadButton
             disabled={disabled}
             fileSpec={fileSpec}
             onFileUploadError={onFileUploadError}
             onFileUpload={onFileUpload}
           />
-          <CommandButton
-            disabled={disabled}
-            onCommandSelect={setSelectedCommand}
-          />
           {chatSettingsInputs.length > 0 && (
             <Button
               id="chat-settings-open-modal"
               disabled={disabled}
               onClick={() => setChatSettingsOpen(true)}
-              className="hover:bg-muted"
+              className="hover:bg-muted rounded-full"
               variant="ghost"
               size="icon"
             >
@@ -194,7 +232,11 @@ export default function MessageComposer({
             </Button>
           )}
           <McpButton disabled={disabled} />
-          <VoiceButton disabled={disabled} />
+          <CommandButton
+            disabled={disabled}
+            selectedCommandId={selectedCommand?.id}
+            onCommandSelect={setSelectedCommand}
+          />
           <CommandButtons
             disabled={disabled}
             selectedCommandId={selectedCommand?.id}
@@ -204,7 +246,10 @@ export default function MessageComposer({
         <div className="flex items-center gap-1">
           <SubmitButton
             onSubmit={submit}
-            disabled={disabled || (!value.trim() && !selectedCommand)}
+            disabled={
+              disabled ||
+              (!value.trim() && !selectedCommand && attachments.length === 0)
+            }
           />
         </div>
       </div>

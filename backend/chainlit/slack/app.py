@@ -7,6 +7,7 @@ from typing import Dict, List, Optional, Union
 
 import httpx
 from slack_bolt.adapter.fastapi.async_handler import AsyncSlackRequestHandler
+from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
 from slack_bolt.async_app import AsyncApp
 
 from chainlit.config import config
@@ -125,6 +126,16 @@ slack_app = AsyncApp(
 )
 
 
+async def start_socket_mode():
+    """
+    Initializes and starts the Slack app in Socket Mode asynchronously.
+
+    Uses the SLACK_WEBSOCKET_TOKEN from environment variables to authenticate.
+    """
+    handler = AsyncSocketModeHandler(slack_app, os.environ.get("SLACK_WEBSOCKET_TOKEN"))
+    await handler.start_async()
+
+
 def init_slack_context(
     session: HTTPSession,
     slack_channel_id: str,
@@ -156,6 +167,26 @@ slack_app_handler = AsyncSlackRequestHandler(slack_app)
 users_by_slack_id: Dict[str, Union[User, PersistedUser]] = {}
 
 USER_PREFIX = "slack_"
+
+
+bot_user_id: Optional[str] = None
+
+
+async def get_bot_user_id() -> Optional[str]:
+    """Get and cache the bot's user ID."""
+    global bot_user_id
+    if bot_user_id:
+        return bot_user_id
+
+    try:
+        result = await slack_app.client.auth_test()
+        if result.get("ok"):
+            bot_user_id = result.get("user_id")
+            return bot_user_id
+    except Exception as e:
+        logger.error(f"Failed to get bot user ID: {e}")
+
+    return None
 
 
 def clean_content(message: str):
@@ -307,8 +338,6 @@ async def process_slack_message(
         author=user.metadata.get("real_name"),
     )
 
-    await msg.send()
-
     if on_message := config.code.on_message:
         await on_message(msg)
 
@@ -360,13 +389,93 @@ async def handle_message(message, say):
     )
 
 
+@slack_app.event("reaction_added")
+async def handle_reaction_added(event):
+    bot_id = await get_bot_user_id()
+
+    if event.get("user") == bot_id:
+        return
+
+    item = event.get("item", {})
+    channel_id = item.get("channel")
+    thread_ts = item.get("ts")
+
+    if not channel_id:
+        logger.warning(
+            "reaction_added event missing channel_id, skipping context setup"
+        )
+        return
+
+    try:
+        result = await slack_app.client.conversations_replies(
+            channel=channel_id, ts=thread_ts, limit=1
+        )
+
+        if result.get("ok"):
+            messages = result.get("messages")
+            message = messages[0]
+            message_user = message.get("user")
+            message_bot_id = message.get("bot_id")
+
+            if message_user != bot_id and message_bot_id != bot_id:
+                return
+        else:
+            raise Exception(
+                f"Failed to fetch message: {result.get('error', 'Unknown error')}"
+            )
+
+    except Exception as e:
+        logger.warning(f"Failed to fetch message for reaction: {e}")
+        return
+
+    async def say(text: str = "", **kwargs):
+        await slack_app.client.chat_postMessage(
+            channel=channel_id, text=text, thread_ts=thread_ts, **kwargs
+        )
+
+    user = await get_user(event["user"])
+
+    thread_id = (
+        str(uuid.uuid5(uuid.NAMESPACE_DNS, thread_ts))
+        if thread_ts
+        else str(uuid.uuid4())
+    )
+
+    session_id = str(uuid.uuid4())
+    session = HTTPSession(
+        id=session_id,
+        thread_id=thread_id,
+        user=user,
+        client_type="slack",
+    )
+
+    ctx = init_slack_context(
+        session=session,
+        slack_channel_id=channel_id,
+        event=event,
+        say=say,
+        thread_ts=thread_ts,
+    )
+
+    try:
+        if on_chat_start := config.code.on_chat_start:
+            await on_chat_start()
+
+        if on_slack_reaction_added := config.code.on_slack_reaction_added:
+            await on_slack_reaction_added(event)
+    finally:
+        await ctx.session.delete()
+
+
 @slack_app.block_action("thumbdown")
 async def thumb_down(ack, context, body):
     await ack()
     step_id = body["actions"][0]["value"]
+    thread_ts = body["message"]["thread_ts"]
+    thread_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, thread_ts))
 
     if data_layer := get_data_layer():
-        feedback = Feedback(forId=step_id, value=0)
+        feedback = Feedback(forId=step_id, value=0, threadId=thread_id)
         await data_layer.upsert_feedback(feedback)
 
     text = body["message"]["text"]
@@ -390,9 +499,11 @@ async def thumb_down(ack, context, body):
 async def thumb_up(ack, context, body):
     await ack()
     step_id = body["actions"][0]["value"]
+    thread_ts = body["message"]["thread_ts"]
+    thread_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, thread_ts))
 
     if data_layer := get_data_layer():
-        feedback = Feedback(forId=step_id, value=1)
+        feedback = Feedback(forId=step_id, value=1, threadId=thread_id)
         await data_layer.upsert_feedback(feedback)
 
     text = body["message"]["text"]

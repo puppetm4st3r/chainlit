@@ -103,6 +103,11 @@
                 }
             }
         },
+        "tts": {
+            "listen": "Escuchar",
+            "stop": "Detener",
+            "rendering": "Renderizando audio…"
+        },
         "history": {
             "title": "Últimas entradas",
             "empty": "Está vacío...",

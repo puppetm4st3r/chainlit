@@ -4,7 +4,8 @@ import React, { memo, useContext } from 'react';
 import {
   type IAction,
   type IMessageElement,
-  type IStep
+  type IStep,
+  useConfig
 } from '@chainlit/react-client';
 
 import BlinkingCursor from '@/components/BlinkingCursor';
@@ -20,6 +21,7 @@ interface Props {
   indent: number;
   isRunning?: boolean;
   scorableRun?: IStep;
+  parentMessage?: IStep; // Parent step for child messages grouping
 }
 
 const CL_RUN_NAMES = ['on_chat_start', 'on_message', 'on_audio_end'];
@@ -44,33 +46,75 @@ const hasAssistantMessage = (step: IStep): boolean => {
 };
 
 const Messages = memo(
-  ({ messages, elements, actions, indent, isRunning, scorableRun }: Props) => {
+  ({ messages, elements, actions, indent, isRunning, scorableRun, parentMessage }: Props) => {
     const messageContext = useContext(MessageContext);
     const layoutMaxWidth = useLayoutMaxWidth();
+    const { config } = useConfig();
+    
     return (
       <>
         {messages.map((m, index) => {
           // Get previous message for grouping logic
-          const previousMessage = index > 0 ? messages[index - 1] : null;
-          const getMessageAuthor = (message: IStep) => 
-            message.metadata?.avatarName || message.name;
+          // For child steps/messages at same level (index > 0), use previous sibling
+          // For first child at level 0 with indent=0 (child assistant messages), use parent
+          const isFirstInArray = index === 0;
+          const previousMessage = !isFirstInArray ? messages[index - 1] : null;
           
-          // Determine if current or previous message is a step
-          const isCurrentStep = !m.type.includes('message');
-          const isPreviousStep = previousMessage && !previousMessage.type.includes('message');
+          // Smart author detection: use metadata.avatarName if available, otherwise use message.name
+          // The backend (bot_name) is the source of truth for the author name
+          const getMessageAuthor = (message: IStep) => {
+            // Priority 1: If metadata.avatarName is set, use it (new messages with explicit metadata)
+            if (message.metadata?.avatarName) {
+              return message.metadata.avatarName;
+            }
+            
+            // Priority 2: For legacy persisted messages, detect if it's assistant by type
+            // This ensures old conversations group correctly even without metadata.avatarName
+            const isAssistantType = message.type && (
+              message.type.includes('llm') ||
+              message.type.includes('tool') ||
+              message.type.includes('assistant') ||
+              message.type.includes('retrieval') ||
+              message.type.includes('rerank')
+            );
+            
+            // If it's an assistant type, normalize to a common name
+            // We'll use the first non-technical name we find in the messages array
+            if (isAssistantType) {
+              // Try to find a bot name from sibling messages with metadata.avatarName
+              const botNameFromSiblings = messages.find(m => m.metadata?.avatarName)?.metadata?.avatarName;
+              if (botNameFromSiblings) {
+                return botNameFromSiblings;
+              }
+              // Fallback: use the message name if it looks like a bot name (not a technical name)
+              if (message.name && !message.name.includes('herramienta') && !message.name.includes('razonamiento')) {
+                return message.name;
+              }
+              // Last fallback: use config bot name or 'Assistant'
+              return config?.ui?.name || 'Assistant';
+            }
+            
+            // Priority 3: Use message.name as-is (for user messages, etc.)
+            return message.name || 'Assistant';
+          };
           
-          // Group consecutive messages from same author, but never group steps
+          // Group consecutive messages/steps from same author
+          // Child steps (nested, indent > 0) should NOT group with parent
+          // Only child assistant messages at root level (indent = 0) can group with parent
+          const currentAuthor = getMessageAuthor(m);
+          const previousAuthor = previousMessage ? getMessageAuthor(previousMessage) : null;
+          
+          // For first child assistant message (indent=0), check parent for grouping
+          const parentAuthor = isFirstInArray && parentMessage && indent === 0 ? getMessageAuthor(parentMessage) : null;
+          const effectivePreviousAuthor = previousAuthor || parentAuthor;
+          
           const shouldGroup = Boolean(
-            previousMessage &&
-            !isCurrentStep &&
-            !isPreviousStep &&
+            (previousMessage || (parentMessage && indent === 0)) &&
             !CL_RUN_NAMES.includes(m.name) &&
-            !CL_RUN_NAMES.includes(previousMessage.name) &&
-            getMessageAuthor(m) === getMessageAuthor(previousMessage)
+            (!previousMessage || !CL_RUN_NAMES.includes(previousMessage.name)) &&
+            (!parentMessage || !CL_RUN_NAMES.includes(parentMessage.name)) &&
+            currentAuthor === effectivePreviousAuthor
           );
-
-
-
           // Handle chainlit runs
           if (CL_RUN_NAMES.includes(m.name)) {
             const isRunning = !m.end && !m.isError && messageContext.loading;
@@ -156,6 +200,8 @@ const Messages = memo(
                 scorableRun={_scorableRun}
                 isScorable={isScorable}
                 shouldGroup={shouldGroup}
+                messages={messages}
+                index={index}
               />
             );
           }

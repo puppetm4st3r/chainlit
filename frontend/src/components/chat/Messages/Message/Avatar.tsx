@@ -34,21 +34,18 @@ const MessageAvatar = ({ author, hide, isError, isStep }: Props) => {
   }, [config, chatProfile]);
 
   const avatarUrl = useMemo(() => {
-    // If it's a step, use the gear avatar that exists in backend/public/avatars/
-    if (isStep) {
-      return apiClient?.buildEndpoint('/avatars/gear') || '/avatars/gear';
-    }
+    // Use the same avatar logic for both steps and messages
     if (config?.ui?.default_avatar_file_url) return config?.ui?.default_avatar_file_url;
     const isAssistant = !author || author === config?.ui.name;
     if (isAssistant && selectedChatProfile?.icon) {
       return selectedChatProfile.icon;
     }
     return apiClient?.buildEndpoint(`/avatars/${author || 'default'}`);
-  }, [apiClient, selectedChatProfile, config, author, isStep]);
+  }, [apiClient, selectedChatProfile, config, author]);
 
   if (isError) {
     return (
-      <AlertCircle className="h-5 w-5 fill-destructive mt-[5px] text-destructive-foreground" />
+      <AlertCircle className="fill-destructive text-destructive-foreground flex-shrink-0" style={{ width: '32px', height: '32px', minWidth: '32px', minHeight: '32px' }} />
     );
   }
 
@@ -57,7 +54,7 @@ const MessageAvatar = ({ author, hide, isError, isStep }: Props) => {
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
-            <Avatar className="h-5 w-5 mt-[3px]">
+            <Avatar className="flex-shrink-0" style={{ width: '48px', height: '48px' }}>
               <AvatarImage
                 src={avatarUrl}
                 alt={`Avatar for ${author || 'default'}`}

@@ -28,6 +28,8 @@ interface Props {
   isScorable?: boolean;
   scorableRun?: IStep;
   shouldGroup?: boolean;
+  messages?: IStep[];
+  index?: number;
 }
 
 const Message = memo(
@@ -39,7 +41,9 @@ const Message = memo(
     indent,
     isScorable,
     scorableRun,
-    shouldGroup = false
+    shouldGroup = false,
+    messages,
+    index
   }: Props) => {
     const { allowHtml, cot, latex, onError } = useContext(MessageContext);
     const layoutMaxWidth = useLayoutMaxWidth();
@@ -73,17 +77,18 @@ const Message = memo(
 
     return (
       <>
-        <div data-step-type={message.type} className={cn("step", shouldGroup ? "py-1" : "py-2")}>
+        <div 
+          data-step-type={message.type} 
+          className={cn("step", { "py-2": !shouldGroup })}
+        >
           <div
             className="flex flex-col"
             style={{
-              maxWidth: indent ? '100%' : layoutMaxWidth
+              maxWidth: indent ? '100%' : layoutMaxWidth,
+              marginLeft: indent ? `${indent * 1}rem` : undefined
             }}
           >
-            <div
-              className={cn('flex flex-grow', shouldGroup ? 'pb-2' : 'pb-2')}
-              id={`step-${message.id}`}
-            >
+            <div className={cn('flex flex-grow pb-2')}>
               {/* User message is displayed differently */}
               {isUserMessage ? (
                 <div className="flex flex-col flex-grow max-w-full">
@@ -97,10 +102,10 @@ const Message = memo(
                   </UserMessage>
                 </div>
               ) : (
-                <div className="ai-message flex gap-4 w-full">
+                <div className="ai-message flex gap-4 w-full items-start">
                   {shouldGroup ? (
                     <div className="shrink-0" style={{ width: '48px', height: '0' }} />
-                  ) : (
+                  ) : (isStep && indent > 0) ? null : (
                     <MessageAvatar
                       author={message.metadata?.avatarName || message.name}
                       isError={message.isError}
@@ -108,8 +113,22 @@ const Message = memo(
                     />
                   )}
                   {/* Display the step and its children */}
-                  {isStep ? (
-                    <Step step={message} isRunning={isRunning}>
+                {isStep ? (
+                  <Step
+                    step={message}
+                    isRunning={isRunning}
+                    style={
+                      !shouldGroup
+                        ? { paddingTop: 'var(--message-first-item-padding, 0.7em)' }
+                        : undefined
+                    }
+                  >
+                      <MessageContent
+                        elements={elements}
+                        message={message}
+                        allowHtml={allowHtml}
+                        latex={latex}
+                      />
                       {message.steps ? (
                         <Messages
                           messages={message.steps.filter(
@@ -119,19 +138,21 @@ const Message = memo(
                           actions={actions}
                           indent={indent + 1}
                           isRunning={isRunning}
+                          parentMessage={message}
                         />
                       ) : null}
-                      <MessageContent
-                        elements={elements}
-                        message={message}
-                        allowHtml={allowHtml}
-                        latex={latex}
-                      />
                       <MessageButtons message={message} actions={actions} />
                     </Step>
                   ) : (
                     // Display an assistant message
-                    <div className="flex flex-col items-start min-w-[150px] flex-grow gap-2">
+                  <div
+                    className="flex flex-col items-start min-w-[150px] flex-grow gap-2"
+                    style={
+                      !shouldGroup
+                        ? { paddingTop: 'var(--message-first-item-padding, 0.7em)' }
+                        : undefined
+                    }
+                  >
                       <MessageContent
                         elements={elements}
                         message={message}
@@ -148,6 +169,9 @@ const Message = memo(
                       <MessageButtons
                         message={message}
                         actions={actions}
+                        elements={elements}
+                        messages={messages}
+                        index={index}
                         run={
                           scorableRun && isScorable ? scorableRun : undefined
                         }
@@ -168,6 +192,7 @@ const Message = memo(
             indent={0}
             isRunning={isRunning}
             scorableRun={scorableRun}
+            parentMessage={message}
           />
         ) : null}
         {/* Display the child steps if the message is not a step (usually a user message). */}
@@ -178,6 +203,7 @@ const Message = memo(
             actions={actions}
             indent={indent}
             isRunning={isRunning}
+            parentMessage={message}
           />
         ) : null}
       </>

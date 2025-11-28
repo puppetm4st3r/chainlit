@@ -1,5 +1,6 @@
 import {
   IAction,
+  type IMessageElement,
   type IStep,
   useChatMessages,
   useConfig
@@ -10,14 +11,18 @@ import CopyButton from '@/components/CopyButton';
 import MessageActions from './Actions';
 import { DebugButton } from './DebugButton';
 import { FeedbackButtons } from './FeedbackButtons';
+import { TTSButton } from './TTSButton';
 
 interface Props {
   message: IStep;
   actions: IAction[];
   run?: IStep;
+  elements?: IMessageElement[];
+  messages?: IStep[];
+  index?: number;
 }
 
-const MessageButtons = ({ message, actions, run }: Props) => {
+const MessageButtons = ({ message, actions, run, elements, messages, index }: Props) => {
   const { config } = useConfig();
   const { firstInteraction } = useChatMessages();
 
@@ -41,6 +46,8 @@ const MessageButtons = ({ message, actions, run }: Props) => {
     <div className="-ml-1.5 flex items-center flex-wrap">
       {showCopyButton ? <CopyButton content={message.output} /> : null}
       {run ? <FeedbackButtons message={run} /> : null}
+      {/* TTS playback for assistant messages */}
+      {!isUser && hasContent ? <TTSButton message={message} elements={elements} messages={messages} index={index} /> : null}
       {messageActions.length ? (
         <MessageActions actions={messageActions} />
       ) : null}

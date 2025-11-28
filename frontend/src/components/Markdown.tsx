@@ -154,11 +154,15 @@ const Markdown = ({
               const anyEl = element as any;
               const href = anyEl.url || (anyEl as any).props?.url || '#';
               const title = (anyEl as any).props?.tooltip || name;
+              // Normalize path arrows in tooltip to line breaks. Supports both "- >" and unicode "→" with optional spaces.
+              const formattedTitle = typeof title === 'string'
+                ? title.replace(/\s*(-\s*>|→)\s*/g, '\n')
+                : title;
               const showIcon = (anyEl as any).props?.show_icon === true;
               const contentNode = showIcon ? (
                 <span
-                  className="chainlink inline-flex items-center justify-center rounded-full bg-primary/20 dark:bg-primary/30 text-primary align-middle leading-none"
-                  style={{ width: 18, height: 18, verticalAlign: 'middle' }}
+                  className="chainlink inline-flex items-center justify-center rounded-full bg-muted text-foreground border align-middle leading-none hover:bg-muted/80 transition-colors"
+                  style={{ width: 18, height: 18, verticalAlign: 'middle', borderColor: '#656565', borderWidth: '1px' }}
                 >
                   {/* Lucide link icon, rotated ~25deg */}
                   <svg
@@ -179,7 +183,10 @@ const Markdown = ({
                   </svg>
                 </span>
               ) : (
-                <span className="chainlink text-primary hover:underline">{children}</span>
+                <span 
+                  className="chainlink bg-muted text-foreground px-1.5 py-0.5 rounded border hover:bg-muted/80 transition-colors"
+                  style={{ borderColor: '#656565', borderWidth: '1px' }}
+                >{children}</span>
               );
 
               return (
@@ -196,7 +203,7 @@ const Markdown = ({
                         {contentNode}
                       </a>
                     </TooltipTrigger>
-                    <TooltipContent>{title}</TooltipContent>
+                    <TooltipContent className="whitespace-pre-line">{formattedTitle}</TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
               );

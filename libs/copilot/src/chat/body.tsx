@@ -23,7 +23,11 @@ import {
 import WelcomeScreen from '@/components/WelcomeScreen';
 import ElementSideView from 'components/ElementSideView';
 
-const Chat = () => {
+interface ChatProps {
+  expanded: boolean;
+}
+
+const Chat = ({ expanded }: ChatProps) => {
   const { config } = useConfig();
   const layoutMaxWidth = useLayoutMaxWidth();
   const setAttachments = useSetRecoilState(attachmentsState);
@@ -138,6 +142,15 @@ const Chat = () => {
 
   const enableAttachments =
     !disabled && config?.features?.spontaneous_file_upload?.enabled;
+
+  useEffect(() => {
+    const shadowRoot = window.cl_shadowRootElement;
+    if (!shadowRoot) return;
+
+    shadowRoot.classList.toggle('copilot-expanded', expanded);
+    shadowRoot.classList.toggle('copilot-collapsed', !expanded);
+    shadowRoot.style.setProperty('--message-first-item-padding', '0px');
+  }, [expanded]);
 
   return (
     <div

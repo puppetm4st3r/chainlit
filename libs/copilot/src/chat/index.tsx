@@ -10,7 +10,11 @@ import {
 import { copilotThreadIdState } from '../state';
 import ChatBody from './body';
 
-export default function ChatWrapper() {
+interface Props {
+  expanded: boolean;
+}
+
+export default function ChatWrapper({ expanded }: Props) {
   const { connect, session, idToResume } = useChatSession();
   const { sendMessage } = useChatInteract();
   const copilotThreadId = useRecoilValue(copilotThreadIdState);
@@ -64,5 +68,5 @@ export default function ChatWrapper() {
     window.sendChainlitMessage = sendMessage;
   }, [sendMessage]);
 
-  return <ChatBody />;
+  return <ChatBody expanded={expanded} />;
 }

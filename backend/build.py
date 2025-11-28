@@ -27,7 +27,20 @@ def run_subprocess(cmd: list[str], cwd: os.PathLike) -> None:
 
 
 def pnpm_install(project_root, pnpm_path):
-    run_subprocess([pnpm_path, "install", "--frozen-lockfile"], project_root)
+    cmd = [pnpm_path, "install"]
+    
+    # Check if we're in production mode (Docker build or CI)
+    is_production = os.environ.get("NODE_ENV") == "production" or os.environ.get("CI") == "true"
+    
+    if is_production:
+        # Production mode: install all deps (needed for build) but skip problematic scripts
+        # CYPRESS_INSTALL_BINARY=0 environment variable prevents Cypress download
+        cmd.extend(["--no-frozen-lockfile", "--ignore-scripts"])
+    else:
+        # Development mode: normal install
+        cmd.append("--frozen-lockfile")
+    
+    run_subprocess(cmd, project_root)
 
 
 def pnpm_buildui(project_root, pnpm_path):

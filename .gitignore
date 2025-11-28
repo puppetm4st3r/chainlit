@@ -11,7 +11,8 @@ venv
 .venv
 .DS_Store
 
-**/.chainlit/*
+.chainlit
+!cypress/e2e/**/*/.chainlit/*
 chainlit.md
 
 cypress/screenshots

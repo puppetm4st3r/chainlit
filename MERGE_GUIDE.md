@@ -1,5 +1,68 @@
 # 🔧 Guía Completa: Meld y Difftool en Scripts de Git
 
+## 🚀 Workflows Rápidos
+
+### 🎯 Flujo de Trabajo Completo (Orden Recomendado)
+
+Cuando tienes cambios locales en `dev` y necesitas sincronizar con upstream:
+
+**1. Commitea tus cambios en dev**
+```bash
+git add .
+git commit -m "Descripción de tus cambios"
+```
+
+**2. Cambia a main y sincroniza con upstream**
+```bash
+git checkout main
+./sync_upstream.sh
+```
+*Esto actualiza tu main con los últimos cambios del repo original de Chainlit*
+
+**3. Integra dev a main (con main ya actualizado)**
+```bash
+./merge_dev_to_main.sh
+```
+*Ahora tus cambios de dev se integran sobre un main actualizado*
+
+**¿Por qué en este orden?**
+- ✅ **Menos conflictos**: Main actualizado primero = conflictos más simples
+- ✅ **Práctica estándar**: Rama principal siempre alineada con upstream
+- ✅ **Más seguro**: Si algo falla en sync, dev queda intacto
+- ❌ **Evitar**: Mergear dev→main primero y luego hacer sync genera conflictos más complejos
+
+**⚠️ Importante**: Los scripts requieren working directory limpio (sin cambios sin commitear). Si ves el error *"Tienes cambios sin commitear"*, primero haz commit en tu rama actual.
+
+---
+
+### Sincronizar con Repo Original de Chainlit
+Para traer los últimos cambios del repositorio upstream de Chainlit a tu repo local:
+
+1. **Ejecuta el script de sync**: `./sync_upstream.sh`
+2. **Si hay conflictos**: Meld abrirá **mergetool (3 paneles)** para resolverlos
+   - *Izq: tu código | Centro: EDITAS aquí | Der: código upstream*
+3. **Revisión obligatoria**: Meld mostrará todos los cambios en **difftool (2 paneles)**
+   - *Izq: antes del merge | Der: después del merge (solo lectura)*
+4. **Confirma o cancela**: El script te preguntará si proceder con el commit
+   - **Si confirmas (y)**: Los cambios de upstream se integran permanentemente a tu rama local. Puedes hacer push para sincronizar con el remoto.
+   - **Si cancelas (n)**: Se hace rollback completo, tu rama vuelve al estado anterior al merge. Los cambios de upstream NO se integran. Puedes intentar de nuevo cuando estés listo.
+
+### Mergear Dev a Master (nuestro repo)
+Para integrar cambios de la rama `dev` (chainlit) a la rama `master` (chainlit):
+
+1. **Ejecuta el script de merge**: `./merge_dev_to_main.sh`
+2. **Si hay conflictos**: Meld abrirá **mergetool (3 paneles)** para resolverlos
+   - *Izq: tu master | Centro: EDITAS aquí | Der: código de dev*
+3. **Revisión completa**: **Difftool (2 paneles)** te mostrará todos los cambios
+   - *Izq: master antes | Der: master después (solo lectura)*
+4. **Decide y confirma**: Acepta el merge o cancela si algo no se ve bien
+   - **Si confirmas (y)**: Los cambios de dev se integran a master de forma permanente. Tu rama master queda actualizada con las nuevas funcionalidades. Listo para push a remoto.
+   - **Si cancelas (n)**: Se revierte todo, master queda intacto como estaba antes. Los cambios de dev NO se integran. Puedes revisar qué salió mal y reintentar el merge cuando resuelvas los problemas.
+
+**💡 Tip**: Ambos scripts crean backups automáticos antes de cualquier operación. Siempre puedes volver atrás si algo sale mal.
+
+---
+
 ## 📋 Índice
 - [Flujo General](#flujo-general)
 - [Mergetool: Resolución de Conflictos](#mergetool-resolución-de-conflictos)
@@ -42,6 +105,10 @@ Script ejecuta merge → ❌ Conflictos → Mergetool (resolver) → Difftool (r
 └─────────────┴─────────────┴─────────────┘
 ```
 
+**Panel IZQUIERDA**: Tu código actual en la rama donde estás (main/master)  
+**Panel CENTRO**: El resultado final que se guardará - AQUÍ EDITAS para resolver conflictos  
+**Panel DERECHA**: El código que viene de la otra rama (upstream/dev)
+
 ### Qué Puedes Hacer (CONTROL TOTAL)
 - **Click flecha ←**: Tomar línea de la izquierda
 - **Click flecha →**: Tomar línea de la derecha
@@ -52,19 +119,26 @@ Script ejecuta merge → ❌ Conflictos → Mergetool (resolver) → Difftool (r
 
 ### Ejemplo de Conflicto
 ```python
-# IZQUIERDA (tu main)        # DERECHA (upstream)
-def calculate_total(items):  def calculate_sum(items):
-    total = 0                    result = 0
-    for item in items:           for item in items:
-        total += item.price          result += item.price
-    return total                 return result
+# ─────────────── PANEL IZQUIERDA (tu main actual) ───────────────
+def calculate_total(items):
+    total = 0
+    for item in items:
+        total += item.price
+    return total
 
-# CENTRO (tu decisión final - puedes escribir lo que quieras):
-def calculate_total(items):  # ← Mantienes tu nombre
-    result = 0               # ← Pero usas su variable
+# ─────────────── PANEL DERECHA (código de upstream/dev) ───────────────
+def calculate_sum(items):
+    result = 0
     for item in items:
         result += item.price
-    return result            # ← Combinas ambos enfoques
+    return result
+
+# ─────────────── PANEL CENTRO (TU EDITAS AQUÍ - resultado final) ───────────────
+def calculate_total(items):  # ← Decides mantener tu nombre de función
+    result = 0               # ← Pero tomas su nombre de variable
+    for item in items:
+        result += item.price
+    return result            # ← Combinas lo mejor de ambos
 ```
 
 ### Proceso de Resolución
@@ -93,6 +167,10 @@ def calculate_total(items):  # ← Mantienes tu nombre
 └─────────────────┴─────────────────┘
 ```
 
+**Panel IZQUIERDA**: Tu código ANTES del merge - cómo está ahora tu rama  
+**Panel DERECHA**: Tu código DESPUÉS del merge - cómo quedará con todos los cambios integrados  
+**Ambos paneles son SOLO LECTURA**: Aquí solo revisas, no editas
+
 ### Qué Puedes Hacer (SOLO REVISAR)
 - ✅ **Ver** todos los cambios archivo por archivo
 - ✅ **Navegar** entre archivos (Meld los abre secuencialmente)
@@ -107,14 +185,22 @@ def calculate_total(items):  # ← Mantienes tu nombre
 
 ### Ejemplo de Revisión
 ```python
-# IZQUIERDA (antes)          # DERECHA (después del merge)
-import requests             import requests
-                           import pandas as pd      # ← Añadido automáticamente
+# ─────── PANEL IZQUIERDA (tu código ANTES del merge) ───────
+import requests
 
-def process_data():        def process_advanced_data():  # ← Renombrado automáticamente
-    return []                  return pd.DataFrame([])   # ← Lógica cambiada
+def process_data():
+    return []
 
-DEBUG = False              DEBUG = True             # ← Tu resolución de conflicto
+DEBUG = False
+
+# ─────── PANEL DERECHA (tu código DESPUÉS del merge) ───────
+import requests
+import pandas as pd      # ← Añadido automáticamente por el merge
+
+def process_advanced_data():  # ← Función renombrada automáticamente
+    return pd.DataFrame([])   # ← Lógica actualizada
+
+DEBUG = True             # ← Tu resolución de conflicto (si hubo)
 ```
 
 ### Proceso de Revisión
@@ -169,7 +255,11 @@ DEBUG = False              DEBUG = True             # ← Tu resolución de conf
 # "✅ Merge automático exitoso"
 # "🔍 REVISIÓN OBLIGATORIA: Abriendo difftool..."
 
-# Meld te muestra:
+# ═══════════ DIFFTOOL (2 paneles) - Revisión de cambios ═══════════
+# PANEL IZQUIERDA (tu main antes):  Tu código actual
+# PANEL DERECHA (main después):    Con los cambios de upstream integrados
+
+# Meld te muestra archivo por archivo:
 # 1. requirements.txt: numpy==1.21.0 → numpy==1.24.0
 # 2. src/api.py: añadieron nueva función authenticate()
 # 3. README.md: actualizaron documentación de instalación
@@ -186,18 +276,20 @@ DEBUG = False              DEBUG = True             # ← Tu resolución de conf
 # "🚨 2 archivos con conflictos detectados"
 # "🔧 Abriendo Meld para resolver conflictos..."
 
-# MERGETOOL - Archivo 1: config.py
-# IZQUIERDA (main): DEBUG = False
-# DERECHA (dev): DEBUG = True
-# CENTRO: Decides → DEBUG = False (producción)
+# ═══════════ MERGETOOL (3 paneles) - Archivo 1: config.py ═══════════
+# PANEL IZQUIERDA (tu main):  DEBUG = False
+# PANEL DERECHA (dev):        DEBUG = True
+# PANEL CENTRO (TU EDITAS):   DEBUG = False  ← Decides dejar prod
 
-# MERGETOOL - Archivo 2: api.py
-# IZQUIERDA: def get_users() → return db.users.all()
-# DERECHA: def get_users() → return db.users.filter(active=True)
-# CENTRO: Combinas → return db.users.filter(active=True).all()
+# ═══════════ MERGETOOL (3 paneles) - Archivo 2: api.py ═══════════
+# PANEL IZQUIERDA:  def get_users() → return db.users.all()
+# PANEL DERECHA:    def get_users() → return db.users.filter(active=True)
+# PANEL CENTRO:     def get_users() → return db.users.filter(active=True).all()
+#                   ↑ Combinas ambas versiones
 
-# DIFFTOOL - Revisión completa:
-# Ve tus resoluciones + otros 8 archivos que se fusionaron automáticamente
+# ═══════════ DIFFTOOL (2 paneles) - Revisión completa ═══════════
+# PANEL IZQUIERDA (antes):  Tu main sin cambios
+# PANEL DERECHA (después):  Tus 2 resoluciones + 8 archivos mergeados automáticamente
 # Todo se ve bien, aceptas el merge
 ```
 
@@ -207,8 +299,14 @@ DEBUG = False              DEBUG = True             # ← Tu resolución de conf
 # Eliges "3) Squash"
 # "🚨 Conflictos detectados en el squash merge"
 
-# MERGETOOL resuelve conflictos
-# DIFFTOOL muestra el resultado: 15 archivos en un solo commit squash
+# ═══════════ MERGETOOL (3 paneles) - Resuelves conflictos ═══════════
+# PANEL IZQUIERDA: Tu código en dev
+# PANEL CENTRO: Editas y resuelves los conflictos
+# PANEL DERECHA: Código que viene de main
+
+# ═══════════ DIFFTOOL (2 paneles) - Revisión final ═══════════
+# PANEL IZQUIERDA (antes): Dev sin los cambios de main
+# PANEL DERECHA (después): Dev con 15 archivos actualizados en un squash
 # Escribes mensaje: "Sync with main: auth improvements and bug fixes"
 ```
 

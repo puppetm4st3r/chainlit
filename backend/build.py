@@ -1,5 +1,6 @@
 """Build script gets called on uv/pip build."""
 
+import os
 import pathlib
 import shutil
 import subprocess
@@ -73,17 +74,13 @@ def build():
     print(
         "\n-- Building frontend, this might take a while!\n\n"
         "   If you don't need to build the frontend and just want dependencies installed, use:\n"
-        "   `uv sync --no-install-project --no-editable`\n"
+        "   `poetry install --no-root`\n"
     )
 
     try:
         # Find directory containing this file
         backend_dir = pathlib.Path(__file__).resolve().parent
         project_root = backend_dir.parent
-
-        # Dirty hack to distinguish between building wheel from sdist and from source code
-        if not (project_root / "package.json").exists():
-            return
 
         pnpm = shutil.which("pnpm")
         if not pnpm:
@@ -105,6 +102,5 @@ def build():
         sys.exit(1)
 
 
-class CustomBuildHook(BuildHookInterface):
-    def initialize(self, _, __):
-        build()
+if __name__ == "__main__":
+    build()

@@ -27,6 +27,10 @@ export default function AppWrapper() {
   );
 
   useEffect(() => {
+    setTranslationLoaded(false);
+  }, [languageInUse]);
+
+  useEffect(() => {
     if (!translations) return;
     handleChangeLanguage(translations.translation);
     setTranslationLoaded(true);

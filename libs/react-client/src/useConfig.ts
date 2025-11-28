@@ -1,15 +1,16 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { useRecoilState, useRecoilValue } from 'recoil';
 
 import { useApi, useAuth } from './api';
 import { configState, chatProfileState } from './state';
 import { IChainlitConfig } from './types';
+import { useLanguage } from './useLanguage';
 
 const useConfig = () => {
   const [config, setConfig] = useRecoilState(configState);
   const { isAuthenticated } = useAuth();
   const chatProfile = useRecoilValue(chatProfileState);
-  const language = navigator.language || 'en-US';
+  const { language } = useLanguage();
   const prevChatProfileRef = useRef(chatProfile);
 
   // Build the API URL with optional chat profile parameter

@@ -113,6 +113,11 @@
           "updated": "Feedback updated"
         }
       }
+        },
+        "tts": {
+            "listen": "Listen",
+            "stop": "Stop",
+            "rendering": "Rendering audio…"
     },
     "history": {
       "title": "Last Inputs",

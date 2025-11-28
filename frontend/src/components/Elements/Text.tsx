@@ -36,9 +36,14 @@ const TextElement = ({ element }: TextElementProps) => {
     content = `\`\`\`${element.language}\n${content}\n\`\`\``;
   }
 
+  // Allow per-element HTML when explicitly requested via MIME override
+  // Supported overrides: "text/html" and custom "text/hmarkdown" (markdown with raw HTML)
+  const mime = (element as any)?.mime as string | undefined;
+  const allowHtmlElement = allowHtml || mime === 'text/html' || mime === 'text/hmarkdown';
+
   return (
     <Markdown
-      allowHtml={allowHtml}
+      allowHtml={allowHtmlElement}
       latex={latex}
       className={`${element.display}-text`}
     >

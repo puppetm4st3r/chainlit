@@ -14,6 +14,7 @@ from typing import (
     TypeVar,
     Union,
 )
+from urllib.parse import urlparse
 
 import filetype
 from pydantic import Field
@@ -40,6 +41,7 @@ ElementType = Literal[
     "file",
     "plotly",
     "dataframe",
+    "link",
     "custom",
 ]
 ElementDisplay = Literal["inline", "side", "page"]
@@ -181,6 +183,8 @@ class Element:
 
         elif type == "custom":
             return CustomElement(props=e_dict.get("props", {}), **common_params)  # type: ignore[arg-type]
+        elif type == "link":
+            return Link(**common_params)  # type: ignore[arg-type]
         else:
             # Default to File for any other type
             return File(**common_params)  # type: ignore[arg-type]
@@ -390,6 +394,47 @@ class Video(Element):
 class File(Element):
     type: ClassVar[ElementType] = "file"
 
+
+@dataclass
+class Link(Element):
+    """Represents an external hyperlink to be rendered inline in the chat content.
+
+    - name: The label to display for the link
+    - url: The destination URL (must be http/https)
+    - display: Should be kept as "inline"; other displays are not applicable
+    """
+
+    type: ClassVar[ElementType] = "link"
+    props: Dict = Field(default_factory=dict)
+    tooltip: Optional[str] = None
+    show_icon: Optional[bool] = None
+
+    def __post_init__(self) -> None:
+        # Enforce display strictly to inline
+        if getattr(self, "display", None) and self.display != "inline":
+            raise ValueError("Link element only supports display='inline'.")
+
+        # Validate URL scheme and host
+        if not self.url:
+            raise ValueError("Link element requires a URL.")
+        parsed = urlparse(self.url)
+        if parsed.scheme not in ("http", "https") or not parsed.netloc:
+            raise ValueError("Link element URL must be an absolute http(s) URL.")
+
+        # Normalize tooltip into props, so it is sent to the frontend
+        if self.tooltip is not None and not self.props.get("tooltip"):
+            self.props["tooltip"] = self.tooltip
+        if self.show_icon is not None and not self.props.get("show_icon"):
+            self.props["show_icon"] = self.show_icon
+
+        # Ensure inline display
+        self.display = "inline"
+
+        # Ensure a stable key to reference from tokens
+        if not self.chainlit_key:
+            self.chainlit_key = self.id
+
+        super().__post_init__()
 
 @dataclass
 class Plotly(Element):

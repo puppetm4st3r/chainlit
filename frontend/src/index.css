@@ -52,6 +52,7 @@ code {
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+    --message-first-item-padding: 0.7em;
   }
   .dark {
     --background: 0 0% 13%;
@@ -100,36 +101,100 @@ code {
 
 @keyframes loading-shimmer {
   0% {
-    background-position: -100% top;
+    left: -50%;
   }
+  85.7% {
+    left: 75%;
+  }
+  100% {
+    left: 75%;
+  }
+}
 
-  to {
-    background-position: 250% top;
+@keyframes shimmer-text {
+  0% {
+    background-position: 200% center;
+  }
+  85.7% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: -200% center;
   }
 }
 
 .loading-shimmer {
-  background-position: -100% top;
-  text-fill-color: transparent;
-  -webkit-text-fill-color: transparent;
-  animation-delay: 0s;
-  animation-duration: 4s;
-  animation-iteration-count: infinite;
-  animation-name: loading-shimmer;
-  background: hsl(var(--muted))
-    gradient(
-      linear,
-      100% 0,
-      0 0,
-      from(hsl(var(--muted))),
-      color-stop(0.5, hsl(var(--foreground))),
-      to(hsl(var(--muted)))
-    );
-  background: hsl(var(--muted)) -webkit-gradient(linear, 100% 0, 0 0, from(hsl(var(--muted))), color-stop(0.5, hsl(var(--foreground))), to(hsl(var(--muted))));
-  background-clip: text;
+  position: relative;
+  display: inline-block;
+  overflow: hidden;
+}
+
+/* Light theme - brillo blanco superpuesto (Overlay) */
+.loading-shimmer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -50%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    transparent 20%,
+    rgba(255, 255, 255, 0.8) 50%,
+    transparent 80%,
+    transparent 100%
+  );
+  animation: loading-shimmer 3.5s linear infinite;
+  pointer-events: none;
+}
+
+/* Dark theme - brillo recortado al texto (Text Clip) */
+/* 1. Ocultamos la capa superpuesta que causa la banda gris */
+.dark .loading-shimmer::before {
+  display: none;
+}
+
+/* 2. Aplicamos el brillo directamente al texto */
+.dark .loading-shimmer {
+  /* Gradiente: Texto semi-opaco -> Blanco brillante -> Texto semi-opaco */
+  background: linear-gradient(
+    90deg,
+    hsl(var(--foreground) / 0.6) 0%,
+    hsl(var(--foreground) / 0.6) 40%,
+    #ffffff 50%,
+    hsl(var(--foreground) / 0.6) 60%,
+    hsl(var(--foreground) / 0.6) 100%
+  );
+  background-size: 200% auto;
+  
+  /* Recortamos el fondo a la forma del texto */
   -webkit-background-clip: text;
-  background-repeat: no-repeat;
-  background-size: 50% 200%;
+  background-clip: text;
+  
+  /* Hacemos el color del texto transparente para ver el gradiente */
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  
+  /* Animamos la posición del fondo */
+  animation: shimmer-text 3.5s linear infinite;
+}
+
+@keyframes bulb-glow {
+  0%, 100% {
+    filter: drop-shadow(0 0 2px rgba(255, 193, 7, 0.7)) drop-shadow(0 0 4px rgba(255, 193, 7, 0.5));
+  }
+  50% {
+    filter: drop-shadow(0 0 4px rgba(255, 193, 7, 1)) drop-shadow(0 0 8px rgba(255, 193, 7, 0.8)) drop-shadow(0 0 12px rgba(255, 193, 7, 0.6));
+  }
+}
+
+.bulb-glow {
+  animation: bulb-glow 1.2s ease-in-out infinite;
+}
+
+.bulb-off {
+  filter: grayscale(100%) opacity(0.85);
 }
 
 /* Custom scrollbar styles for command lists */

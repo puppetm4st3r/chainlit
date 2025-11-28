@@ -118,7 +118,7 @@ const Widget = ({ config, error }: Props) => {
                 projectConfig={projectConfig}
               />
               <div className="flex flex-grow overflow-y-auto">
-                <ChatWrapper />
+                <ChatWrapper expanded={expanded} />
               </div>
             </>
           )}

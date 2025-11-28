@@ -29,6 +29,10 @@ export const prepareContent = ({
   id: string;
   language?: string;
 }) => {
+  // Prepare content; no special token syntax, rely on simple name matches
+  let preparedContent = content ? content.trim() : '';
+  const refElements: IMessageElement[] = [];
+
   const elementNames = elements.map((e) => escapeRegExp(e.name));
 
   // Sort by descending length to avoid matching substrings
@@ -38,11 +42,10 @@ export const prepareContent = ({
     ? new RegExp(`(${elementNames.join('|')})`, 'g')
     : undefined;
 
-  let preparedContent = content ? content.trim() : '';
   const inlinedElements = elements.filter(
     (e) => isForIdMatch(id, e?.forId) && e.display === 'inline'
   );
-  const refElements: IMessageElement[] = [];
+  // Keep collecting ref elements for non-inline references found later
 
   if (elementRegexp) {
     preparedContent = preparedContent.replaceAll(elementRegexp, (match) => {
@@ -58,7 +61,17 @@ export const prepareContent = ({
         // Element reference does not exist, return plain text
         return match;
       } else if (inlined) {
-        // If element is inlined, add it to the list and return plain text
+        // Inline elements: special-case link to embed a direct anchor at the match position.
+        if ((element as any).type === ('link' as any)) {
+          if (!refElements.find((e) => e.id === element!.id)) {
+            refElements.push(element);
+          }
+          const anyEl = element as any;
+          const anchorKey = anyEl.chainlitKey || anyEl.id;
+          const anchorText = element.name;
+          return `[${anchorText}](#link:${anchorKey})`;
+        }
+        // For other inline elements, keep previous behavior (collect and leave text as-is)
         if (inlinedElements.indexOf(element) === -1) {
           inlinedElements.push(element);
         }

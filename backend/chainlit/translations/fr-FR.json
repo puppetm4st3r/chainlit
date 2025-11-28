@@ -65,11 +65,6 @@
                 "attachFiles": "Joindre des fichiers"
             }
         },
-        "commands": {
-            "button": "Outils",
-            "changeTool": "Changer d'outil",
-            "availableTools": "Outils disponibles"
-        },
         "speech": {
             "start": "Démarrer l'enregistrement",
             "stop": "Arrêter l'enregistrement",
@@ -82,10 +77,6 @@
             "errors": {
                 "failed": "Échec du téléversement",
                 "cancelled": "Téléversement annulé de"
-            },
-            "actions": {
-                "cancelUpload": "Annuler le téléversement",
-                "removeAttachment": "Supprimer la pièce jointe"
             }
         },
         "messages": {
@@ -105,8 +96,7 @@
                 "edit": "Modifier le commentaire",
                 "dialog": {
                     "title": "Ajouter un commentaire",
-                    "submit": "Envoyer le commentaire",
-                    "yourFeedback": "Votre avis..."
+                    "submit": "Envoyer le commentaire"
                 },
                 "status": {
                     "updating": "Mise à jour",
@@ -120,10 +110,9 @@
             "show": "Afficher l'historique"
         },
         "settings": {
-            "title": "Panneau des paramètres",
-            "customize": "Personnalisez vos paramètres de chat ici"
+            "title": "Panneau des paramètres"
         },
-        "watermark": "Les LLMs peuvent se tromper. Vérifiez les réponses."
+        "watermark": "Construit avec"
     },
     "threadHistory": {
         "sidebar": {
@@ -148,23 +137,9 @@
             "untitled": "Conversation sans titre",
             "menu": {
                 "rename": "Renommer",
-                "share": "Partager",
                 "delete": "Supprimer"
             },
             "actions": {
-                "share": {
-                    "title": "Partager le lien de la discussion",
-                    "button": "Partager",
-                    "status": {
-                        "copied": "Lien copié",
-                        "created": "Lien de partage créé !",
-                        "unshared": "Partage désactivé pour ce fil"
-                    },
-                    "error": {
-                        "create": "Échec de la création du lien de partage",
-                        "unshare": "Échec de la désactivation du partage du fil"
-                    }
-                },
                 "delete": {
                     "title": "Confirmer la suppression",
                     "description": "Cela supprimera le fil de discussion ainsi que ses messages et éléments. Cette action ne peut pas être annulée",
@@ -236,10 +211,5 @@
         "security": "Sécurité",
         "beta": "Bêta",
         "best-practice": "Meilleure pratique"
-    },
-    "components": {
-        "MultiSelectInput": {
-        "placeholder": "Sélectionner..."
-        }
     }
 }

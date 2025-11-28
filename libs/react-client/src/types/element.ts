@@ -8,6 +8,7 @@ export type IElement =
   | IFileElement
   | IPlotlyElement
   | IDataframeElement
+  | ILinkElement
   | ICustomElement;
 
 export type IMessageElement =
@@ -19,6 +20,7 @@ export type IMessageElement =
   | IFileElement
   | IPlotlyElement
   | IDataframeElement
+  | ILinkElement
   | ICustomElement;
 
 export type ElementType = IElement['type'];
@@ -46,6 +48,8 @@ export interface IImageElement extends TMessageElement<'image'> {
 export interface ITextElement extends TMessageElement<'text'> {
   language?: string;
 }
+
+export interface ILinkElement extends TMessageElement<'link'> {}
 
 export interface IPdfElement extends TMessageElement<'pdf'> {
   page?: number;

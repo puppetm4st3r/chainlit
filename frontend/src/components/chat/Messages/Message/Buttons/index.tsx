@@ -1,5 +1,6 @@
 import {
   IAction,
+  IMessageElement,
   type IStep,
   useChatMessages,
   useConfig
@@ -10,6 +11,7 @@ import CopyButton from '@/components/CopyButton';
 import MessageActions from './Actions';
 import { DebugButton } from './DebugButton';
 import { FeedbackButtons } from './FeedbackButtons';
+import { TTSButton } from './TTSButton';
 
 interface Props {
   message: IStep;

@@ -53,11 +53,13 @@ import {
 import { OutputAudioChunk } from './types/audio';
 
 import { ChainlitContext } from './context';
+import { useLanguage } from './useLanguage';
 import type { IToken } from './useChatData';
 
 const useChatSession = () => {
   const client = useContext(ChainlitContext);
   const sessionId = useRecoilValue(sessionIdState);
+  const { language } = useLanguage();
 
   const [session, setSession] = useRecoilState(sessionState);
   const setIsAiSpeaking = useSetRecoilState(isAiSpeakingState);
@@ -117,6 +119,10 @@ const useChatSession = () => {
       // Add CSRF headers when protections are active
       const extraHeaders: Record<string, string> = {};
       extraHeaders['X-Requested-With'] = 'XMLHttpRequest';
+
+      if (language) {
+        extraHeaders['X-Prompt-Language'] = language;
+      }
       
       // Add origin validation
       const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
@@ -481,7 +487,7 @@ const useChatSession = () => {
         }
       });
     },
-    [setSession, sessionId, idToResume, chatProfile]
+    [setSession, sessionId, idToResume, chatProfile, language]
   );
 
   const connect = useCallback(debounce(_connect, 200), [_connect]);

@@ -45,7 +45,8 @@ export default function UserNav() {
     { code: 'ml', label: 'മലയാളം' },
     { code: 'mr', label: 'मराठी' },
     { code: 'ta', label: 'தமிழ்' },
-    { code: 'te', label: 'తెలుగు' }
+    { code: 'te', label: 'తెలుగు' },
+    { code: 'uk-UA', label: 'Українська' }
   ];
 
   return (

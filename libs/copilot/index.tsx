@@ -19,6 +19,7 @@ import { IWidgetConfig } from './src/types';
 
 const id = 'chainlit-copilot';
 let root: ReactDOM.Root | null = null;
+let lastConfig: IWidgetConfig | null = null;
 
 declare global {
   interface Window {
@@ -149,6 +150,14 @@ function generateDynamicStyles(className: string | undefined, customCssUrl?: str
 }
 
 window.mountChainlitWidget = (config: IWidgetConfig) => {
+  lastConfig = config;
+  if (config.persistThreadId === false) {
+    try {
+      localStorage.removeItem('chainlit-copilot-thread-id');
+    } catch (error) {
+      console.warn('Failed to clear copilot thread id from localStorage:', error);
+    }
+  }
   const container = document.createElement('div');
   container.id = id;
   document.body.appendChild(container);
@@ -181,7 +190,16 @@ window.mountChainlitWidget = (config: IWidgetConfig) => {
 };
 
 window.unmountChainlitWidget = () => {
+  if (lastConfig?.persistThreadId === false) {
+    window.dispatchEvent(new CustomEvent('chainlit-copilot-session-reset'));
+    try {
+      localStorage.removeItem('chainlit-copilot-thread-id');
+    } catch (error) {
+      console.warn('Failed to clear copilot thread id from localStorage:', error);
+    }
+  }
   root?.unmount();
+  lastConfig = null;
 };
 
 window.sendChainlitMessage = () => {

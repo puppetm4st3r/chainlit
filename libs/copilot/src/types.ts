@@ -10,6 +10,9 @@ export interface IWidgetConfig {
   };
   customCssUrl?: string;
   additionalQueryParamsForAPI?: Record<string, string>;
+  // Persist copilot thread id across mounts
+  // Defaults to true
+  persistThreadId?: boolean;
   expanded?: boolean;
   language?: string;
   opened?: boolean;

@@ -2,8 +2,11 @@ import { atom } from 'recoil';
 import { v4 as uuidv4 } from 'uuid';
 
 const COPILOT_THREAD_ID_KEY = 'chainlit-copilot-thread-id';
+let nextSessionId: string | null = null;
 export const COPILOT_THREAD_CHANGED_EVENT_KEY =
   'chainlit-copilot-thread-changed';
+export const COPILOT_SESSION_RESET_EVENT_KEY =
+  'chainlit-copilot-session-reset';
 export class CopilotThreadChangedEventParams {
   newThreadId?: string;
 }
@@ -61,4 +64,16 @@ export const clearChainlitCopilotThreadId = (newThreadId?: string) => {
       }
     )
   );
+};
+
+export const getCopilotNextSessionId = () => {
+  return nextSessionId;
+};
+
+export const setCopilotNextSessionId = (sessionId: string) => {
+  nextSessionId = sessionId;
+};
+
+export const clearCopilotNextSessionId = () => {
+  nextSessionId = null;
 };

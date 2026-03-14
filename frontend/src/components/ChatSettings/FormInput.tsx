@@ -2,6 +2,7 @@ import { IInput } from 'types/Input';
 
 import { CheckboxInput, CheckboxInputProps } from './CheckboxInput';
 import { MultiSelectInput, MultiSelectInputProps } from './MultiSelectInput';
+import { ProgressInput, ProgressInputProps } from './ProgressInput';
 import { RadioButtonGroup, RadioButtonGroupProps } from './RadioButtonGroup';
 import { SelectInput, SelectInputProps } from './SelectInput';
 import { SliderInput, SliderInputProps } from './SliderInput';
@@ -21,6 +22,7 @@ interface IFormInput<T, V extends TFormInputValue> extends IInput {
 type TFormInput =
   | (Omit<SwitchInputProps, 'checked'> & IFormInput<'switch', boolean>)
   | (Omit<SliderInputProps, 'value'> & IFormInput<'slider', number>)
+  | (Omit<ProgressInputProps, 'value'> & IFormInput<'progress', number>)
   | (Omit<TagsInputProps, 'value'> & IFormInput<'tags', string[]>)
   | (Omit<SelectInputProps, 'value'> & IFormInput<'select', string>)
   | (Omit<TextInputProps, 'value'> & IFormInput<'textinput', string>)
@@ -35,6 +37,8 @@ const FormInput = ({ element }: { element: TFormInput }): JSX.Element => {
       return <SelectInput {...element} value={element.value ?? ''} />;
     case 'slider':
       return <SliderInput {...element} value={element.value ?? 0} />;
+    case 'progress':
+      return <ProgressInput {...element} value={element.value ?? 0} />;
     case 'tags':
       return <TagsInput {...element} value={element.value ?? []} />;
     case 'switch':

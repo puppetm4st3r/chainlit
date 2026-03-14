@@ -39,10 +39,61 @@ export default function ChatSettingsModal() {
   });
   const setChatSettingsValue = useSetRecoilState(chatSettingsValueState);
 
-  // Reset form when default values change
+  const collectLeafInputs = (inputs: any[]): any[] => {
+    const leafInputs: any[] = [];
+
+    inputs.forEach((input: any) => {
+      if (!input) {
+        return;
+      }
+
+      if (Array.isArray(input.inputs) && input.inputs.length > 0) {
+        leafInputs.push(...collectLeafInputs(input.inputs));
+        return;
+      }
+
+      leafInputs.push(input);
+    });
+
+    return leafInputs;
+  };
+
+  const collectReadOnlyProgressIds = (inputs: any[]): string[] => {
+    const ids: string[] = [];
+
+    inputs.forEach((input: any) => {
+      if (!input) {
+        return;
+      }
+
+      if (Array.isArray(input.inputs) && input.inputs.length > 0) {
+        ids.push(...collectReadOnlyProgressIds(input.inputs));
+        return;
+      }
+
+      if (input.type === 'progress' && input.id) {
+        ids.push(input.id);
+      }
+    });
+
+    return ids;
+  };
+
+  // Reset form when the widget schema changes or when the modal opens.
   useEffect(() => {
+    if (!chatSettingsOpen) {
+      return;
+    }
     reset(chatSettingsValue);
-  }, [chatSettingsValue, reset]);
+  }, [chatSettingsInputs, chatSettingsOpen, reset]);
+
+  // Live progress widgets should refresh in place without resetting editable fields.
+  useEffect(() => {
+    const progressIds = collectReadOnlyProgressIds(chatSettingsInputs);
+    progressIds.forEach((id) => {
+      setValue(id, chatSettingsValue[id]);
+    });
+  }, [chatSettingsInputs, chatSettingsValue, setValue]);
 
   const handleClose = (open: boolean) => {
     if (!open) {
@@ -72,6 +123,10 @@ export default function ChatSettingsModal() {
   };
 
   const values = watch();
+  const leafInputs = collectLeafInputs(chatSettingsInputs);
+  const hasOnlyProgressInputs =
+    leafInputs.length > 0 &&
+    leafInputs.every((input: any) => input?.type === 'progress');
   const tabInputs = chatSettingsInputs.filter(
     (input: any) => Array.isArray(input?.inputs) && input.inputs.length > 0
   );
@@ -80,6 +135,10 @@ export default function ChatSettingsModal() {
   );
   const hasTabs = tabInputs.length > 0;
   const defaultTab = tabInputs[0]?.id;
+
+  const handlePrimaryAction = hasOnlyProgressInputs
+    ? () => handleClose(false)
+    : handleConfirm;
 
   return (
     <Dialog open={chatSettingsOpen} onOpenChange={handleClose}>
@@ -145,14 +204,18 @@ export default function ChatSettingsModal() {
           </div>
         )}
         <DialogFooter>
-          <Button variant="outline" onClick={handleReset}>
-            <Translator path="common.actions.reset" />
-          </Button>
-          <div className="flex-1" />
-          <Button variant="ghost" onClick={() => handleClose(false)}>
-            <Translator path="common.actions.cancel" />
-          </Button>
-          <Button onClick={handleConfirm} id="confirm" autoFocus>
+          {!hasOnlyProgressInputs ? (
+            <>
+              <Button variant="outline" onClick={handleReset}>
+                <Translator path="common.actions.reset" />
+              </Button>
+              <div className="flex-1" />
+              <Button variant="ghost" onClick={() => handleClose(false)}>
+                <Translator path="common.actions.cancel" />
+              </Button>
+            </>
+          ) : null}
+          <Button onClick={handlePrimaryAction} id="confirm" autoFocus>
             <Translator path="common.actions.confirm" />
           </Button>
         </DialogFooter>

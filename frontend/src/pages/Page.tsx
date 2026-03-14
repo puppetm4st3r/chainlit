@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useRecoilValue } from 'recoil';
 
@@ -16,11 +17,25 @@ type Props = {
   children: JSX.Element;
 };
 
+const DEFAULT_TASKLIST_PANEL_SIZE = 30;
+const DEFAULT_SIDE_VIEW_PANEL_SIZE = 70;
+
 const Page = ({ children }: Props) => {
   const { config } = useConfig();
   const { data } = useAuth();
   const userEnv = useRecoilValue(userEnvState);
   const sideView = useRecoilValue(sideViewState);
+  const defaultSidePanelSize = sideView
+    ? DEFAULT_SIDE_VIEW_PANEL_SIZE
+    : DEFAULT_TASKLIST_PANEL_SIZE;
+  const [desktopPanelSizes, setDesktopPanelSizes] = useState<number[]>([
+    100 - defaultSidePanelSize,
+    defaultSidePanelSize
+  ]);
+
+  useEffect(() => {
+    setDesktopPanelSizes([100 - defaultSidePanelSize, defaultSidePanelSize]);
+  }, [defaultSidePanelSize]);
 
   if (config?.userEnv) {
     for (const key of config.userEnv || []) {
@@ -30,15 +45,17 @@ const Page = ({ children }: Props) => {
 
   const mainContent = (
     <div className="flex flex-col h-full w-full">
-      <Header />
+      <Header sidePanelSize={desktopPanelSizes[1] ?? defaultSidePanelSize} />
       <ResizablePanelGroup
+        key={sideView ? 'side-view-layout' : 'tasklist-layout'}
         direction="horizontal"
         className="flex flex-row flex-grow"
+        onLayout={setDesktopPanelSizes}
       >
         <ResizablePanel
           className="flex flex-col h-full w-full"
-          minSize={40}
-          defaultSize={60}
+          minSize={30}
+          defaultSize={100 - defaultSidePanelSize}
         >
           <div className="flex flex-row flex-grow overflow-auto">
             {children}

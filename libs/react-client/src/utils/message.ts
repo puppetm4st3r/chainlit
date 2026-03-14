@@ -160,6 +160,86 @@ const deleteMessageById = (messages: IStep[], messageId: string) => {
   return nextMessages;
 };
 
+const applyUpdatedContentToMessage = (
+  message: IStep,
+  updatedContent: string,
+  isSequence: boolean,
+  isInput: boolean
+): IStep => {
+  if (isInput && 'input' in message && message.input !== undefined) {
+    return {
+      ...message,
+      input: isSequence ? updatedContent : message.input + updatedContent
+    };
+  }
+
+  if ('output' in message && message.output !== undefined) {
+    return {
+      ...message,
+      output: isSequence ? updatedContent : message.output + updatedContent
+    };
+  }
+
+  return message;
+};
+
+const updateMessageContentInTree = (
+  messages: IStep[],
+  messageId: number | string,
+  updatedContent: string,
+  isSequence: boolean,
+  isInput: boolean
+): [IStep[], boolean] => {
+  for (let index = 0; index < messages.length; index++) {
+    const msg = messages[index];
+
+    if (isEqual(msg.id, messageId)) {
+      const updatedMessage = applyUpdatedContentToMessage(
+        msg,
+        updatedContent,
+        isSequence,
+        isInput
+      );
+
+      if (updatedMessage === msg) {
+        return [messages, false];
+      }
+
+      return [
+        [
+          ...messages.slice(0, index),
+          updatedMessage,
+          ...messages.slice(index + 1)
+        ],
+        true
+      ];
+    }
+
+    if (msg.steps?.length) {
+      const [updatedSteps, didUpdate] = updateMessageContentInTree(
+        msg.steps,
+        messageId,
+        updatedContent,
+        isSequence,
+        isInput
+      );
+
+      if (didUpdate) {
+        return [
+          [
+            ...messages.slice(0, index),
+            { ...msg, steps: updatedSteps },
+            ...messages.slice(index + 1)
+          ],
+          true
+        ];
+      }
+    }
+  }
+
+  return [messages, false];
+};
+
 const updateMessageContentById = (
   messages: IStep[],
   messageId: number | string,
@@ -167,49 +247,14 @@ const updateMessageContentById = (
   isSequence: boolean,
   isInput: boolean
 ): IStep[] => {
-  const nextMessages = [...messages];
-  for (let index = 0; index < nextMessages.length; index++) {
-    const msg = nextMessages[index];
-
-    if (isEqual(msg.id, messageId)) {
-      if ('content' in msg && msg.content !== undefined) {
-        if (isSequence) {
-          msg.content = updatedContent;
-        } else {
-          msg.content += updatedContent;
-        }
-      } else if (isInput) {
-        if ('input' in msg && msg.input !== undefined) {
-          if (isSequence) {
-            msg.input = updatedContent;
-          } else {
-            msg.input += updatedContent;
-          }
-        }
-      } else {
-        if ('output' in msg && msg.output !== undefined) {
-          if (isSequence) {
-            msg.output = updatedContent;
-          } else {
-            msg.output += updatedContent;
-          }
-        }
-      }
-
-      nextMessages[index] = { ...msg };
-    } else if (msg.steps) {
-      msg.steps = updateMessageContentById(
-        msg.steps,
-        messageId,
-        updatedContent,
-        isSequence,
-        isInput
-      );
-      nextMessages[index] = { ...msg };
-    }
-  }
-
-  return nextMessages;
+  const [updatedMessages] = updateMessageContentInTree(
+    messages,
+    messageId,
+    updatedContent,
+    isSequence,
+    isInput
+  );
+  return updatedMessages;
 };
 
 export {

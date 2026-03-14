@@ -25,6 +25,7 @@ from pydantic.dataclasses import dataclass
 InputWidgetType = Literal[
     "switch",
     "slider",
+    "progress",
     "select",
     "textinput",
     "tags",

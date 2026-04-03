@@ -1,5 +1,4 @@
 import { cn } from '@/lib/utils';
-import { GripVertical } from 'lucide-react';
 import * as ResizablePrimitive from 'react-resizable-panels';
 
 const ResizablePanelGroup = ({
@@ -26,15 +25,20 @@ const ResizableHandle = ({
 }) => (
   <ResizablePrimitive.PanelResizeHandle
     className={cn(
-      'relative flex w-px items-center justify-center bg-border after:absolute after:inset-y-0 after:left-1/2 after:w-1 after:-translate-x-1/2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-1 data-[panel-group-direction=vertical]:h-px data-[panel-group-direction=vertical]:w-full data-[panel-group-direction=vertical]:after:left-0 data-[panel-group-direction=vertical]:after:h-1 data-[panel-group-direction=vertical]:after:w-full data-[panel-group-direction=vertical]:after:-translate-y-1/2 data-[panel-group-direction=vertical]:after:translate-x-0 [&[data-panel-group-direction=vertical]>div]:rotate-90',
+      'group relative flex w-3 shrink-0 items-center justify-center bg-transparent focus-visible:outline-none',
+      'data-[panel-group-direction=vertical]:h-3 data-[panel-group-direction=vertical]:w-full',
+      'after:pointer-events-none after:absolute after:left-1/2 after:h-12 after:w-1.5 after:-translate-x-1/2 after:rounded-full after:bg-muted-foreground/20 after:transition-all after:duration-200',
+      'hover:after:bg-muted-foreground/30 data-[resize-handle-state=drag]:after:h-14 data-[resize-handle-state=drag]:after:bg-ring/55',
+      'data-[panel-group-direction=vertical]:after:left-auto data-[panel-group-direction=vertical]:after:top-1/2 data-[panel-group-direction=vertical]:after:h-1.5 data-[panel-group-direction=vertical]:after:w-12 data-[panel-group-direction=vertical]:after:-translate-y-1/2 data-[panel-group-direction=vertical]:after:translate-x-0',
+      'data-[panel-group-direction=vertical]:hover:after:w-14 data-[panel-group-direction=vertical]:data-[resize-handle-state=drag]:after:w-16',
+      'cursor-col-resize data-[panel-group-direction=vertical]:cursor-row-resize',
+      'focus-visible:after:bg-ring/55',
       className
     )}
     {...props}
   >
     {withHandle && (
-      <div className="z-10 flex h-4 w-3 items-center justify-center rounded-sm border bg-border">
-        <GripVertical className="h-2.5 w-2.5" />
-      </div>
+      <div className="z-10 h-12 w-1.5 rounded-full bg-muted-foreground/20 transition-all duration-200 group-hover:bg-muted-foreground/30 group-data-[resize-handle-state=drag]:h-14 group-data-[resize-handle-state=drag]:bg-ring/55 data-[panel-group-direction=vertical]:h-1.5 data-[panel-group-direction=vertical]:w-12" />
     )}
   </ResizablePrimitive.PanelResizeHandle>
 );

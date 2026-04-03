@@ -127,6 +127,16 @@ async def set_chat_profile(profile_name: str):
     await context.emitter.set_chat_profile(profile_name)
 
 
+async def update_chat_settings(settings: Dict[str, Any]):
+    """
+    Programmatically update one or more chat setting values in the UI.
+
+    Args:
+        settings (Dict[str, Any]): Partial chat settings payload to merge into the current session state.
+    """
+    await context.emitter.update_chat_settings(settings)
+
+
 @dataclass()
 class CopilotFunction:
     name: str
@@ -226,6 +236,7 @@ __all__ = [
     "run_sync",
     "send_window_message",
     "set_chat_profile",
+    "update_chat_settings",
     "set_chat_profiles",
     "set_starter_categories",
     "set_starters",

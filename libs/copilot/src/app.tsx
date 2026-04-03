@@ -5,13 +5,16 @@ import Widget from 'widget';
 
 import { useTranslation } from '@chainlit/app/src/components/i18n/Translator';
 import { ChainlitContext, useAuth } from '@chainlit/react-client';
+import { v4 as uuidv4 } from 'uuid';
 
 import { useCopilotInteract } from './hooks/useCopilotInteract';
 
 import { ThemeProvider } from './ThemeProvider';
 import {
+  COPILOT_SESSION_RESET_EVENT_KEY,
   COPILOT_THREAD_CHANGED_EVENT_KEY,
-  CopilotThreadChangedEventParams
+  CopilotThreadChangedEventParams,
+  setCopilotNextSessionId
 } from './state';
 
 interface Props {
@@ -84,6 +87,22 @@ export default function App({ widgetConfig }: Props) {
     return () => {
       window.removeEventListener(
         COPILOT_THREAD_CHANGED_EVENT_KEY,
+        eventListener
+      );
+    };
+  }, []);
+
+  useEffect(() => {
+    const eventListener = () => {
+      const newSessionId = uuidv4();
+      setCopilotNextSessionId(newSessionId);
+    };
+
+    window.addEventListener(COPILOT_SESSION_RESET_EVENT_KEY, eventListener);
+
+    return () => {
+      window.removeEventListener(
+        COPILOT_SESSION_RESET_EVENT_KEY,
         eventListener
       );
     };

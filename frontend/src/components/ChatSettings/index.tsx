@@ -53,10 +53,66 @@ export default function ChatSettingsModal() {
     setChatSettingsValue(cloneDeep(valuesAtOpen));
   }, [inputsAtOpen, setChatSettingsInputs, setChatSettingsValue, valuesAtOpen]);
 
-  // Reset form when default values change
+  const collectLeafInputs = (inputs: any[]): any[] => {
+    const leafInputs: any[] = [];
+
+    inputs.forEach((input: any) => {
+      if (!input) {
+        return;
+      }
+
+      if (Array.isArray(input.inputs) && input.inputs.length > 0) {
+        leafInputs.push(...collectLeafInputs(input.inputs));
+        return;
+      }
+
+      leafInputs.push(input);
+    });
+
+    return leafInputs;
+  };
+
+  const collectLiveReadOnlyInputIds = (inputs: any[]): string[] => {
+    const ids: string[] = [];
+
+    inputs.forEach((input: any) => {
+      if (!input) {
+        return;
+      }
+
+      if (Array.isArray(input.inputs) && input.inputs.length > 0) {
+        ids.push(...collectLiveReadOnlyInputIds(input.inputs));
+        return;
+      }
+
+      const isReadOnlyProgress = input.type === 'progress';
+      const isDisabledInformationalField =
+        input.disabled === true &&
+        (input.type === 'textinput' || input.type === 'numberinput');
+
+      if ((isReadOnlyProgress || isDisabledInformationalField) && input.id) {
+        ids.push(input.id);
+      }
+    });
+
+    return ids;
+  };
+
+  // Reset form when the widget schema changes or when the modal opens.
   useEffect(() => {
+    if (!chatSettingsOpen) {
+      return;
+    }
     reset(chatSettingsValue);
-  }, [chatSettingsValue, reset]);
+  }, [chatSettingsInputs, chatSettingsOpen, reset]);
+
+  // Live progress widgets should refresh in place without resetting editable fields.
+  useEffect(() => {
+    const readOnlyInputIds = collectLiveReadOnlyInputIds(chatSettingsInputs);
+    readOnlyInputIds.forEach((id) => {
+      setValue(id, chatSettingsValue[id]);
+    });
+  }, [chatSettingsInputs, chatSettingsValue, setValue]);
 
   const handleClose = (open: boolean) => {
     if (!open) {
@@ -87,7 +143,23 @@ export default function ChatSettingsModal() {
   };
 
   const values = watch();
+  const leafInputs = collectLeafInputs(chatSettingsInputs);
+  const hasOnlyReadOnlyInformationalInputs =
+    leafInputs.length > 0 &&
+    leafInputs.every((input: any) => {
+      if (!input) {
+        return false;
+      }
 
+      if (input.type === 'progress') {
+        return true;
+      }
+
+      return (
+        input.disabled === true &&
+        (input.type === 'textinput' || input.type === 'numberinput')
+      );
+    });
   const tabInputs = chatSettingsInputs.filter(
     (input: any) => Array.isArray(input?.inputs) && input.inputs.length > 0
   );
@@ -96,6 +168,10 @@ export default function ChatSettingsModal() {
   );
   const hasTabs = tabInputs.length > 0;
   const defaultTab = tabInputs[0]?.id;
+
+  const handlePrimaryAction = hasOnlyReadOnlyInformationalInputs
+    ? () => handleClose(false)
+    : handleConfirm;
 
   return (
     <Dialog open={chatSettingsOpen} onOpenChange={handleClose}>
@@ -161,14 +237,18 @@ export default function ChatSettingsModal() {
           </div>
         )}
         <DialogFooter>
-          <Button variant="outline" onClick={handleReset}>
-            <Translator path="common.actions.reset" />
-          </Button>
-          <div className="flex-1" />
-          <Button variant="ghost" onClick={() => handleClose(false)}>
-            <Translator path="common.actions.cancel" />
-          </Button>
-          <Button onClick={handleConfirm} id="confirm" autoFocus>
+          {!hasOnlyReadOnlyInformationalInputs ? (
+            <>
+              <Button variant="outline" onClick={handleReset}>
+                <Translator path="common.actions.reset" />
+              </Button>
+              <div className="flex-1" />
+              <Button variant="ghost" onClick={() => handleClose(false)}>
+                <Translator path="common.actions.cancel" />
+              </Button>
+            </>
+          ) : null}
+          <Button onClick={handlePrimaryAction} id="confirm" autoFocus>
             <Translator path="common.actions.confirm" />
           </Button>
         </DialogFooter>

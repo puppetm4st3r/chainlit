@@ -3,6 +3,7 @@ from typing import Literal, Optional, cast, List
 from urllib.parse import urlparse
 
 from fastapi import Request, Response
+from fastapi.openapi.models import OAuth2, OAuthFlowPassword, OAuthFlows
 from fastapi.exceptions import HTTPException
 from fastapi.security.base import SecurityBase
 from fastapi.security.utils import get_authorization_scheme_param
@@ -73,10 +74,15 @@ class OAuth2PasswordBearerWithCookie(SecurityBase):
         tokenUrl: str,
         scheme_name: Optional[str] = None,
         auto_error: bool = True,
+        description: Optional[str] = None,
     ):
         self.tokenUrl = tokenUrl
         self.scheme_name = scheme_name or self.__class__.__name__
         self.auto_error = auto_error
+        self.model = OAuth2(
+            flows=OAuthFlows(password=OAuthFlowPassword(tokenUrl=tokenUrl, scopes={})),
+            description=description,
+        )
 
     async def __call__(self, request: Request) -> Optional[str]:
         # First try to get the token from the cookie

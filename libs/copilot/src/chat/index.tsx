@@ -4,7 +4,8 @@ import { useRecoilValue, useSetRecoilState } from 'recoil';
 import {
   threadIdToResumeState,
   useChatInteract,
-  useChatSession
+  useChatSession,
+  sessionIdState
 } from '@chainlit/react-client';
 
 import { copilotThreadIdState } from '../state';
@@ -18,9 +19,11 @@ export default function ChatWrapper({ expanded }: Props) {
   const { connect, session, idToResume } = useChatSession();
   const { sendMessage } = useChatInteract();
   const copilotThreadId = useRecoilValue(copilotThreadIdState);
+  const sessionId = useRecoilValue(sessionIdState);
   const setThreadIdToResume = useSetRecoilState(threadIdToResumeState);
   const hasConnected = useRef<boolean>(false);
   const lastConnectedThreadId = useRef<string | null>(null);
+  const lastConnectedSessionId = useRef<string | null>(null);
 
   useEffect(() => {
     if (!copilotThreadId) {
@@ -46,6 +49,22 @@ export default function ChatWrapper({ expanded }: Props) {
   }, [copilotThreadId]);
 
   useEffect(() => {
+    if (
+      sessionId &&
+      lastConnectedSessionId.current &&
+      sessionId !== lastConnectedSessionId.current &&
+      hasConnected.current
+    ) {
+      if (session?.socket?.connected) {
+        session.socket.disconnect();
+      }
+      hasConnected.current = false;
+      lastConnectedThreadId.current = null;
+      lastConnectedSessionId.current = null;
+    }
+  }, [sessionId, session]);
+
+  useEffect(() => {
     if (!copilotThreadId || !idToResume || copilotThreadId !== idToResume) {
       return;
     }
@@ -56,12 +75,13 @@ export default function ChatWrapper({ expanded }: Props) {
 
     hasConnected.current = true;
     lastConnectedThreadId.current = copilotThreadId;
+    lastConnectedSessionId.current = sessionId || null;
     connect({
       // @ts-expect-error window typing
       transports: window.transports,
       userEnv: {}
     });
-  }, [copilotThreadId, idToResume, connect]);
+  }, [copilotThreadId, idToResume, connect, sessionId]);
 
   useEffect(() => {
     // @ts-expect-error is not a valid prop

@@ -73,6 +73,35 @@ class Slider(InputWidget):
 
 
 @dataclass
+class Progress(InputWidget):
+    """Useful to create a read-only progress indicator."""
+
+    type: InputWidgetType = "progress"
+    initial: float = 0
+    min: float = 0
+    max: float = 100
+    step: float = 1
+    precision: int = 0
+    suffix: Optional[str] = "%"
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "type": self.type,
+            "id": self.id,
+            "label": self.label,
+            "initial": self.initial,
+            "min": self.min,
+            "max": self.max,
+            "step": self.step,
+            "precision": self.precision,
+            "suffix": self.suffix,
+            "tooltip": self.tooltip,
+            "description": self.description,
+            "disabled": True if self.disabled is None else self.disabled,
+        }
+
+
+@dataclass
 class Select(InputWidget):
     """Useful to create a select input."""
 

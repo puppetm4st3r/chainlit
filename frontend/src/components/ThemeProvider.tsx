@@ -20,6 +20,38 @@ const initialState: ThemeProviderState = {
 
 const ThemeProviderContext = createContext<ThemeProviderState>(initialState);
 
+function isTheme(value: unknown): value is Theme {
+  return value === 'light' || value === 'dark' || value === 'system';
+}
+
+function parseThemeControlMessage(data: unknown): { type: string; theme?: Theme } | null {
+  if (typeof data === 'string') {
+    const trimmed = data.trim();
+    if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) return null;
+    try {
+      return parseThemeControlMessage(JSON.parse(trimmed));
+    } catch {
+      return null;
+    }
+  }
+
+  if (!data || typeof data !== 'object') return null;
+
+  const candidate = data as { type?: unknown; theme?: unknown };
+  if (typeof candidate.type !== 'string') return null;
+  if (candidate.theme !== undefined && !isTheme(candidate.theme)) return null;
+
+  return {
+    type: candidate.type,
+    theme: candidate.theme
+  };
+}
+
+function postThemeMessage(message: Record<string, unknown>) {
+  if (typeof window === 'undefined' || window.parent === window) return;
+  window.parent.postMessage(JSON.stringify(message), '*');
+}
+
 function applyThemeVariables(variant: 'dark' | 'light') {
   if (!window.theme) return;
 
@@ -62,6 +94,37 @@ export function ThemeProvider({
     }
 
     root.classList.add(theme);
+  }, [theme]);
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      const message = parseThemeControlMessage(event.data);
+      if (!message || message.type !== 'host:set_theme' || !message.theme) return;
+      localStorage.setItem(storageKey, message.theme);
+      setTheme(message.theme);
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [storageKey]);
+
+  useEffect(() => {
+    postThemeMessage({ type: 'chainlit:theme_sync_request' });
+  }, []);
+
+  useEffect(() => {
+    const effectiveTheme =
+      theme === 'system'
+        ? window.matchMedia('(prefers-color-scheme: dark)').matches
+          ? 'dark'
+          : 'light'
+        : theme;
+
+    postThemeMessage({
+      type: 'chainlit:theme_changed',
+      theme,
+      effectiveTheme
+    });
   }, [theme]);
 
   const value = {

@@ -1,5 +1,5 @@
 import { debounce } from 'lodash';
-import { useCallback, useContext, useEffect } from 'react';
+import { useCallback, useContext, useEffect, useRef } from 'react';
 import {
   useRecoilState,
   useRecoilValue,
@@ -56,11 +56,17 @@ import {
 import { OutputAudioChunk } from './types/audio';
 
 import { ChainlitContext } from './context';
+import { useLanguage } from './useLanguage';
 import type { IToken } from './useChatData';
+
+interface BufferedStreamToken extends IToken {
+  key: string;
+}
 
 const useChatSession = () => {
   const client = useContext(ChainlitContext);
   const sessionId = useRecoilValue(sessionIdState);
+  const { language } = useLanguage();
 
   const [session, setSession] = useRecoilState(sessionState);
   const setIsAiSpeaking = useSetRecoilState(isAiSpeakingState);
@@ -90,6 +96,142 @@ const useChatSession = () => {
 
   const [currentThreadId, setCurrentThreadId] =
     useRecoilState(currentThreadIdState);
+  const bufferedStreamTokensRef = useRef<Map<string, BufferedStreamToken>>(
+    new Map()
+  );
+  const streamFlushHandleRef = useRef<number | null>(null);
+
+  const mergeChatSettingsInputs = useCallback(
+    (inputs: any[], values: Record<string, any>): any[] => {
+      if (!Array.isArray(inputs)) {
+        return inputs;
+      }
+
+      return inputs.map((input) => {
+        if (!input) {
+          return input;
+        }
+
+        if (Array.isArray(input.inputs) && input.inputs.length > 0) {
+          return {
+            ...input,
+            inputs: mergeChatSettingsInputs(input.inputs, values)
+          };
+        }
+
+        if (input.id === undefined || !Object.prototype.hasOwnProperty.call(values, input.id)) {
+          return input;
+        }
+
+        const rawValue = values[input.id];
+        const nextInitial =
+          rawValue && typeof rawValue === 'object' && Object.prototype.hasOwnProperty.call(rawValue, 'value')
+            ? rawValue.value
+            : rawValue;
+
+        return {
+          ...input,
+          initial: nextInitial,
+          description:
+            rawValue && typeof rawValue === 'object' && typeof rawValue.description === 'string'
+              ? rawValue.description
+              : input.description
+        };
+      });
+    },
+    []
+  );
+
+  const cancelScheduledStreamFlush = useCallback(() => {
+    if (streamFlushHandleRef.current === null) {
+      return;
+    }
+    if (typeof window !== 'undefined') {
+      window.cancelAnimationFrame(streamFlushHandleRef.current);
+    }
+    streamFlushHandleRef.current = null;
+  }, []);
+
+  const flushBufferedStreamTokens = useCallback(() => {
+    cancelScheduledStreamFlush();
+    const bufferedTokens = Array.from(bufferedStreamTokensRef.current.values());
+    bufferedStreamTokensRef.current.clear();
+
+    if (!bufferedTokens.length) {
+      return;
+    }
+
+    setMessages((oldMessages) => {
+      let nextMessages = oldMessages;
+      for (const { id, token, isSequence, isInput } of bufferedTokens) {
+        nextMessages = updateMessageContentById(
+          nextMessages,
+          id,
+          token,
+          isSequence,
+          isInput
+        );
+      }
+      return nextMessages;
+    });
+  }, [cancelScheduledStreamFlush, setMessages]);
+
+  const scheduleStreamFlush = useCallback(() => {
+    if (streamFlushHandleRef.current !== null) {
+      return;
+    }
+
+    if (typeof window === 'undefined') {
+      flushBufferedStreamTokens();
+      return;
+    }
+
+    streamFlushHandleRef.current = window.requestAnimationFrame(() => {
+      streamFlushHandleRef.current = null;
+      flushBufferedStreamTokens();
+    });
+  }, [flushBufferedStreamTokens]);
+
+  const enqueueBufferedStreamToken = useCallback(
+    ({ id, token, isSequence, isInput }: IToken) => {
+      const key = `${id}:${isInput ? 'input' : 'output'}`;
+      const existingToken = bufferedStreamTokensRef.current.get(key);
+
+      if (!existingToken) {
+        bufferedStreamTokensRef.current.set(key, {
+          id,
+          token,
+          isSequence,
+          isInput,
+          key
+        });
+      } else if (isSequence) {
+        bufferedStreamTokensRef.current.set(key, {
+          id,
+          token,
+          isSequence: true,
+          isInput,
+          key
+        });
+      } else {
+        bufferedStreamTokensRef.current.set(key, {
+          ...existingToken,
+          token: existingToken.token + token,
+          isSequence: existingToken.isSequence
+        });
+      }
+
+      scheduleStreamFlush();
+    },
+    [scheduleStreamFlush]
+  );
+
+  useEffect(() => {
+    return () => {
+      cancelScheduledStreamFlush();
+      bufferedStreamTokensRef.current.clear();
+    };
+  }, [cancelScheduledStreamFlush]);
 
   // Use currentThreadId as thread id in websocket header
   useEffect(() => {
@@ -122,6 +264,10 @@ const useChatSession = () => {
       // Add CSRF headers when protections are active
       const extraHeaders: Record<string, string> = {};
       extraHeaders['X-Requested-With'] = 'XMLHttpRequest';
+
+      if (language) {
+        extraHeaders['X-Prompt-Language'] = language;
+      }
       
       // Add origin validation
       const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
@@ -306,6 +452,7 @@ const useChatSession = () => {
       });
 
       socket.on('new_message', (message: IStep) => {
+        flushBufferedStreamTokens();
         setMessages((oldMessages) => addMessage(oldMessages, message));
       });
 
@@ -318,37 +465,30 @@ const useChatSession = () => {
       );
 
       socket.on('update_message', (message: IStep) => {
+        flushBufferedStreamTokens();
         setMessages((oldMessages) =>
           updateMessageById(oldMessages, message.id, message)
         );
       });
 
       socket.on('delete_message', (message: IStep) => {
+        flushBufferedStreamTokens();
         setMessages((oldMessages) =>
           deleteMessageById(oldMessages, message.id)
         );
       });
 
       socket.on('stream_start', (message: IStep) => {
+        flushBufferedStreamTokens();
         setMessages((oldMessages) => addMessage(oldMessages, message));
       });
 
-      socket.on(
-        'stream_token',
-        ({ id, token, isSequence, isInput }: IToken) => {
-          setMessages((oldMessages) =>
-            updateMessageContentById(
-              oldMessages,
-              id,
-              token,
-              isSequence,
-              isInput
-            )
-          );
-        }
-      );
+      socket.on('stream_token', (payload: IToken) => {
+        enqueueBufferedStreamToken(payload);
+      });
 
       socket.on('ask', ({ msg, spec }, callback) => {
+        flushBufferedStreamTokens();
         setAskUser({ spec, callback, parentId: msg.parentId });
         setMessages((oldMessages) => addMessage(oldMessages, msg));
 
@@ -379,6 +519,27 @@ const useChatSession = () => {
       socket.on('chat_settings', (inputs: any) => {
         setChatSettingsInputs(inputs);
         resetChatSettingsValue();
+      });
+
+      socket.on('chat_settings_values', (values: Record<string, any>) => {
+        setChatSettingsInputs((previousInputs) =>
+          mergeChatSettingsInputs(previousInputs, values)
+        );
+        setChatSettingsValue((previousValues) => ({
+          ...previousValues,
+          ...Object.fromEntries(
+            Object.entries(values).map(([key, value]) => {
+              if (
+                value &&
+                typeof value === 'object' &&
+                Object.prototype.hasOwnProperty.call(value, 'value')
+              ) {
+                return [key, value.value];
+              }
+              return [key, value];
+            })
+          )
+        }));
       });
 
       socket.on('set_commands', (commands: ICommand[]) => {
@@ -508,17 +669,27 @@ const useChatSession = () => {
         }
       });
     },
-    [setSession, sessionId, idToResume, chatProfile]
+    [
+      setSession,
+      sessionId,
+      idToResume,
+      chatProfile,
+      language,
+      enqueueBufferedStreamToken,
+      flushBufferedStreamTokens
+    ]
   );
 
   const connect = useCallback(debounce(_connect, 200), [_connect]);
 
   const disconnect = useCallback(() => {
+    cancelScheduledStreamFlush();
+    bufferedStreamTokensRef.current.clear();
     if (session?.socket) {
       session.socket.removeAllListeners();
       session.socket.close();
     }
-  }, [session]);
+  }, [cancelScheduledStreamFlush, session]);
 
   return {
     connect,

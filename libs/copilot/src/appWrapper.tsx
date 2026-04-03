@@ -4,9 +4,13 @@ import { RecoilRoot } from 'recoil';
 import { IWidgetConfig } from 'types';
 
 import { i18nSetupLocalization } from '@chainlit/app/src/i18n';
-import { ChainlitContext } from '@chainlit/react-client';
+import { ChainlitContext, sessionIdState } from '@chainlit/react-client';
 
 import App from './app';
+import {
+  clearCopilotNextSessionId,
+  getCopilotNextSessionId
+} from './state';
 
 i18nSetupLocalization();
 interface Props {
@@ -70,7 +74,15 @@ export default function AppWrapper({ widgetConfig }: Props) {
 
   return (
     <ChainlitContext.Provider value={apiClient}>
-      <RecoilRoot>
+      <RecoilRoot
+        initializeState={({ set }) => {
+          const nextSessionId = getCopilotNextSessionId();
+          if (nextSessionId) {
+            set(sessionIdState, nextSessionId);
+            clearCopilotNextSessionId();
+          }
+        }}
+      >
         <App widgetConfig={widgetConfig} />
       </RecoilRoot>
     </ChainlitContext.Provider>

@@ -7,7 +7,7 @@ import { atom, useRecoilState } from 'recoil';
  * 2) Browser language (navigator.language)
  * 3) Fallback to 'en-US'
  */
-function resolveDefaultLanguage(): string {
+export function resolveDefaultLanguage(): string {
   try {
     if (typeof window !== 'undefined') {
       const stored = window.localStorage.getItem('cl:language');

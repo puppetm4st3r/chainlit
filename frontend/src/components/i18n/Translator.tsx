@@ -1,15 +1,35 @@
 import { TOptions } from 'i18next';
-import { $Dictionary } from 'i18next/typescript/helpers';
 import { useTranslation as usei18nextTranslation } from 'react-i18next';
 
 import { Skeleton } from '@/components/ui/skeleton';
 
-type options = TOptions<$Dictionary>;
+type TranslationKey = string | string[];
+type TranslationOptions = TOptions;
+
+/**
+ * Normalizes i18n results to plain text because this wrapper is only used
+ * in UI surfaces that expect string content.
+ */
+const toText = (value: unknown): string => {
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+
+  if (value == null) {
+    return '';
+  }
+
+  return JSON.stringify(value);
+};
 
 type TranslatorProps = {
-  path: string | string[];
+  path: TranslationKey;
   suffix?: string;
-  options?: options;
+  options?: TranslationOptions;
 };
 
 const Translator = ({ path, options, suffix }: TranslatorProps) => {
@@ -21,7 +41,7 @@ const Translator = ({ path, options, suffix }: TranslatorProps) => {
 
   return (
     <span>
-      {t(path, options)}
+      {toText(t(path, options))}
       {suffix}
     </span>
   );
@@ -31,12 +51,12 @@ export const useTranslation = () => {
   const { t, ready, i18n } = usei18nextTranslation();
 
   return {
-    t: (path: string | string[], options?: options) => {
+    t: (path: TranslationKey, options?: TranslationOptions) => {
       if (!i18n.exists(path, options)) {
         return '...';
       }
 
-      return t(path, options);
+      return toText(t(path, options));
     },
     ready,
     i18n

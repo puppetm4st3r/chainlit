@@ -2,6 +2,7 @@ import { IElement, IThread, IUser } from 'src/types';
 
 import { IAction } from 'src/types/action';
 import { IFeedback } from 'src/types/feedback';
+import { resolveDefaultLanguage } from 'src/useLanguage';
 
 export * from './hooks/auth';
 export * from './hooks/api';
@@ -117,7 +118,7 @@ export class APIBase {
     path: string,
     data?: Payload,
     signal?: AbortSignal,
-    headers: { Authorization?: string; 'Content-Type'?: string } = {}
+    headers: Record<string, string> = {}
   ): Promise<Response> {
     try {
       let body;
@@ -127,6 +128,11 @@ export class APIBase {
       } else {
         headers['Content-Type'] = 'application/json';
         body = data ? JSON.stringify(data) : null;
+      }
+
+      const promptLanguage = resolveDefaultLanguage();
+      if (promptLanguage && !headers['X-Prompt-Language']) {
+        headers['X-Prompt-Language'] = promptLanguage;
       }
 
       // Add CSRF protection headers when protections are active
@@ -290,6 +296,11 @@ export class ChainlitAPI extends APIBase {
         ),
         true
       );
+
+      const promptLanguage = resolveDefaultLanguage();
+      if (promptLanguage) {
+        xhr.setRequestHeader('X-Prompt-Language', promptLanguage);
+      }
 
       // Track the progress of the upload
       xhr.upload.onprogress = function (event) {

@@ -628,8 +628,9 @@ async def jwt_auth(request: Request):
 
     try:
         user = decode_jwt(token)
-        # this method must be used only in DEXA Navigator mode
-        if not user.extra.get("navigator"):
+        # This method must be used only in DEXA Navigator mode
+        user_roles = (user.metadata or {}).get("roles", [])
+        if "navigator" not in user_roles:
             raise HTTPException(status_code=401, detail="Invalid token (DEXA Navigator mode only)")
         response = await _authenticate_user(request, user)
         return response

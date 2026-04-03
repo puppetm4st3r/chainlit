@@ -19,11 +19,13 @@ import {
   commandsState,
   currentThreadIdState,
   elementState,
+  favoriteMessagesState,
   firstUserInteraction,
   isAiSpeakingState,
   loadingState,
   mcpState,
   messagesState,
+  modesState,
   resumeThreadErrorState,
   sessionIdState,
   sessionState,
@@ -39,6 +41,7 @@ import {
   ICommand,
   IElement,
   IMessageElement,
+  IMode,
   IStep,
   ITasklistElement,
   IThread
@@ -73,6 +76,7 @@ const useChatSession = () => {
   const setAskUser = useSetRecoilState(askUserState);
   const setCallFn = useSetRecoilState(callFnState);
   const setCommands = useSetRecoilState(commandsState);
+  const setModes = useSetRecoilState(modesState);
   const setSideView = useSetRecoilState(sideViewState);
   const setElements = useSetRecoilState(elementState);
   const setTasklists = useSetRecoilState(tasklistState);
@@ -82,6 +86,7 @@ const useChatSession = () => {
   const [chatProfile, setChatProfile] = useRecoilState(chatProfileState);
   const idToResume = useRecoilValue(threadIdToResumeState);
   const setThreadResumeError = useSetRecoilState(resumeThreadErrorState);
+  const setFavoriteMessages = useSetRecoilState(favoriteMessagesState);
 
   const [currentThreadId, setCurrentThreadId] =
     useRecoilState(currentThreadIdState);
@@ -148,6 +153,7 @@ const useChatSession = () => {
       socket.on('connect', () => {
         socket.emit('connection_successful');
         setSession((s) => ({ ...s!, error: false }));
+        socket.emit('fetch_favorites');
         setMcps((prev) =>
           prev.map((mcp) => {
             let promise;
@@ -222,20 +228,31 @@ const useChatSession = () => {
           let isFirstChunk = true;
           const startTime = Date.now();
           const mimeType = 'pcm16';
-          // Connect to microphone
-          await wavRecorder.begin();
-          await wavStreamPlayer.connect();
-          await wavRecorder.record(async (data) => {
-            const elapsedTime = Date.now() - startTime;
-            socket.emit('audio_chunk', {
-              isStart: isFirstChunk,
-              mimeType,
-              elapsedTime,
-              data: data.mono
+          try {
+            await wavRecorder.begin();
+            await wavStreamPlayer.connect();
+            await wavRecorder.record(async (data) => {
+              const elapsedTime = Date.now() - startTime;
+              socket.emit('audio_chunk', {
+                isStart: isFirstChunk,
+                mimeType,
+                elapsedTime,
+                data: data.mono
+              });
+              isFirstChunk = false;
             });
-            isFirstChunk = false;
-          });
-          wavStreamPlayer.onStop = () => setIsAiSpeaking(false);
+            wavStreamPlayer.onStop = () => setIsAiSpeaking(false);
+          } catch {
+            try {
+              await wavRecorder.end();
+            } catch {
+              // ignored
+            }
+            await wavStreamPlayer.interrupt();
+            socket.emit('audio_end');
+            setAudioConnection('off');
+            return;
+          }
         } else {
           await wavRecorder.end();
           await wavStreamPlayer.interrupt();
@@ -253,7 +270,9 @@ const useChatSession = () => {
       });
 
       socket.on('resume_thread', (thread: IThread) => {
-        const isReadOnlyView = Boolean((thread as any)?.metadata?.viewer_read_only);
+        const isReadOnlyView = Boolean(
+          (thread as any)?.metadata?.viewer_read_only
+        );
         if (!isReadOnlyView && idToResume && thread.id !== idToResume) {
           window.location.href = `/thread/${thread.id}`;
         }
@@ -368,6 +387,14 @@ const useChatSession = () => {
 
       socket.on('set_chat_profile', (profileName: string) => {
         setChatProfile(profileName);
+      });
+
+      socket.on('set_modes', (modes: IMode[]) => {
+        setModes(modes);
+      });
+
+      socket.on('set_favorites', (steps: IStep[]) => {
+        setFavoriteMessages(steps);
       });
 
       socket.on('set_sidebar_title', (title: string) => {

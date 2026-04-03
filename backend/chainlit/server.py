@@ -10,7 +10,7 @@ import urllib.parse
 import webbrowser
 from contextlib import AsyncExitStack, asynccontextmanager
 from pathlib import Path
-from typing import List, Optional, Union, cast, Any
+from typing import TYPE_CHECKING, List, Optional, Union, cast, Any
 
 import socketio
 from fastapi import (
@@ -85,7 +85,11 @@ from ._utils import is_path_inside
 import json
 import base64
 
+if TYPE_CHECKING:
+    from chainlit.element import CustomElement, ElementDict
+
 mimetypes.add_type("application/javascript", ".js")
+mimetypes.add_type("application/javascript", ".mjs")
 mimetypes.add_type("text/css", ".css")
 
 
@@ -98,11 +102,12 @@ async def lifespan(app: FastAPI):
     host = config.run.host
     port = config.run.port
     root_path = os.getenv("CHAINLIT_ROOT_PATH", "")
+    scheme = "https" if config.run.ssl_cert else "http"
 
     if host == DEFAULT_HOST:
-        url = f"http://localhost:{port}{root_path}"
+        url = f"{scheme}://localhost:{port}{root_path}"
     else:
-        url = f"http://{host}:{port}{root_path}"
+        url = f"{scheme}://{host}:{port}{root_path}"
 
     logger.info(f"Your app is available at {url}")
 
@@ -446,10 +451,10 @@ def get_html_template(root_path):
         js += f"""<script src="{config.ui.custom_js}" {config.ui.custom_js_attributes}></script>"""
 
     font = None
-    if custom_theme and custom_theme.get("custom_fonts"):
+    if custom_theme and "custom_fonts" in custom_theme:
         font = "\n".join(
-            f"""<link rel="stylesheet" href="{font}">"""
-            for font in custom_theme.get("custom_fonts")
+            f"""<link rel="stylesheet" href="{f}">"""
+            for f in custom_theme["custom_fonts"]
         )
 
     index_html_file_path = os.path.join(build_dir, "index.html")
@@ -461,7 +466,7 @@ def get_html_template(root_path):
             content = content.replace(JS_PLACEHOLDER, js)
         if css:
             content = content.replace(CSS_PLACEHOLDER, css)
-        if font:
+        if font is not None:
             content = replace_between_tags(
                 content, "<!-- FONT START -->", "<!-- FONT END -->", font
             )
@@ -736,7 +741,7 @@ async def oauth_callback(
     try:
         validate_oauth_state_cookie(request, random_value)
     except Exception as e:
-        logger.exception("Unable to validate oauth state: %1", e)
+        logger.exception("Unable to validate oauth state: %s", e)
 
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -851,8 +856,11 @@ async def project_translations(
 ):
     """Return project translations."""
 
-    # Load translation based on the provided language
-    translation = config.load_translation(language)
+    # Use configured language if set, otherwise use the language from query
+    effective_language = config.ui.language or language
+
+    # Load translation based on the effective language
+    translation = config.load_translation(effective_language)
 
     return JSONResponse(
         content={
@@ -873,13 +881,18 @@ async def project_settings(
 ):
     """Return project settings. This is called by the UI before the establishing the websocket connection."""
 
+    # Use configured language if set, otherwise use the language from query
+    effective_language = config.ui.language or language
+
     # Load the markdown file based on the provided language
-    markdown = get_markdown_str(config.root, language)
+    markdown = get_markdown_str(config.root, effective_language)
 
     chat_profiles = []
     profiles: list[dict] = []
     if config.code.set_chat_profiles:
-        chat_profiles = await config.code.set_chat_profiles(current_user, language)
+        chat_profiles = await config.code.set_chat_profiles(
+            current_user, effective_language
+        )
         if chat_profiles:
             for p in chat_profiles:
                 d = p.to_dict()
@@ -888,9 +901,15 @@ async def project_settings(
 
     starters = []
     if config.code.set_starters:
-        s = await config.code.set_starters(current_user, language)
+        s = await config.code.set_starters(current_user, effective_language)
         if s:
             starters = [it.to_dict() for it in s]
+
+    starter_categories = []
+    if config.code.set_starter_categories:
+        sc = await config.code.set_starter_categories(current_user, effective_language)
+        if sc:
+            starter_categories = [it.to_dict() for it in sc]
 
     data_layer = get_data_layer()
     debug_url = (
@@ -921,6 +940,7 @@ async def project_settings(
             "markdown": markdown,
             "chatProfiles": profiles,
             "starters": starters,
+            "starterCategories": starter_categories,
             "debugUrl": debug_url,
         }
     )
@@ -1061,6 +1081,7 @@ async def get_shared_thread(
     if not isinstance(metadata, dict):
         metadata = {}
 
+    user_can_view = False
     if getattr(config.code, "on_shared_thread_view", None):
         try:
             user_can_view = await config.code.on_shared_thread_view(
@@ -1112,7 +1133,7 @@ async def update_thread_element(
     """Update a specific thread element."""
 
     from chainlit.context import init_ws_context
-    from chainlit.element import Element, ElementDict
+    from chainlit.element import ElementDict
     from chainlit.session import WebsocketSession
 
     session = WebsocketSession.get_by_id(payload.sessionId)
@@ -1123,7 +1144,7 @@ async def update_thread_element(
     if element_dict["type"] != "custom":
         return {"success": False}
 
-    element = Element.from_dict(element_dict)
+    element = _sanitize_custom_element(element_dict)
 
     if current_user:
         if (
@@ -1136,6 +1157,7 @@ async def update_thread_element(
             )
 
     await element.update()
+
     return {"success": True}
 
 
@@ -1147,7 +1169,7 @@ async def delete_thread_element(
     """Delete a specific thread element."""
 
     from chainlit.context import init_ws_context
-    from chainlit.element import CustomElement, ElementDict
+    from chainlit.element import ElementDict
     from chainlit.session import WebsocketSession
 
     session = WebsocketSession.get_by_id(payload.sessionId)
@@ -1158,17 +1180,7 @@ async def delete_thread_element(
     if element_dict["type"] != "custom":
         return {"success": False}
 
-    element = CustomElement(
-        id=element_dict["id"],
-        object_key=element_dict["objectKey"],
-        chainlit_key=element_dict["chainlitKey"],
-        url=element_dict["url"],
-        for_id=element_dict.get("forId") or "",
-        thread_id=element_dict.get("threadId") or "",
-        name=element_dict["name"],
-        props=element_dict.get("props") or {},
-        display=element_dict["display"],
-    )
+    element = _sanitize_custom_element(element_dict)
 
     if current_user:
         if (
@@ -1183,6 +1195,19 @@ async def delete_thread_element(
     await element.remove()
 
     return {"success": True}
+
+
+def _sanitize_custom_element(element_dict: "ElementDict") -> "CustomElement":
+    from chainlit.element import CustomElement
+
+    return CustomElement(
+        id=element_dict["id"],
+        for_id=element_dict.get("forId") or "",
+        thread_id=element_dict.get("threadId") or "",
+        name=element_dict["name"],
+        props=element_dict.get("props") or {},
+        display=element_dict["display"],
+    )
 
 
 @router.put("/project/thread")
@@ -1334,6 +1359,8 @@ async def connect_mcp(
     payload: ConnectMCPRequest,
     current_user: UserParam,
 ):
+    import asyncio
+
     from mcp import ClientSession
     from mcp.client.sse import sse_client
     from mcp.client.stdio import (
@@ -1351,7 +1378,7 @@ async def connect_mcp(
         StdioMcpConnection,
         validate_mcp_command,
     )
-    from chainlit.session import WebsocketSession
+    from chainlit.session import McpSession, WebsocketSession
 
     session = WebsocketSession.get_by_id(payload.sessionId)
     context = init_ws_context(session)
@@ -1367,113 +1394,203 @@ async def connect_mcp(
             )
 
     mcp_enabled = config.features.mcp.enabled
-    if mcp_enabled:
-        if payload.name in session.mcp_sessions:
-            old_client_session, old_exit_stack = session.mcp_sessions[payload.name]
-            if on_mcp_disconnect := config.code.on_mcp_disconnect:
-                await on_mcp_disconnect(payload.name, old_client_session)
-            try:
-                await old_exit_stack.aclose()
-            except Exception:
-                pass
-
-        try:
-            exit_stack = AsyncExitStack()
-            mcp_connection: McpConnection
-
-            if payload.clientType == "sse":
-                if not config.features.mcp.sse.enabled:
-                    raise HTTPException(
-                        status_code=400,
-                        detail="SSE MCP is not enabled",
-                    )
-
-                mcp_connection = SseMcpConnection(
-                    url=payload.url,
-                    name=payload.name,
-                    headers=getattr(payload, "headers", None),
-                )
-
-                transport = await exit_stack.enter_async_context(
-                    sse_client(
-                        url=mcp_connection.url,
-                        headers=mcp_connection.headers,
-                    )
-                )
-            elif payload.clientType == "stdio":
-                if not config.features.mcp.stdio.enabled:
-                    raise HTTPException(
-                        status_code=400,
-                        detail="Stdio MCP is not enabled",
-                    )
-
-                env_from_cmd, command, args = validate_mcp_command(payload.fullCommand)
-                mcp_connection = StdioMcpConnection(
-                    command=command, args=args, name=payload.name
-                )
-
-                env = get_default_environment()
-                env.update(env_from_cmd)
-                # Create the server parameters
-                server_params = StdioServerParameters(
-                    command=command, args=args, env=env
-                )
-
-                transport = await exit_stack.enter_async_context(
-                    stdio_client(server_params)
-                )
-
-            elif payload.clientType == "streamable-http":
-                if not config.features.mcp.streamable_http.enabled:
-                    raise HTTPException(
-                        status_code=400,
-                        detail="HTTP MCP is not enabled",
-                    )
-                mcp_connection = HttpMcpConnection(
-                    url=payload.url,
-                    name=payload.name,
-                    headers=getattr(payload, "headers", None),
-                )
-                transport = await exit_stack.enter_async_context(
-                    streamablehttp_client(
-                        url=mcp_connection.url,
-                        headers=mcp_connection.headers,
-                    )
-                )
-
-            # The transport can return (read, write) for stdio, sse
-            # Or (read, write, get_session_id) for streamable-http
-            # We are only interested in the read and write streams here.
-            read, write = transport[:2]
-
-            mcp_session: ClientSession = await exit_stack.enter_async_context(
-                ClientSession(
-                    read_stream=read, write_stream=write, sampling_callback=None
-                )
-            )
-
-            # Initialize the session
-            await mcp_session.initialize()
-
-            # Store the session
-            session.mcp_sessions[mcp_connection.name] = (mcp_session, exit_stack)
-
-            # Call the callback
-            if config.code.on_mcp_connect:
-                await config.code.on_mcp_connect(mcp_connection, mcp_session)
-
-        except Exception as e:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Could not connect to the MCP: {e!s}",
-            )
-    else:
+    if not mcp_enabled:
         raise HTTPException(
             status_code=400,
             detail="This app does not support MCP.",
         )
 
-    tool_list = await mcp_session.list_tools()
+    # Disconnect previous session for this name (reconnection)
+    if payload.name in session.mcp_sessions:
+        old_mcp = session.mcp_sessions.pop(payload.name)
+        if on_mcp_disconnect := config.code.on_mcp_disconnect:
+            try:
+                await on_mcp_disconnect(payload.name, old_mcp.client)
+            except Exception:
+                logger.debug(
+                    "Error in on_mcp_disconnect callback for %s",
+                    payload.name,
+                    exc_info=True,
+                )
+        try:
+            await old_mcp.close()
+        except Exception:
+            logger.debug(
+                "Error closing old MCP session %s", payload.name, exc_info=True
+            )
+
+    # ── Validate config before launching the background task ──
+    mcp_connection: McpConnection
+
+    if payload.clientType == "sse":
+        if not config.features.mcp.sse.enabled:
+            raise HTTPException(
+                status_code=400,
+                detail="SSE MCP is not enabled",
+            )
+        mcp_connection = SseMcpConnection(
+            url=payload.url,
+            name=payload.name,
+            headers=getattr(payload, "headers", None),
+        )
+    elif payload.clientType == "stdio":
+        if not config.features.mcp.stdio.enabled:
+            raise HTTPException(
+                status_code=400,
+                detail="Stdio MCP is not enabled",
+            )
+        env_from_cmd, command, args = validate_mcp_command(payload.fullCommand)
+        mcp_connection = StdioMcpConnection(
+            command=command, args=args, name=payload.name
+        )
+    elif payload.clientType == "streamable-http":
+        if not config.features.mcp.streamable_http.enabled:
+            raise HTTPException(
+                status_code=400,
+                detail="HTTP MCP is not enabled",
+            )
+        mcp_connection = HttpMcpConnection(
+            url=payload.url,
+            name=payload.name,
+            headers=getattr(payload, "headers", None),
+        )
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown MCP client type: {payload.clientType}",
+        )
+
+    # ── Launch the MCP connection in its own background task ──
+    #
+    # The background task owns the AsyncExitStack: it enters all context
+    # managers, calls initialize(), signals ``ready_event``, and then
+    # blocks on ``stop_event.wait()``.  When the stop event fires the
+    # task wakes up and closes the exit stack *in the same task* that
+    # opened it — avoiding the cross-task cancel-scope corruption from
+    # https://github.com/Chainlit/chainlit/issues/2182.
+
+    ready_event: asyncio.Event = asyncio.Event()
+    stop_event: asyncio.Event = asyncio.Event()
+    # Mutable container to pass the ClientSession back from the bg task.
+    result_holder: dict[str, object] = {}
+
+    async def _mcp_session_runner() -> None:
+        exit_stack = AsyncExitStack()
+        try:
+            try:
+                if isinstance(mcp_connection, SseMcpConnection):
+                    transport = await exit_stack.enter_async_context(
+                        sse_client(
+                            url=mcp_connection.url,
+                            headers=mcp_connection.headers,
+                        )
+                    )
+                elif isinstance(mcp_connection, StdioMcpConnection):
+                    env = get_default_environment()
+                    env.update(env_from_cmd)
+                    server_params = StdioServerParameters(
+                        command=command, args=args, env=env
+                    )
+                    transport = await exit_stack.enter_async_context(
+                        stdio_client(server_params)
+                    )
+                elif isinstance(mcp_connection, HttpMcpConnection):
+                    transport = await exit_stack.enter_async_context(
+                        streamablehttp_client(
+                            url=mcp_connection.url,
+                            headers=mcp_connection.headers,
+                        )
+                    )
+                else:
+                    raise ValueError(f"Unknown client type: {payload.clientType}")
+
+                read, write = transport[:2]
+
+                mcp_client: ClientSession = await exit_stack.enter_async_context(
+                    ClientSession(
+                        read_stream=read,
+                        write_stream=write,
+                        sampling_callback=None,
+                    )
+                )
+
+                await mcp_client.initialize()
+                result_holder["client"] = mcp_client
+
+            except BaseException as exc:
+                result_holder["error"] = exc
+                return  # outer finally closes exit_stack
+            finally:
+                # Always signal the caller so it doesn't wait forever.
+                ready_event.set()
+
+            # ── Keep the task (and the exit stack) alive ──
+            try:
+                await stop_event.wait()
+            except asyncio.CancelledError:
+                logger.debug("MCP background task for %r cancelled", payload.name)
+        finally:
+            # Close exit_stack in ALL paths (error, normal shutdown,
+            # cancellation) — always in the same task that opened it.
+            logger.debug("Closing MCP exit stack for %r (same-task)", payload.name)
+            try:
+                await exit_stack.aclose()
+            except BaseException:
+                logger.debug(
+                    "Error closing MCP exit stack for %r",
+                    payload.name,
+                    exc_info=True,
+                )
+
+    task = asyncio.create_task(
+        _mcp_session_runner(), name=f"mcp-session-{payload.name}"
+    )
+
+    # Wait for the background task to finish initialisation.
+    await ready_event.wait()
+
+    if "error" in result_holder:
+        # The task already exited and cleaned up its exit stack.
+        # Make sure the task itself is fully done.
+        try:
+            await task
+        except BaseException:
+            pass
+        return JSONResponse(
+            status_code=400,
+            content={
+                "detail": f"Could not connect to the MCP: {result_holder['error']!s}"
+            },
+        )
+
+    mcp_client_session = cast("ClientSession", result_holder["client"])
+
+    # Call the user callback
+    if config.code.on_mcp_connect:
+        try:
+            await config.code.on_mcp_connect(mcp_connection, mcp_client_session)
+        except Exception as e:
+            # Callback failed — tear down the connection.
+            stop_event.set()
+            try:
+                await task
+            except BaseException:
+                pass
+            return JSONResponse(
+                status_code=400,
+                content={"detail": f"Could not connect to the MCP: {e!s}"},
+            )
+
+    # Store the session
+    mcp_session_obj = McpSession(
+        name=mcp_connection.name,
+        client=mcp_client_session,
+        task=task,
+        stop_event=stop_event,
+    )
+    session.mcp_sessions[mcp_connection.name] = mcp_session_obj
+
+    tool_list = await mcp_client_session.list_tools()
 
     return JSONResponse(
         content={
@@ -1519,22 +1636,17 @@ async def disconnect_mcp(
 
     callback = config.code.on_mcp_disconnect
     if payload.name in session.mcp_sessions:
+        mcp_session_obj = session.mcp_sessions.pop(payload.name)
         try:
-            client_session, exit_stack = session.mcp_sessions[payload.name]
             if callback:
-                await callback(payload.name, client_session)
-
-            try:
-                await exit_stack.aclose()
-            except Exception:
-                pass
-            del session.mcp_sessions[payload.name]
-
+                await callback(payload.name, mcp_session_obj.client)
         except Exception as e:
             raise HTTPException(
                 status_code=400,
-                detail=f"Could not disconnect to the MCP: {e!s}",
+                detail=f"Could not disconnect from the MCP: {e!s}",
             )
+        finally:
+            await mcp_session_obj.close()
 
     return JSONResponse(content={"success": True})
 
@@ -1782,6 +1894,12 @@ async def get_avatar(avatar_id: str):
 def status_check():
     """Check if the site is operational."""
     return {"message": "Site is operational"}
+
+
+@router.get("/health")
+def health_check():
+    """Health check endpoint for container orchestration and monitoring."""
+    return {"status": "ok"}
 
 
 @router.get("/{full_path:path}")

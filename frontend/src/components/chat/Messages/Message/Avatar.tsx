@@ -8,6 +8,7 @@ import {
   useConfig
 } from '@chainlit/react-client';
 
+import Icon from '@/components/Icon';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -21,10 +22,10 @@ interface Props {
   author?: string;
   hide?: boolean;
   isError?: boolean;
-  isStep?: boolean;
+  iconName?: string;
 }
 
-const MessageAvatar = ({ author, hide, isError, isStep }: Props) => {
+const MessageAvatar = ({ author, hide, isError, iconName }: Props) => {
   const apiClient = useContext(ChainlitContext);
   const { chatProfile } = useChatSession();
   const { config } = useConfig();
@@ -43,28 +44,59 @@ const MessageAvatar = ({ author, hide, isError, isStep }: Props) => {
     return apiClient?.buildEndpoint(`/avatars/${author || 'default'}`);
   }, [apiClient, selectedChatProfile, config, author]);
 
+  const avatarSize = config?.ui?.avatar_size;
+  const avatarContainerSize = avatarSize ?? 48;
+  const sizeStyle = {
+    width: `${avatarContainerSize}px`,
+    height: `${avatarContainerSize}px`,
+    minWidth: `${avatarContainerSize}px`,
+    minHeight: `${avatarContainerSize}px`
+  };
+  const errorIconSize = Math.min(avatarContainerSize, 32);
+
   if (isError) {
     return (
-      <AlertCircle className="fill-destructive text-destructive-foreground flex-shrink-0" style={{ width: '32px', height: '32px', minWidth: '32px', minHeight: '32px' }} />
+      <span
+        className={cn('inline-flex flex-shrink-0 items-center justify-center', hide && 'invisible')}
+        style={sizeStyle}
+      >
+        <AlertCircle
+          className="fill-destructive text-destructive-foreground"
+          style={{ width: `${errorIconSize}px`, height: `${errorIconSize}px` }}
+        />
+      </span>
     );
   }
+
+  // Render icon or avatar based on iconName
+  const avatarContent = iconName ? (
+    <span
+      className="inline-flex flex-shrink-0 items-center justify-center"
+      style={sizeStyle}
+    >
+      <Icon name={iconName} size={avatarSize ?? 20} /> {/* 20 => h-5 w-5 */}
+    </span>
+  ) : (
+    <Avatar
+      className="flex-shrink-0"
+      style={sizeStyle}
+    >
+      <AvatarImage
+        src={avatarUrl}
+        alt={`Avatar for ${author || 'default'}`}
+        className="bg-transparent"
+      />
+      <AvatarFallback className="bg-transparent">
+        <Skeleton className="h-full w-full rounded-full" />
+      </AvatarFallback>
+    </Avatar>
+  );
 
   return (
     <span className={cn('inline-block', hide && 'invisible')}>
       <TooltipProvider>
         <Tooltip>
-          <TooltipTrigger asChild>
-            <Avatar className="flex-shrink-0" style={{ width: '48px', height: '48px' }}>
-              <AvatarImage
-                src={avatarUrl}
-                alt={`Avatar for ${author || 'default'}`}
-                className="bg-transparent"
-              />
-              <AvatarFallback className="bg-transparent">
-                <Skeleton className="h-full w-full rounded-full" />
-              </AvatarFallback>
-            </Avatar>
-          </TooltipTrigger>
+          <TooltipTrigger asChild>{avatarContent}</TooltipTrigger>
           <TooltipContent>
             <p>{author}</p>
           </TooltipContent>

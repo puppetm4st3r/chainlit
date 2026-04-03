@@ -10,6 +10,7 @@ from chainlit.data import get_data_layer
 from chainlit.element import Element, ElementDict, File
 from chainlit.logger import logger
 from chainlit.message import Message
+from chainlit.mode import Mode
 from chainlit.session import BaseSession, WebsocketSession
 from chainlit.step import StepDict
 from chainlit.types import (
@@ -142,11 +143,15 @@ class BaseChainlitEmitter:
         """Stub method to send the available commands to the UI."""
         pass
 
+    async def set_modes(self, modes: List[Mode]):
+        """Stub method to send the available modes to the UI."""
+        pass
+
     async def send_window_message(self, data: Any):
         """Stub method to send custom data to the host window."""
         pass
 
-    def send_toast(self, message: str, type: Optional[ToastType] = "info"):
+    async def send_toast(self, message: str, type: Optional[ToastType] = "info"):
         """Stub method to send a toast message to the UI."""
         pass
 
@@ -154,6 +159,9 @@ class BaseChainlitEmitter:
         """Stub method to send a chat profile selection to the UI."""
         pass
 
+    async def set_favorites(self, steps: List[StepDict]):
+        """Stub method to send the favorite messages to the UI."""
+        pass
 
 class ChainlitEmitter(BaseChainlitEmitter):
     """
@@ -348,7 +356,6 @@ class ChainlitEmitter(BaseChainlitEmitter):
                     ]
                     final_res = files
                     interaction = ",".join([file["name"] for file in files])
-                    
                     if get_data_layer():
                         # Create File elements
                         elements = [
@@ -496,16 +503,30 @@ class ChainlitEmitter(BaseChainlitEmitter):
             commands,
         )
 
+    def set_modes(self, modes: List[Mode]):
+        """Send the available modes to the UI."""
+        return self.emit(
+            "set_modes",
+            [mode.to_dict() for mode in modes],
+        )
+
+    def set_favorites(self, steps: List[StepDict]):
+        """Send the favorite messages to the UI."""
+        return self.emit(
+            "set_favorites",
+            steps,
+        )
+
     def send_window_message(self, data: Any):
         """Send custom data to the host window."""
         return self.emit("window_message", data)
 
-    def send_toast(self, message: str, type: Optional[ToastType] = "info"):
+    async def send_toast(self, message: str, type: Optional[ToastType] = "info"):
         """Send a toast message to the UI."""
         # check that the type is valid using ToastType
         if type not in get_args(ToastType):
             raise ValueError(f"Invalid toast type: {type}")
-        return self.emit("toast", {"message": message, "type": type})
+        await return self.emit("toast", {"message": message, "type": type})
 
     async def set_chat_profile(self, profile_name: str):
         """Send a chat profile selection to the UI."""

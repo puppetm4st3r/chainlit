@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils';
-import { PropsWithChildren, useMemo, useState, useEffect } from 'react';
+import { PropsWithChildren, useEffect, useMemo, useState } from 'react';
 
 import type { IStep } from '@chainlit/react-client';
 
@@ -30,45 +30,53 @@ export default function Step({
   const isError = step.isError;
   const stepName = step.name;
 
-  // Calculate duration in seconds
+  // Keep the locally-added elapsed time feature for long-running steps.
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
-  
+  const [openValue, setOpenValue] = useState<string>(
+    step.defaultOpen ? step.id : ''
+  );
+
   useEffect(() => {
-    if (!step.start) return;
+    if (!step.start) {
+      setElapsedSeconds(0);
+      return;
+    }
 
     const startTime = new Date(step.start).getTime();
-    
-    // If step is closed, calculate final duration
+
     if (step.end) {
       const endTime = new Date(step.end).getTime();
-      const duration = Math.round((endTime - startTime) / 1000);
+      const duration = Math.max(0, Math.round((endTime - startTime) / 1000));
       setElapsedSeconds(duration);
       return;
     }
-    
-    // If step is still running, update counter every second
-    if (using) {
-      const interval = setInterval(() => {
-        const now = Date.now();
-        const elapsed = Math.round((now - startTime) / 1000);
-        setElapsedSeconds(elapsed);
-      }, 1000);
-      
-      // Initial calculation
-      const now = Date.now();
-      const elapsed = Math.round((now - startTime) / 1000);
-      setElapsedSeconds(elapsed);
-      
-      return () => clearInterval(interval);
+
+    if (!using) {
+      setElapsedSeconds(0);
+      return;
     }
+
+    const updateElapsedSeconds = () => {
+      const now = Date.now();
+      const elapsed = Math.max(0, Math.round((now - startTime) / 1000));
+      setElapsedSeconds(elapsed);
+    };
+
+    updateElapsedSeconds();
+    const interval = setInterval(updateElapsedSeconds, 1000);
+
+    return () => clearInterval(interval);
   }, [step.start, step.end, using]);
 
-  // Format duration text (using universal "s" abbreviation for seconds)
-  const durationText = elapsedSeconds > 0 
-    ? ` @ ${elapsedSeconds} s.`
-    : '';
+  // Preserve upstream auto-collapse behavior when a step finishes.
+  useEffect(() => {
+    if (!using && step.autoCollapse) {
+      setOpenValue('');
+    }
+  }, [using, step.autoCollapse]);
 
-  // If there's no content, render just the status text without accordion
+  const durationText = elapsedSeconds > 0 ? ` @ ${elapsedSeconds} s.` : '';
+
   if (!hasContent) {
     return (
       <div className="flex flex-col flex-grow w-0" style={style}>
@@ -76,7 +84,7 @@ export default function Step({
           className="flex items-center gap-1 font-medium"
           id={`step-${stepName}`}
         >
-          <span className={cn("text-lg", using && "bulb-glow", !using && "bulb-off")}>💡</span>
+          <span className={cn('text-lg', using && 'bulb-glow', !using && 'bulb-off')}>💡</span>
           <span
             className={cn(
               'ml-2',
@@ -98,7 +106,8 @@ export default function Step({
       <Accordion
         type="single"
         collapsible
-        defaultValue={step.defaultOpen ? step.id : undefined}
+        value={openValue}
+        onValueChange={(val) => setOpenValue(val)}
         className="w-full"
       >
         <AccordionItem value={step.id} className="border-none">
@@ -106,7 +115,7 @@ export default function Step({
             className="flex items-center gap-1 justify-start transition-none p-0 hover:no-underline"
             id={`step-${stepName}`}
           >
-            <span className={cn("text-lg", using && "bulb-glow", !using && "bulb-off")}>💡</span>
+            <span className={cn('text-lg', using && 'bulb-glow', !using && 'bulb-off')}>💡</span>
             <span
               className={cn(
                 'ml-2',

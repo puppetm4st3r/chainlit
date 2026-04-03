@@ -45,6 +45,7 @@ const TextElement = ({ element }: TextElementProps) => {
     <Markdown
       allowHtml={allowHtmlElement}
       latex={latex}
+      renderMarkdown={true}
       className={`${element.display}-text`}
     >
       {content}

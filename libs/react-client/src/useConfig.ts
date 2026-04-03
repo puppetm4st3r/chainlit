@@ -14,7 +14,7 @@ const useConfig = () => {
   const prevChatProfileRef = useRef(chatProfile);
 
   // Build the API URL with optional chat profile parameter
-  const apiUrl = isAuthenticated 
+  const apiUrl = isAuthenticated
     ? `/project/settings?language=${language}${chatProfile ? `&chat_profile=${encodeURIComponent(chatProfile)}` : ''}`
     : null;
 

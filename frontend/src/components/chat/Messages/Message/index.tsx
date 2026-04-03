@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils';
 import { MessageContext } from 'contexts/MessageContext';
-import { memo, useContext, useRef } from 'react';
+import { memo, useContext, useMemo, useRef } from 'react';
 
 import {
   type IAction,
@@ -32,6 +32,8 @@ interface Props {
   index?: number;
 }
 
+const EMPTY_ELEMENTS: IMessageElement[] = [];
+
 const Message = memo(
   ({
     message,
@@ -45,7 +47,8 @@ const Message = memo(
     messages,
     index
   }: Props) => {
-    const { allowHtml, cot, latex, onError } = useContext(MessageContext);
+    const { allowHtml, cot, latex, renderUserMarkdown, onError } =
+      useContext(MessageContext);
     const layoutMaxWidth = useLayoutMaxWidth();
     const contentRef = useRef<HTMLDivElement>(null);
     const isUserMessage = message.type === 'user_message';
@@ -61,6 +64,19 @@ const Message = memo(
     const skip = toolCallSkip || hiddenSkip;
     const showInputSection = Boolean(message.input && message.showInput);
     const shouldRenderOutput = !showInputSection || Boolean(message.output);
+
+    const userMessageContent = useMemo(
+      () => (
+        <MessageContent
+          elements={EMPTY_ELEMENTS}
+          message={message}
+          allowHtml={allowHtml}
+          latex={latex}
+          renderMarkdown={renderUserMarkdown}
+        />
+      ),
+      [message, allowHtml, latex]
+    );
 
     if (skip) {
       if (!message.steps) {
@@ -116,6 +132,7 @@ const Message = memo(
                       author={message.metadata?.avatarName || message.name}
                       isError={message.isError}
                       isStep={isStep}
+iconName={message.metadata?.icon}
                     />
                   )}
                   {/* Display the step and its children */}
@@ -133,6 +150,7 @@ style={
                           message={message}
                           allowHtml={allowHtml}
                           latex={latex}
+                          renderMarkdown={true}
                           sections={['input']}
                         />
                       ) : null}
@@ -155,6 +173,7 @@ style={
                           message={message}
                           allowHtml={allowHtml}
                           latex={latex}
+                          renderMarkdown={true}
                           sections={showInputSection ? ['output'] : undefined}
                         />
                       ) : null}
@@ -180,6 +199,7 @@ style={
                         message={message}
                         allowHtml={allowHtml}
                         latex={latex}
+                        renderMarkdown={true}
                       />
 
                       <AskFileButton messageId={message.id} onError={onError} />

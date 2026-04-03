@@ -1,14 +1,17 @@
 import json
 from unittest.mock import AsyncMock, Mock, patch
 
+import jwt as pyjwt
 import pytest
 
 from chainlit.session import WebsocketSession
 from chainlit.socket import (
     _authenticate_connection,
+    _identifiers_match,
     _get_token,
     _get_token_from_cookie,
     clean_session,
+    connect,
     load_user_env,
     persist_user_session,
     restore_existing_session,
@@ -108,6 +111,17 @@ class TestAuthenticateConnection:
 
                 assert user is None
                 assert token is None
+
+
+class TestIdentifierMatching:
+    """Test suite for normalized identifier comparisons."""
+
+    def test_identifiers_match_ignores_case_and_whitespace(self):
+        assert _identifiers_match(" User@Example.com ", "user@example.com")
+
+    def test_identifiers_match_rejects_empty_values(self):
+        assert _identifiers_match("", "user@example.com") is False
+        assert _identifiers_match(None, "user@example.com") is False
 
 
 class TestRestoreExistingSession:
@@ -275,6 +289,35 @@ class TestResumeThread:
                 assert result == thread
                 assert mock_session.chat_profile == "gpt-4"
                 assert mock_session.chat_settings == {"temperature": 0.7}
+                assert user_sessions.get("session_123") == metadata
+        finally:
+            user_sessions.clear()
+            user_sessions.update(original_sessions)
+
+    @pytest.mark.asyncio
+    async def test_resume_thread_matches_author_case_insensitively(self):
+        """Test thread resumption when author identifier differs only by case/whitespace."""
+        from chainlit.user_session import user_sessions
+
+        mock_session = Mock(spec=WebsocketSession)
+        mock_session.user = Mock(identifier="User@Example.com")
+        mock_session.thread_id_to_resume = "thread_123"
+        mock_session.id = "session_123"
+
+        metadata = {"chat_profile": "gpt-4"}
+        thread = {"userIdentifier": " user@example.com ", "metadata": metadata}
+
+        mock_data_layer = AsyncMock()
+        mock_data_layer.get_thread.return_value = thread
+
+        original_sessions = user_sessions.copy()
+        try:
+            with patch("chainlit.socket.get_data_layer") as mock_get_dl:
+                mock_get_dl.return_value = mock_data_layer
+
+                result = await resume_thread(mock_session)
+
+                assert result == thread
                 assert user_sessions.get("session_123") == metadata
         finally:
             user_sessions.clear()
@@ -477,3 +520,89 @@ class TestSocketEdgeCases:
                 # Should propagate the exception
                 with pytest.raises(Exception, match="Auth error"):
                     await _authenticate_connection(environ)
+
+
+class TestConnect:
+    """Test suite for websocket connect authorization."""
+
+    @pytest.mark.asyncio
+    async def test_connect_reports_missing_access_token_cookie(self):
+        with patch("chainlit.socket.require_login", return_value=True):
+            with patch(
+                "chainlit.socket._authenticate_connection",
+                AsyncMock(return_value=(None, None)),
+            ):
+                with pytest.raises(
+                    ConnectionRefusedError,
+                    match="authentication failed: missing Chainlit auth cookie 'access_token'",
+                ):
+                    await connect(
+                        "sid-1",
+                        {"HTTP_COOKIE": "session=abc123", "HTTP_HOST": "www.lexrah.app", "PATH_INFO": "/common/ws/socket.io"},
+                        {
+                            "sessionId": "session-1",
+                            "userEnv": None,
+                            "clientType": "webapp",
+                            "chatProfile": None,
+                            "threadId": None,
+                        },
+                    )
+
+    @pytest.mark.asyncio
+    async def test_connect_reports_expired_access_token(self):
+        expired_error = pyjwt.ExpiredSignatureError("Signature has expired")
+
+        with patch("chainlit.socket.require_login", return_value=True):
+            with patch(
+                "chainlit.socket._authenticate_connection",
+                AsyncMock(return_value=(None, None)),
+            ):
+                with patch("chainlit.socket.decode_jwt", side_effect=expired_error):
+                    with pytest.raises(
+                        ConnectionRefusedError,
+                        match="authentication failed: access token expired",
+                    ):
+                        await connect(
+                            "sid-1",
+                            {"HTTP_COOKIE": "access_token=expired-token"},
+                            {
+                                "sessionId": "session-1",
+                                "userEnv": None,
+                                "clientType": "webapp",
+                                "chatProfile": None,
+                                "threadId": None,
+                            },
+                        )
+
+    @pytest.mark.asyncio
+    async def test_connect_authorizes_thread_case_insensitively(self):
+        mock_user = Mock(identifier="User@Example.com")
+        mock_data_layer = AsyncMock()
+        mock_data_layer.get_thread.return_value = {
+            "userIdentifier": " user@example.com ",
+            "metadata": {},
+        }
+
+        with patch("chainlit.socket.require_login", return_value=True):
+            with patch(
+                "chainlit.socket._authenticate_connection",
+                AsyncMock(return_value=(mock_user, "token")),
+            ):
+                with patch("chainlit.socket.get_data_layer", return_value=mock_data_layer):
+                    with patch("chainlit.socket.restore_existing_session", return_value=False):
+                        with patch("chainlit.socket.load_user_env", return_value={}):
+                            with patch("chainlit.socket.WebsocketSession") as mock_session_ctor:
+                                result = await connect(
+                                    "sid-1",
+                                    {"HTTP_COOKIE": "access_token=test"},
+                                    {
+                                        "sessionId": "session-1",
+                                        "userEnv": None,
+                                        "clientType": "webapp",
+                                        "chatProfile": None,
+                                        "threadId": "thread-123",
+                                    },
+                                )
+
+                                assert result is True
+                                mock_session_ctor.assert_called_once()

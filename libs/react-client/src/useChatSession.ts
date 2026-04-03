@@ -118,9 +118,19 @@ const useChatSession = () => {
           return input;
         }
 
+        const rawValue = values[input.id];
+        const nextInitial =
+          rawValue && typeof rawValue === 'object' && Object.prototype.hasOwnProperty.call(rawValue, 'value')
+            ? rawValue.value
+            : rawValue;
+
         return {
           ...input,
-          initial: values[input.id]
+          initial: nextInitial,
+          description:
+            rawValue && typeof rawValue === 'object' && typeof rawValue.description === 'string'
+              ? rawValue.description
+              : input.description
         };
       });
     },
@@ -498,7 +508,18 @@ const useChatSession = () => {
         );
         setChatSettingsValue((previousValues) => ({
           ...previousValues,
-          ...values
+          ...Object.fromEntries(
+            Object.entries(values).map(([key, value]) => {
+              if (
+                value &&
+                typeof value === 'object' &&
+                Object.prototype.hasOwnProperty.call(value, 'value')
+              ) {
+                return [key, value.value];
+              }
+              return [key, value];
+            })
+          )
         }));
       });
 

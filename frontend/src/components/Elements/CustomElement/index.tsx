@@ -24,6 +24,7 @@ import {
 import Alert from '@/components/Alert';
 
 import Imports from './Imports';
+import { loadCustomElementModuleTree } from './moduleLoader';
 import * as Renderer from './Renderer';
 
 const CustomElement = memo(function ({ element }: { element: ICustomElement }) {
@@ -34,14 +35,64 @@ const CustomElement = memo(function ({ element }: { element: ICustomElement }) {
   const { askUser } = useContext(MessageContext);
 
   const [sourceCode, setSourceCode] = useState<string>();
+  const [localImports, setLocalImports] = useState<Record<string, unknown>>({});
   const [error, setError] = useState<string>();
+  const [isLoadingSource, setIsLoadingSource] = useState(false);
+
+  const baseImports = useMemo(
+    () => ({
+      ...Imports,
+      '@/components/renderer': Renderer
+    }),
+    []
+  );
 
   useEffect(() => {
-    apiClient
-      .get(`/public/elements/${element.name}.jsx`)
-      .then(async (res) => setSourceCode(await res.text()))
-      .catch((err) => setError(String(err)));
-  }, [element.name, apiClient]);
+    let isCancelled = false;
+    const sourceLoadTimeout = window.setTimeout(() => {
+      if (isCancelled) return;
+      setError(
+        `Loading custom element '${element.name}' timed out before the source code became available.`
+      );
+    }, 10000);
+
+    setError(undefined);
+    setSourceCode(undefined);
+    setLocalImports({});
+    setIsLoadingSource(true);
+
+    loadCustomElementModuleTree({
+      rootModulePath: `${element.name}.jsx`,
+      fetchModuleSource: async (publicPath) => {
+        const response = await apiClient.get(publicPath);
+        if ('ok' in response && !response.ok) {
+          throw new Error(
+            `Failed to fetch custom element module '${publicPath}' (${response.status}).`
+          );
+        }
+        return response.text();
+      },
+      baseImports
+    })
+      .then(({ sourceCode, localImports }) => {
+        if (isCancelled) return;
+        window.clearTimeout(sourceLoadTimeout);
+        setSourceCode(sourceCode);
+        setLocalImports(localImports);
+        setIsLoadingSource(false);
+      })
+      .catch((err) => {
+        if (isCancelled) return;
+        window.clearTimeout(sourceLoadTimeout);
+        setError(String(err));
+        setIsLoadingSource(false);
+      });
+
+    return () => {
+      isCancelled = true;
+      window.clearTimeout(sourceLoadTimeout);
+    };
+  }, [apiClient, baseImports, element.name]);
 
   const updateElement = useCallback(
     (nextProps: Record<string, unknown>) => {
@@ -107,14 +158,24 @@ const CustomElement = memo(function ({ element }: { element: ICustomElement }) {
   }, [element.props]);
 
   if (error) return <Alert variant="error">{error}</Alert>;
-  if (!sourceCode) return null;
+  if (!sourceCode) {
+    return isLoadingSource ? (
+      <Alert variant="info">
+        {`Loading custom element '${element.name}'...`}
+      </Alert>
+    ) : (
+      <Alert variant="error">
+        {`Custom element '${element.name}' did not provide renderable source code.`}
+      </Alert>
+    );
+  }
 
   return (
     <div className={`${element.display}-custom flex flex-col flex-grow`}>
       <Runner
         code={sourceCode}
         scope={{
-          import: { ...Imports, '@/components/renderer': Renderer },
+          import: { ...baseImports, ...localImports },
           props,
           apiClient,
           updateElement,

@@ -40,7 +40,7 @@ const ProgressInput = ({
     safeMax === safeMin
       ? 0
       : ((clampedValue - safeMin) / (safeMax - safeMin)) * 100;
-  const formattedValue = `${clampedValue.toFixed(precision)}${suffix || ''}`;
+  const formattedValue = `${safeValue.toFixed(precision)}${suffix || ''}`;
 
   return (
     <InputStateHandler

@@ -495,7 +495,10 @@ class ChainlitEmitter(BaseChainlitEmitter):
 
     async def update_chat_settings(self, settings: Dict[str, Any]):
         for key, value in settings.items():
-            self.session.chat_settings[key] = value
+            if isinstance(value, dict) and "value" in value:
+                self.session.chat_settings[key] = value["value"]
+            else:
+                self.session.chat_settings[key] = value
         await self.emit("chat_settings_values", settings)
 
     def set_commands(self, commands: List[CommandDict]):

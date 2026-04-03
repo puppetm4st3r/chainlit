@@ -22,7 +22,11 @@ export default function ElementSideView() {
   const isMobile = useIsMobile();
   const [isVisible, setIsVisible] = useState(false);
 
-  const isCanvas = sideView?.title === 'canvas';
+  const isCanvas = Boolean(
+    sideView?.elements?.some(
+      (element) => element.type === 'custom' && element.name === 'Canvas Editor'
+    ) || sideView?.title?.trim().toLowerCase() === 'canvas'
+  );
 
   useEffect(() => {
     if (sideView) {

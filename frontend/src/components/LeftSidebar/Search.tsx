@@ -49,13 +49,13 @@ export default function SearchChats() {
             { search: query || undefined }
           );
           setThreads(data || []);
-        } catch (error) {
-          toast.error('Error fetching threads: ' + error);
+        } catch (_error) {
+          toast.error(t('common.status.error.default'));
         } finally {
           setLoading(false);
         }
       }, 300),
-    [apiClient]
+    [apiClient, t]
   );
 
   // Group threads by month and year
@@ -145,7 +145,7 @@ export default function SearchChats() {
                     }}
                   >
                     <div className="line-clamp-2">
-                      {thread.name || 'Untitled Conversation'}
+                      {thread.name || t('threadHistory.thread.untitled')}
                     </div>
                   </CommandItem>
                 ))}

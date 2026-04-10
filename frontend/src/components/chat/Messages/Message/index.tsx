@@ -28,8 +28,6 @@ interface Props {
   isScorable?: boolean;
   scorableRun?: IStep;
   shouldGroup?: boolean;
-  messages?: IStep[];
-  index?: number;
 }
 
 const EMPTY_ELEMENTS: IMessageElement[] = [];
@@ -43,9 +41,7 @@ const Message = memo(
     indent,
     isScorable,
     scorableRun,
-    shouldGroup = false,
-    messages,
-    index
+    shouldGroup = false
   }: Props) => {
     const { allowHtml, cot, latex, renderUserMarkdown, onError } =
       useContext(MessageContext);
@@ -75,7 +71,7 @@ const Message = memo(
           renderMarkdown={renderUserMarkdown}
         />
       ),
-      [message, allowHtml, latex]
+      [message, allowHtml, latex, renderUserMarkdown]
     );
 
     if (skip) {
@@ -115,12 +111,7 @@ const Message = memo(
               {isUserMessage ? (
                 <div className="flex flex-col flex-grow max-w-full">
                   <UserMessage message={message} elements={elements}>
-                    <MessageContent
-                      elements={[]}
-                      message={message}
-                      allowHtml={allowHtml}
-                      latex={latex}
-                    />
+                    {userMessageContent}
                   </UserMessage>
                 </div>
               ) : (
@@ -137,14 +128,16 @@ iconName={message.metadata?.icon}
                   )}
                   {/* Display the step and its children */}
                   {isStep ? (
-                    <Step step={message} isRunning={isRunning}
-style={
-                      !shouldGroup
-                        ? { paddingTop: 'var(--message-first-item-padding, 0.7em)' }
-                        : undefined
-                    }
-		>
-		    {showInputSection ? (
+                    <Step
+                      step={message}
+                      isRunning={isRunning}
+                      style={
+                        !shouldGroup
+                          ? { paddingTop: 'var(--message-first-item-padding, 0.7em)' }
+                          : undefined
+                      }
+                    >
+                      {showInputSection ? (
                         <MessageContent
                           elements={elements}
                           message={message}
@@ -211,12 +204,10 @@ style={
                       <MessageButtons
                         message={message}
                         actions={actions}
-                        elements={elements}
-                        messages={messages}
-                        index={index}
                         run={
                           scorableRun && isScorable ? scorableRun : undefined
                         }
+                        elements={elements}
                         contentRef={contentRef}
                       />
                     </div>

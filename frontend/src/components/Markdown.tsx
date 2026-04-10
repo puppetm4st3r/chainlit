@@ -1,9 +1,16 @@
 import { cn } from '@/lib/utils';
 import { omit } from 'lodash';
-import { type ReactNode, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  type ReactNode,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState
+} from 'react';
 import { createPortal } from 'react-dom';
 import ReactMarkdown from 'react-markdown';
-import { PluggableList } from 'react-markdown/lib';
 import rehypeKatex from 'rehype-katex';
 import rehypeRaw from 'rehype-raw';
 import remarkDirective from 'remark-directive';
@@ -16,7 +23,6 @@ import { ChainlitContext, type IMessageElement } from '@chainlit/react-client';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { Card } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   Table,
   TableBody,
@@ -47,11 +53,23 @@ interface Props {
 
 type PluggableList = any[];
 
-const REFERENCE_TOOLTIP_CARD_WIDTH = 280;
+const REFERENCE_TOOLTIP_CARD_WIDTH = 420;
 const REFERENCE_TOOLTIP_VIEWPORT_MARGIN = 16;
 const REFERENCE_TOOLTIP_OFFSET = 12;
 const REFERENCE_TOOLTIP_SCORE_SECTION_PREFIX = '__relevance_score__=';
 const CONVERSATION_REFERENCE_TOOLTIP_EVENT_NAME = 'conversation-reference-tooltip';
+const REFERENCE_TOOLTIP_CLOSE_DELAY_MS = 1000;
+const REFERENCE_TOOLTIP_MAX_VISIBLE_ITEMS = 5;
+const REFERENCE_TOOLTIP_SCROLL_MAX_HEIGHT = 296;
+
+interface ParsedTooltipReference {
+  label: string;
+  url?: string;
+  documentName: string;
+  path: string;
+  chunkName: string;
+  relevanceScore: number | null;
+}
 
 function parseTooltipRelevanceScore(section: string) {
   const normalizedSection = String(section || '').trim();
@@ -66,7 +84,7 @@ function parseTooltipRelevanceScore(section: string) {
   return Math.max(0, Math.min(1, numericValue));
 }
 
-function parseReferenceTooltip(rawTooltip: string) {
+function parseLegacyReferenceTooltip(rawTooltip: string): ParsedTooltipReference {
   const normalizedTooltip = String(rawTooltip || '').replace(/\r\n/g, '\n').trim();
   let sections = normalizedTooltip
     .split(/\n\s*\n/)
@@ -88,6 +106,7 @@ function parseReferenceTooltip(rawTooltip: string) {
 
   if (sections.length >= 3) {
     return {
+      label: sections[0],
       documentName: sections[0],
       path: sections[1],
       chunkName: sections[2],
@@ -97,6 +116,7 @@ function parseReferenceTooltip(rawTooltip: string) {
 
   if (sections.length === 2) {
     return {
+      label: sections[0],
       documentName: sections[0],
       path: sections[1],
       chunkName: '',
@@ -105,11 +125,77 @@ function parseReferenceTooltip(rawTooltip: string) {
   }
 
   return {
+    label: normalizedTooltip,
     documentName: normalizedTooltip,
     path: '',
     chunkName: '',
     relevanceScore
   };
+}
+
+function normalizeTooltipReferenceItem(rawItem: unknown): ParsedTooltipReference | null {
+  if (!rawItem || typeof rawItem !== 'object' || Array.isArray(rawItem)) {
+    return null;
+  }
+  const item = rawItem as Record<string, unknown>;
+  const label = String(item.label || '').trim();
+  const documentName = String(item.document_name || item.documentName || label).trim();
+  const path = String(item.path || '').trim();
+  const chunkName = String(item.chunk_name || item.chunkName || '').trim();
+  const url = String(item.url || '').trim() || undefined;
+  const rawScore = item.relevance_score ?? item.relevanceScore ?? null;
+  const numericScore =
+    rawScore === null || rawScore === undefined || rawScore === ''
+      ? null
+      : Number(rawScore);
+  const normalizedScore =
+    typeof numericScore === 'number' && Number.isFinite(numericScore)
+      ? Math.max(0, Math.min(1, numericScore))
+      : null;
+
+  return {
+    label: label || documentName,
+    url,
+    documentName: documentName || label,
+    path,
+    chunkName,
+    relevanceScore: normalizedScore
+  };
+}
+
+function sortTooltipReferences(references: ParsedTooltipReference[]) {
+  return [...references].sort((left, right) => {
+    const leftScore = left.relevanceScore;
+    const rightScore = right.relevanceScore;
+    if (leftScore !== null && rightScore !== null && leftScore !== rightScore) {
+      return rightScore - leftScore;
+    }
+    if (leftScore !== null) {
+      return -1;
+    }
+    if (rightScore !== null) {
+      return 1;
+    }
+    return (left.documentName || left.label).localeCompare(right.documentName || right.label);
+  });
+}
+
+function resolveTooltipReferences(rawReferences: unknown, rawTooltip: string): ParsedTooltipReference[] {
+  if (Array.isArray(rawReferences)) {
+    const normalizedReferences = rawReferences
+      .map((item) => normalizeTooltipReferenceItem(item))
+      .filter((item): item is ParsedTooltipReference => Boolean(item));
+    if (normalizedReferences.length) {
+      return sortTooltipReferences(normalizedReferences);
+    }
+  }
+
+  const normalizedTooltip = String(rawTooltip || '').trim();
+  if (!normalizedTooltip) {
+    return [];
+  }
+
+  return [parseLegacyReferenceTooltip(normalizedTooltip)];
 }
 
 function computeReferenceTooltipViewportPosition(anchorRect: DOMRect | null, tooltipWidth: number, tooltipHeight: number) {
@@ -149,79 +235,241 @@ function computeReferenceTooltipViewportPosition(anchorRect: DOMRect | null, too
   };
 }
 
-function ReferenceTooltipBody({ tooltip }: { tooltip: string }) {
-  const parsedTooltip = parseReferenceTooltip(tooltip);
+function ReferenceTooltipBody({ references }: { references: ParsedTooltipReference[] }) {
+  if (!references.length) {
+    return null;
+  }
+
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [hasScrollableOverflow, setHasScrollableOverflow] = useState(false);
+  const [showTopScrollFade, setShowTopScrollFade] = useState(false);
+  const [showBottomScrollFade, setShowBottomScrollFade] = useState(false);
+
+  useLayoutEffect(() => {
+    const container = scrollRef.current;
+    if (!container) {
+      return;
+    }
+    const hasOverflow = container.scrollHeight > container.clientHeight + 1;
+    setHasScrollableOverflow(hasOverflow);
+    setShowTopScrollFade(container.scrollTop > 1);
+    setShowBottomScrollFade(container.scrollTop + container.clientHeight < container.scrollHeight - 1);
+  }, [references]);
+
+  useEffect(() => {
+    const container = scrollRef.current;
+    if (!container) {
+      return;
+    }
+
+    const updateScrollAffordances = () => {
+      setHasScrollableOverflow(container.scrollHeight > container.clientHeight + 1);
+      setShowTopScrollFade(container.scrollTop > 1);
+      setShowBottomScrollFade(
+        container.scrollTop + container.clientHeight < container.scrollHeight - 1
+      );
+    };
+
+    updateScrollAffordances();
+    container.addEventListener('scroll', updateScrollAffordances, { passive: true });
+    window.addEventListener('resize', updateScrollAffordances);
+
+    return () => {
+      container.removeEventListener('scroll', updateScrollAffordances);
+      window.removeEventListener('resize', updateScrollAffordances);
+    };
+  }, [references]);
 
   return (
     <div
-      className="w-[280px] max-w-[min(280px,calc(100vw-32px))] rounded-[12px_12px_12px_4px] border px-3 py-2.5 shadow-[0_10px_24px_rgba(120,113,108,0.24),0_2px_4px_rgba(120,113,108,0.18)]"
-      style={{
-        borderColor: 'rgba(120, 113, 108, 0.28)',
-        background: 'linear-gradient(180deg, #fff7d6 0%, #fef3c7 100%)',
-        color: '#292524'
-      }}
+      className="w-[420px] max-w-[min(420px,calc(100vw-32px))] rounded-[12px_12px_12px_4px] border border-[rgba(120,113,108,0.28)] bg-[linear-gradient(180deg,#fff7d6_0%,#fef3c7_100%)] px-3.5 py-3 text-[12px] uppercase text-stone-800 dark:border-zinc-600 dark:bg-[linear-gradient(180deg,#3f3f46_0%,#52525b_100%)] dark:text-zinc-100"
     >
-      <div
-        className="text-[13px] font-bold leading-[1.35] break-words"
-      >
-        {parsedTooltip.documentName}
-      </div>
-      {parsedTooltip.path ? (
+      <div className="relative">
         <div
-          className="mt-1.5 text-xs leading-[1.35] break-words"
-          style={{ color: '#57534e' }}
+          ref={scrollRef}
+          className="flex flex-col gap-2 overflow-y-auto pr-1"
+          style={{
+            maxHeight:
+              references.length > REFERENCE_TOOLTIP_MAX_VISIBLE_ITEMS
+                ? REFERENCE_TOOLTIP_SCROLL_MAX_HEIGHT
+                : undefined,
+            scrollbarWidth: 'thin'
+          }}
         >
-          {parsedTooltip.path}
+          {references.map((reference, index) => (
+            <div
+              key={`${reference.documentName || reference.label}-${reference.path}-${reference.chunkName}-${index}`}
+              className={index > 0 ? 'border-t border-stone-400/30 pt-2 dark:border-zinc-400/25' : ''}
+            >
+              {reference.url ? (
+                <a
+                  href={reference.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group -mx-1 block rounded-md px-1 py-1 transition-colors hover:bg-black/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-stone-500/40 dark:hover:bg-white/5 dark:focus-visible:ring-zinc-300/30"
+                  title={reference.documentName || reference.label}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div
+                      className="min-w-0 flex-1 truncate text-[12px] font-bold leading-[1.15] text-stone-800 underline-offset-2 group-hover:underline dark:text-zinc-100"
+                    >
+                      {reference.documentName || reference.label}
+                    </div>
+                  </div>
+                  {reference.path ? (
+                    <div
+                      className="mt-1 truncate text-[12px] leading-[1.15] text-stone-600 dark:text-zinc-300"
+                      title={reference.path}
+                    >
+                      {reference.path}
+                    </div>
+                  ) : null}
+                  {reference.chunkName ? (
+                    <div
+                      className="mt-1 truncate text-[12px] font-bold leading-[1.15] text-stone-700 dark:text-zinc-200"
+                      title={reference.chunkName}
+                    >
+                      {reference.chunkName}
+                    </div>
+                  ) : null}
+                  {reference.relevanceScore !== null ? (
+                    <div className="mt-1.5 flex items-center gap-2">
+                      <div
+                        className="h-1.5 flex-1 overflow-hidden rounded-full"
+                        style={{
+                          background: 'rgba(16, 185, 129, 0.14)',
+                          boxShadow: 'inset 0 0 0 1px rgba(5, 150, 105, 0.12)'
+                        }}
+                      >
+                        <div
+                          className="h-full rounded-full"
+                          style={{
+                            width: `${Math.max(0, Math.min(100, reference.relevanceScore * 100))}%`,
+                            background:
+                              'linear-gradient(90deg, #7f9b8a 0%, #7f9b8a 10%, #059669 58%, #047857 100%)',
+                            backgroundSize: `${100 / Math.max(reference.relevanceScore, 0.0001)}% 100%`,
+                            backgroundPosition: 'left top',
+                            backgroundRepeat: 'no-repeat',
+                            boxShadow: '0 0 10px rgba(16, 185, 129, 0.28)'
+                          }}
+                        />
+                      </div>
+                      <div
+                        className="shrink-0 border border-stone-400/15 bg-[#f8edbf] px-1.5 py-0.5 text-[12px] font-bold leading-none text-stone-800 dark:border-zinc-300/10 dark:bg-zinc-600/60 dark:text-zinc-100"
+                        style={{ borderRadius: 4 }}
+                      >
+                        {`${Math.round(reference.relevanceScore * 100)}%`}
+                      </div>
+                    </div>
+                  ) : null}
+                </a>
+              ) : (
+                <>
+                  <div className="flex items-start justify-between gap-3">
+                    <div
+                      className="min-w-0 flex-1 truncate text-[12px] font-bold leading-[1.15] text-stone-800 dark:text-zinc-100"
+                      title={reference.documentName || reference.label}
+                    >
+                      {reference.documentName || reference.label}
+                    </div>
+                  </div>
+                  {reference.path ? (
+                    <div
+                      className="mt-1 truncate text-[12px] leading-[1.15] text-stone-600 dark:text-zinc-300"
+                      title={reference.path}
+                    >
+                      {reference.path}
+                    </div>
+                  ) : null}
+                  {reference.chunkName ? (
+                    <div
+                      className="mt-1 truncate text-[12px] font-bold leading-[1.15] text-stone-700 dark:text-zinc-200"
+                      title={reference.chunkName}
+                    >
+                      {reference.chunkName}
+                    </div>
+                  ) : null}
+                  {reference.relevanceScore !== null ? (
+                    <div className="mt-1.5 flex items-center gap-2">
+                      <div
+                        className="h-1.5 flex-1 overflow-hidden rounded-full"
+                        style={{
+                          background: 'rgba(16, 185, 129, 0.14)',
+                          boxShadow: 'inset 0 0 0 1px rgba(5, 150, 105, 0.12)'
+                        }}
+                      >
+                        <div
+                          className="h-full rounded-full"
+                          style={{
+                            width: `${Math.max(0, Math.min(100, reference.relevanceScore * 100))}%`,
+                            background:
+                              'linear-gradient(90deg, #7f9b8a 0%, #7f9b8a 10%, #059669 58%, #047857 100%)',
+                            backgroundSize: `${100 / Math.max(reference.relevanceScore, 0.0001)}% 100%`,
+                            backgroundPosition: 'left top',
+                            backgroundRepeat: 'no-repeat',
+                            boxShadow: '0 0 10px rgba(16, 185, 129, 0.28)'
+                          }}
+                        />
+                      </div>
+                      <div
+                        className="shrink-0 border border-stone-400/15 bg-[#f8edbf] px-1.5 py-0.5 text-[12px] font-bold leading-none text-stone-800 dark:border-zinc-300/10 dark:bg-zinc-600/60 dark:text-zinc-100"
+                        style={{ borderRadius: 4 }}
+                      >
+                        {`${Math.round(reference.relevanceScore * 100)}%`}
+                      </div>
+                    </div>
+                  ) : null}
+                </>
+              )}
+            </div>
+          ))}
         </div>
-      ) : (
-        <div style={{ height: 6 }} />
-      )}
-      {parsedTooltip.chunkName ? (
-        <div
-          className="mt-1.5 text-xs font-bold leading-[1.4] break-words"
-          style={{ color: '#44403c' }}
-        >
-          {parsedTooltip.chunkName}
-        </div>
-      ) : null}
-      {parsedTooltip.relevanceScore !== null ? (
-        <div className="mt-2.5 flex flex-col gap-1.5">
+        {hasScrollableOverflow && showTopScrollFade ? (
           <div
-            className="self-end text-[11px] font-bold leading-none"
-            style={{ color: '#047857' }}
-          >
-            {`${Math.round(parsedTooltip.relevanceScore * 100)}%`}
-          </div>
+            className="pointer-events-none absolute inset-x-0 top-0 h-5 rounded-t-[10px] bg-[linear-gradient(180deg,rgba(255,247,214,0.96)_0%,rgba(255,247,214,0)_100%)] dark:bg-[linear-gradient(180deg,rgba(63,63,70,0.96)_0%,rgba(63,63,70,0)_100%)]"
+          />
+        ) : null}
+        {hasScrollableOverflow && showBottomScrollFade ? (
           <div
-            className="h-2 w-full overflow-hidden rounded-full"
-            style={{
-              background: 'rgba(16, 185, 129, 0.14)',
-              boxShadow: 'inset 0 0 0 1px rgba(5, 150, 105, 0.12)'
-            }}
+            className="pointer-events-none absolute inset-x-0 bottom-0 flex h-7 items-end justify-center rounded-b-[10px] bg-[linear-gradient(180deg,rgba(254,243,199,0)_0%,rgba(254,243,199,0.96)_100%)] pb-1 dark:bg-[linear-gradient(180deg,rgba(82,82,91,0)_0%,rgba(82,82,91,0.96)_100%)]"
           >
             <div
-              className="h-full rounded-full"
-              style={{
-                width: `${Math.max(0, Math.min(100, parsedTooltip.relevanceScore * 100))}%`,
-                background: 'linear-gradient(90deg, #10b981 0%, #059669 65%, #047857 100%)',
-                boxShadow: '0 0 10px rgba(16, 185, 129, 0.28)'
-              }}
+              className="h-1 w-10 rounded-full bg-stone-500/30 dark:bg-zinc-300/20"
             />
           </div>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
     </div>
   );
 }
 
 function ConversationReferenceTooltipLayer() {
   const tooltipRef = useRef<HTMLDivElement | null>(null);
+  const closeTimerRef = useRef<number | null>(null);
   const [activeTooltip, setActiveTooltip] = useState<{
     tooltipKey: string;
     tooltip: string;
+    references: ParsedTooltipReference[];
     anchorElement: HTMLElement;
   } | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState({ left: 0, top: 0 });
+
+  const clearCloseTimer = () => {
+    if (closeTimerRef.current !== null) {
+      window.clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+  };
+
+  const scheduleClose = (tooltipKey: string) => {
+    clearCloseTimer();
+    closeTimerRef.current = window.setTimeout(() => {
+      setActiveTooltip((currentTooltip) =>
+        currentTooltip && currentTooltip.tooltipKey === tooltipKey ? null : currentTooltip
+      );
+      closeTimerRef.current = null;
+    }, REFERENCE_TOOLTIP_CLOSE_DELAY_MS);
+  };
 
   const updateTooltipPosition = () => {
     const anchorElement = activeTooltip?.anchorElement || null;
@@ -255,6 +503,7 @@ function ConversationReferenceTooltipLayer() {
         action?: string;
         tooltipKey?: string;
         tooltip?: string;
+        references?: unknown;
         anchorElement?: HTMLElement;
       }>;
       const detail = customEvent.detail || {};
@@ -263,8 +512,13 @@ function ConversationReferenceTooltipLayer() {
         return;
       }
       if (detail.action === 'show') {
+        clearCloseTimer();
         const anchorElement = detail.anchorElement;
         if (!(anchorElement instanceof HTMLElement)) {
+          return;
+        }
+        const resolvedReferences = resolveTooltipReferences(detail.references, String(detail.tooltip || ''));
+        if (!resolvedReferences.length) {
           return;
         }
         setActiveTooltip((currentTooltip) => {
@@ -279,20 +533,20 @@ function ConversationReferenceTooltipLayer() {
           return {
             tooltipKey,
             tooltip: String(detail.tooltip || ''),
+            references: resolvedReferences,
             anchorElement,
           };
         });
         return;
       }
       if (detail.action === 'hide') {
-        setActiveTooltip((currentTooltip) =>
-          currentTooltip && currentTooltip.tooltipKey === tooltipKey ? null : currentTooltip
-        );
+        scheduleClose(tooltipKey);
       }
     };
 
     window.addEventListener(CONVERSATION_REFERENCE_TOOLTIP_EVENT_NAME, handleTooltipEvent);
     return () => {
+      clearCloseTimer();
       window.removeEventListener(CONVERSATION_REFERENCE_TOOLTIP_EVENT_NAME, handleTooltipEvent);
     };
   }, []);
@@ -308,11 +562,36 @@ function ConversationReferenceTooltipLayer() {
       }
       updateTooltipPosition();
     };
+    const handlePointerDownOutside = (event: MouseEvent) => {
+      const eventTarget = event.target;
+      if (!(eventTarget instanceof Node)) {
+        return;
+      }
+      if (tooltipRef.current?.contains(eventTarget)) {
+        return;
+      }
+      if (activeTooltip.anchorElement.contains(eventTarget)) {
+        return;
+      }
+      clearCloseTimer();
+      setActiveTooltip(null);
+    };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') {
+        return;
+      }
+      clearCloseTimer();
+      setActiveTooltip(null);
+    };
     window.addEventListener('resize', handleViewportMutation);
     window.addEventListener('scroll', handleViewportMutation, true);
+    document.addEventListener('mousedown', handlePointerDownOutside, true);
+    document.addEventListener('keydown', handleEscape);
     return () => {
       window.removeEventListener('resize', handleViewportMutation);
       window.removeEventListener('scroll', handleViewportMutation, true);
+      document.removeEventListener('mousedown', handlePointerDownOutside, true);
+      document.removeEventListener('keydown', handleEscape);
     };
   }, [activeTooltip]);
 
@@ -328,28 +607,32 @@ function ConversationReferenceTooltipLayer() {
         left: tooltipPosition.left,
         top: tooltipPosition.top,
         zIndex: 2147483647,
-        pointerEvents: 'none',
-        userSelect: 'none'
+        pointerEvents: 'auto',
+        userSelect: 'text'
       }}
+      onMouseEnter={() => clearCloseTimer()}
+      onMouseLeave={() => scheduleClose(activeTooltip.tooltipKey)}
+      onFocusCapture={() => clearCloseTimer()}
+      onBlurCapture={() => scheduleClose(activeTooltip.tooltipKey)}
     >
-      <ReferenceTooltipBody tooltip={activeTooltip.tooltip} />
+      <ReferenceTooltipBody references={activeTooltip.references} />
     </div>,
     document.body
   );
 }
 
 function ConversationReferenceLink({
-  href,
   tooltip,
+  references,
   tooltipKey,
   children
 }: {
-  href: string;
   tooltip: string;
+  references: unknown;
   tooltipKey: string;
   children: ReactNode;
 }) {
-  const anchorRef = useRef<HTMLAnchorElement | null>(null);
+  const anchorRef = useRef<HTMLButtonElement | null>(null);
   const dispatchTooltipEvent = (action: 'show' | 'hide') => {
     if (typeof window === 'undefined') {
       return;
@@ -360,6 +643,7 @@ function ConversationReferenceLink({
           action,
           tooltipKey,
           tooltip,
+          references,
           anchorElement: anchorRef.current
         }
       })
@@ -367,13 +651,12 @@ function ConversationReferenceLink({
   };
 
   return (
-    <a
+    <button
+      type="button"
       ref={anchorRef}
-      href={href}
       aria-label={tooltip}
-      className=""
-      target="_blank"
-      rel="noopener noreferrer"
+      aria-haspopup="dialog"
+      className="cursor-default"
       onMouseEnter={() => {
         if (anchorRef.current) {
           dispatchTooltipEvent('show');
@@ -386,9 +669,10 @@ function ConversationReferenceLink({
         }
       }}
       onBlur={() => dispatchTooltipEvent('hide')}
+      style={{ background: 'transparent', border: 'none', padding: 0 }}
     >
       {children}
-    </a>
+    </button>
   );
 }
 
@@ -539,17 +823,12 @@ const Markdown = ({
           if (element) {
             if ((element as any).type === 'link') {
               const anyEl = element as any;
-              const href = anyEl.url || (anyEl as any).props?.url || '#';
               const title = (anyEl as any).props?.tooltip || name;
-              // Normalize path arrows in tooltip to line breaks. Supports both "- >" and unicode "→" with optional spaces.
-              const formattedTitle = typeof title === 'string'
-                ? title.replace(/\s*(-\s*>|→)\s*/g, '\n')
-                : title;
               const showIcon = (anyEl as any).props?.show_icon === true;
               const contentNode = showIcon ? (
                 <span
-                  className="chainlink inline-flex items-center justify-center rounded-full bg-muted text-foreground border align-middle leading-none hover:bg-muted/80 transition-colors"
-                  style={{ width: 18, height: 18, verticalAlign: 'middle', borderColor: '#656565', borderWidth: '1px' }}
+                  className="chainlink inline-flex items-center justify-center rounded-full border border-[hsl(var(--reference-link-border))] bg-[hsl(var(--reference-link-bg))] text-[hsl(var(--reference-link-fg))] align-middle leading-none transition-colors hover:bg-[hsl(var(--reference-link-hover))]"
+                  style={{ width: 16, height: 16, verticalAlign: 'middle' }}
                 >
                   {/* Lucide link icon, rotated ~25deg */}
                   <svg
@@ -560,7 +839,7 @@ const Markdown = ({
                     strokeWidth="2.1"
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    className="h-3.5 w-3.5 block"
+                    className="h-3 w-3 block"
                     style={{ transform: 'rotate(30deg)' }}
                   >
                     {/* Lucide "link-2" simplified */}
@@ -571,16 +850,15 @@ const Markdown = ({
                 </span>
               ) : (
                 <span 
-                  className="chainlink bg-muted text-foreground px-1.5 py-0.5 rounded border hover:bg-muted/80 transition-colors"
-                  style={{ borderColor: '#656565', borderWidth: '1px' }}
+                  className="chainlink rounded border border-[hsl(var(--reference-link-border))] bg-[hsl(var(--reference-link-bg))] px-1.5 py-0.5 text-[hsl(var(--reference-link-fg))] transition-colors hover:bg-[hsl(var(--reference-link-hover))]"
                 >{children}</span>
               );
 
               return (
                 <ConversationReferenceLink
-                  href={href}
                   tooltip={String(title)}
-                  tooltipKey={String((anyEl as any).chainlitKey || href || title || name)}
+                  references={(anyEl as any).props?.references}
+                  tooltipKey={String((anyEl as any).chainlitKey || title || name)}
                 >
                   {contentNode}
                 </ConversationReferenceLink>

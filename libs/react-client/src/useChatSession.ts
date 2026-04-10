@@ -31,6 +31,7 @@ import {
   sessionState,
   sideViewState,
   tasklistState,
+  threadHistoryState,
   threadIdToResumeState,
   tokenCountState,
   wavRecorderState,
@@ -93,6 +94,7 @@ const useChatSession = () => {
   const idToResume = useRecoilValue(threadIdToResumeState);
   const setThreadResumeError = useSetRecoilState(resumeThreadErrorState);
   const setFavoriteMessages = useSetRecoilState(favoriteMessagesState);
+  const setThreadHistory = useSetRecoilState(threadHistoryState);
 
   const [currentThreadId, setCurrentThreadId] =
     useRecoilState(currentThreadIdState);
@@ -461,6 +463,40 @@ const useChatSession = () => {
         (event: { interaction: string; thread_id: string }) => {
           setFirstUserInteraction(event.interaction);
           setCurrentThreadId(event.thread_id);
+        }
+      );
+
+      socket.on(
+        'thread_title_updated',
+        (event: { thread_id: string; name: string }) => {
+          setThreadHistory((previousHistory) => {
+            const previousThreads = previousHistory?.threads;
+            if (!previousThreads?.length) {
+              return previousHistory;
+            }
+
+            let hasChanged = false;
+            const nextThreads = previousThreads.map((thread) => {
+              if (thread.id !== event.thread_id || thread.name === event.name) {
+                return thread;
+              }
+
+              hasChanged = true;
+              return {
+                ...thread,
+                name: event.name
+              };
+            });
+
+            if (!hasChanged) {
+              return previousHistory;
+            }
+
+            return {
+              ...previousHistory,
+              threads: nextThreads
+            };
+          });
         }
       );
 

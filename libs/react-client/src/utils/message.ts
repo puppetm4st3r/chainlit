@@ -184,13 +184,6 @@ const applyUpdatedContentToMessage = (
   isSequence: boolean,
   isInput: boolean
 ): IStep => {
-  if ('content' in message && message.content !== undefined) {
-    return {
-      ...message,
-      content: isSequence ? updatedContent : message.content + updatedContent
-    };
-  }
-
   if (isInput && 'input' in message && message.input !== undefined) {
     return {
       ...message,

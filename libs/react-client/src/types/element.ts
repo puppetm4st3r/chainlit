@@ -49,7 +49,7 @@ export interface ITextElement extends TMessageElement<'text'> {
   language?: string;
 }
 
-export interface ILinkElement extends TMessageElement<'link'> {}
+export type ILinkElement = TMessageElement<'link'>;
 
 export interface IPdfElement extends TMessageElement<'pdf'> {
   page?: number;

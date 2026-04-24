@@ -45,28 +45,82 @@ https://github.com/user-attachments/assets/b3738aba-55c0-42fa-ac00-6efd1ee0d148
 
 ## Installation
 
-This package is typically installed as part of the Chainlit development environment:
+Open a terminal and run:
 
-```bash
-pip install -e .
+```sh
+pip install chainlit
+chainlit hello
 ```
 
-## Usage
+If this opens the `hello app` in your browser, you're all set!
 
-The backend provides the core `chainlit` Python package that developers use to build conversational AI applications:
+### Development version
+
+The latest in-development version can be installed straight from GitHub with:
+
+```sh
+pip install git+https://github.com/Chainlit/chainlit.git#subdirectory=backend/
+```
+
+(Requires Node and pnpm installed on the system.)
+
+## 🚀 Quickstart
+
+### 🐍 Pure Python
+
+Create a new file `demo.py` with the following code:
 
 ```python
 import chainlit as cl
 
-@cl.on_message
+
+@cl.step(type="tool")
+async def tool():
+    # Fake tool
+    await cl.sleep(2)
+    return "Response from the tool!"
+
+
+@cl.on_message  # this function will be called every time a user inputs a message in the UI
 async def main(message: cl.Message):
-    await cl.Message(content="Hello World!").send()
+    """
+    This function is called every time a user inputs a message in the UI.
+    It sends back an intermediate response from the tool, followed by the final answer.
+
+    Args:
+        message: The user's message.
+
+    Returns:
+        None.
+    """
+
+
+    # Call the tool
+    tool_res = await tool()
+
+    await cl.Message(content=tool_res).send()
 ```
 
-## Development
+Now run it!
 
-For development setup and contributing guidelines, please refer to the main Chainlit documentation.
+```sh
+chainlit run demo.py -w
+```
 
-## License
+<img src="/images/quick-start.png" alt="Quick Start"></img>
 
-Apache-2.0 License 
+## 📚 More Examples - Cookbook
+
+You can find various examples of Chainlit apps [here](https://github.com/Chainlit/cookbook) that leverage tools and services such as OpenAI, Anthropiс, LangChain, LlamaIndex, ChromaDB, Pinecone and more.
+
+Tell us what you would like to see added in Chainlit using the Github issues or on [Discord](https://discord.gg/k73SQ3FyUh).
+
+## 💁 Contributing
+
+As an open-source initiative in a rapidly evolving domain, we welcome contributions, be it through the addition of new features or the improvement of documentation.
+
+For detailed information on how to contribute, see [here](/CONTRIBUTING.md).
+
+## 📃 License
+
+Chainlit is open-source and licensed under the [Apache 2.0](LICENSE) license.

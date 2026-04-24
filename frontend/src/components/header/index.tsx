@@ -9,6 +9,14 @@ import { ArrowLeft } from 'lucide-react';
 import { memo } from 'react';
 import { useRecoilValue, useSetRecoilState } from 'recoil';
 import { useNavigate } from 'react-router-dom';
+import { useSetRecoilState } from 'recoil';
+
+import {
+  useAudio,
+  useAuth,
+  useChatData,
+  useConfig
+} from '@chainlit/react-client';
 
 import AudioPresence from '@/components/AudioPresence';
 import ButtonLink from '@/components/ButtonLink';
@@ -56,7 +64,9 @@ const Header = memo(({ sidePanelSize = 30 }: HeaderProps) => {
 
   const historyEnabled = data?.requireLogin && config?.dataPersistence;
   const sidebarHidden = config?.ui?.default_sidebar_state === 'hidden';
+
   const links = config?.ui?.header_links || [];
+
   const showSettingsInHeader =
     config?.ui?.chat_settings_location === 'sidebar' &&
     chatSettingsInputs.length > 0;

@@ -132,7 +132,17 @@
       "title": "Πίνακας ρυθμίσεων",
       "customize": "Προσαρμογή"
     },
-    "watermark": "Τα ΜΓΜ μπορεί να κάνουν λάθη. Ελέγξτε σημαντικές πληροφορίες."
+    "workspace": {
+      "activePrimary": "Επεξεργασία αρχείων",
+      "activeSecondary": "Διαθέσιμο",
+      "openEditorWord": "Άνοιγμα επεξεργαστή αρχείων Word"
+    },
+    "watermark": "Τα ΜΓΜ μπορεί να κάνουν λάθη. Ελέγξτε σημαντικές πληροφορίες.",
+    "notifications": {
+      "humanInteraction": {
+        "body": "The assistant has completed the task and is waiting for your review."
+      }
+    }
   },
   "threadHistory": {
     "sidebar": {
@@ -156,10 +166,10 @@
     "thread": {
       "untitled": "Συνομιλία χωρίς τίτλο",
       "menu": {
-          "rename": "Μετονομασία",
-          "share": "Κοινοποίηση",
-          "delete": "Διαγραφή"
-        },
+        "rename": "Μετονομασία",
+        "share": "Κοινοποίηση",
+        "delete": "Διαγραφή"
+      },
       "actions": {
         "share": {
           "title": "Κοινοποίηση συνδέσμου συνομιλίας",

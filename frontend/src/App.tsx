@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { RouterProvider } from 'react-router-dom';
 import { useRecoilValue } from 'recoil';
 import { router } from 'router';
@@ -10,6 +10,7 @@ import ChatSettingsModal from './components/ChatSettings';
 import { ThemeProvider } from './components/ThemeProvider';
 import { Loader } from '@/components/Loader';
 import { Toaster } from '@/components/ui/sonner';
+import { useHumanInteractionNotification } from '@/hooks/useHumanInteractionNotification';
 
 import { userEnvState } from 'state/user';
 
@@ -24,12 +25,38 @@ declare global {
   }
 }
 
+const logRootFlowDiag = (event: string, details?: Record<string, unknown>) => {
+  console.warn(`[ChainlitRootFlowDiag] ${event}`, details || {});
+};
+
+const buildConnectInvocationKey = (
+  sessionId: string,
+  chatProfile: string | undefined,
+  userEnv: Record<string, string>
+): string => {
+  const normalizedUserEnv = Object.keys(userEnv)
+    .sort()
+    .reduce<Record<string, string>>((accumulator, key) => {
+      accumulator[key] = userEnv[key];
+      return accumulator;
+    }, {});
+
+  return JSON.stringify({
+    sessionId,
+    chatProfile: chatProfile || '',
+    userEnv: normalizedUserEnv
+  });
+};
+
 function App() {
   const { config } = useConfig();
 
   const { isAuthenticated, data, isReady } = useAuth();
   const userEnv = useRecoilValue(userEnvState);
-  const { connect, chatProfile, setChatProfile } = useChatSession();
+  const { connect, chatProfile, setChatProfile, sessionId } = useChatSession();
+  useHumanInteractionNotification();
+  const connectRef = useRef(connect);
+  const lastConnectInvocationKeyRef = useRef<string>();
 
   const configLoaded = !!config;
 
@@ -40,15 +67,62 @@ function App() {
     : false;
 
   useEffect(() => {
+    connectRef.current = connect;
+    logRootFlowDiag('app:connect_ref_updated', {
+      sessionId,
+      pathname:
+        typeof window !== 'undefined' ? window.location.pathname : undefined
+    });
+  }, [connect]);
+
+  useEffect(() => {
+    logRootFlowDiag('app:connect_effect', {
+      isAuthenticated,
+      isReady,
+      chatProfileOk,
+      sessionId,
+      pathname:
+        typeof window !== 'undefined' ? window.location.pathname : undefined
+    });
     if (!isAuthenticated || !isReady || !chatProfileOk) {
+      logRootFlowDiag('app:connect_skipped', {
+        isAuthenticated,
+        isReady,
+        chatProfileOk,
+        sessionId
+      });
       return;
     }
 
-    connect({
+    logRootFlowDiag('app:connect_attempt', {
+      sessionId,
+      pathname:
+        typeof window !== 'undefined' ? window.location.pathname : undefined
+    });
+    const connectInvocationKey = buildConnectInvocationKey(
+      sessionId,
+      chatProfile,
+      userEnv
+    );
+    if (lastConnectInvocationKeyRef.current === connectInvocationKey) {
+      logRootFlowDiag('app:connect_duplicate_skipped', {
+        sessionId,
+        pathname:
+          typeof window !== 'undefined' ? window.location.pathname : undefined
+      });
+      return;
+    }
+    lastConnectInvocationKeyRef.current = connectInvocationKey;
+    logRootFlowDiag('app:connect_invoked', {
+      sessionId,
+      pathname:
+        typeof window !== 'undefined' ? window.location.pathname : undefined
+    });
+    connectRef.current({
       transports: window.transports,
       userEnv
     });
-  }, [userEnv, isAuthenticated, connect, isReady, chatProfileOk]);
+  }, [userEnv, isAuthenticated, isReady, chatProfileOk, sessionId]);
 
   useEffect(() => {
     if (

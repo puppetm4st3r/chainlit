@@ -132,7 +132,17 @@
       "title": "सेटिंग्ज पॅनल",
       "customize": "या वेळी तुमच्या चॅट सेटिंग्ज कस्टमाइझ करा"
     },
-    "watermark": "LLM चुका करू शकतात. महत्त्वाची माहिती तपासण्याचा विचार करा."
+    "workspace": {
+      "activePrimary": "फाइल संपादन",
+      "activeSecondary": "उपलब्ध",
+      "openEditorWord": "Word फाइल संपादक उघडा"
+    },
+    "watermark": "LLM चुका करू शकतात. महत्त्वाची माहिती तपासण्याचा विचार करा.",
+    "notifications": {
+      "humanInteraction": {
+        "body": "The assistant has completed the task and is waiting for your review."
+      }
+    }
   },
   "threadHistory": {
     "sidebar": {
@@ -156,23 +166,23 @@
     "thread": {
       "untitled": "शीर्षकविरहित संभाषण",
       "menu": {
-          "rename": "नाव बदला",
-          "share": "शेअर करा",
-          "delete": "हटवा"
-        },
+        "rename": "नाव बदला",
+        "share": "शेअर करा",
+        "delete": "हटवा"
+      },
       "actions": {
         "share": {
-            "title": "चॅटचा दुवा शेअर करा",
-            "button": "शेअर करा",
-            "status": {
-              "copied": "दुवा कॉपी केला",
-              "created": "शेअर दुवा तयार झाला!",
-              "unshared": "या थ्रेडसाठी शेअरिंग अक्षम केले"
-            },
-            "error": {
-              "create": "शेअर दुवा तयार करण्यात अपयश",
-              "unshare": "थ्रेडचे शेअरिंग थांबवण्यात अपयश"
-            }
+          "title": "चॅटचा दुवा शेअर करा",
+          "button": "शेअर करा",
+          "status": {
+            "copied": "दुवा कॉपी केला",
+            "created": "शेअर दुवा तयार झाला!",
+            "unshared": "या थ्रेडसाठी शेअरिंग अक्षम केले"
+          },
+          "error": {
+            "create": "शेअर दुवा तयार करण्यात अपयश",
+            "unshare": "थ्रेडचे शेअरिंग थांबवण्यात अपयश"
+          }
         },
         "delete": {
           "title": "हटविण्याची पुष्टी करा",

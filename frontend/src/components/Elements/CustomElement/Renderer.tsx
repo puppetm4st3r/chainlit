@@ -8,27 +8,25 @@ import Imports from './Imports';
 const createMockAPIs = () => {
   return {
     updateElement: async (
-      nextProps: Record<string, any>
+      _nextProps: Record<string, any>
     ): Promise<{ success: boolean }> => {
-      console.log('updateElement called with:', nextProps);
       return { success: true };
     },
 
     deleteElement: async (): Promise<{ success: boolean }> => {
-      console.log('deleteElement called');
       return { success: true };
     },
 
-    callAction: async (action: {
+    callAction: async (_action: {
       name: string;
       payload: Record<string, unknown>;
     }): Promise<{ success: boolean }> => {
-      console.log('callAction called with:', action);
       return { success: true };
     },
 
     sendUserMessage: (message: string, command?: string): void => {
-      console.log('sendUserMessage called with:', message, command);
+      void message;
+      void command;
     }
   };
 };

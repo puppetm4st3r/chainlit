@@ -167,7 +167,6 @@ const Messages = memo(
                           <MessageAvatar
                             author={m.metadata?.avatarName || m.name}
                             isError={m.isError}
-                            isStep={true}
                           />
                           <div className="flex flex-col flex-grow w-0">
                             {(showToolCoTLoader || showHiddenCoTLoader) ? (

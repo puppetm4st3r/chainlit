@@ -57,7 +57,7 @@ const Page = ({ children }: Props) => {
       >
         <ResizablePanel
           className="flex flex-col h-full w-full"
-          minSize={30}
+          minSize={20}
           defaultSize={100 - defaultSidePanelSize}
         >
           <div className="flex flex-row flex-grow overflow-auto">

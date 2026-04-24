@@ -122,11 +122,11 @@
           "updated": "Feedback updated"
         }
       }
-        },
-        "tts": {
-            "listen": "Listen",
-            "stop": "Stop",
-            "rendering": "Rendering audio…"
+    },
+    "tts": {
+      "listen": "Listen",
+      "stop": "Stop",
+      "rendering": "Rendering audio…"
     },
     "history": {
       "title": "Last Inputs",
@@ -137,7 +137,17 @@
       "title": "Settings panel",
       "customize": "Customize your chat settings here"
     },
-    "watermark": "LLMs can make mistakes. Check important info."
+    "workspace": {
+      "activePrimary": "File editing",
+      "activeSecondary": "Available",
+      "openEditorWord": "Open Word file editor"
+    },
+    "watermark": "LLMs can make mistakes. Check important info.",
+    "notifications": {
+      "humanInteraction": {
+        "body": "The assistant has completed the task and is waiting for your review."
+      }
+    }
   },
   "threadHistory": {
     "sidebar": {
@@ -161,10 +171,10 @@
     "thread": {
       "untitled": "Untitled Conversation",
       "menu": {
-          "rename": "Rename",
-          "share": "Share",
-          "delete": "Delete"
-        },
+        "rename": "Rename",
+        "share": "Share",
+        "delete": "Delete"
+      },
       "actions": {
         "share": {
           "title": "Share link to chat",

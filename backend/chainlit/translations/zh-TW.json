@@ -132,7 +132,17 @@
       "title": "設定面板",
       "customize": "在此自定義您的聊天設定"
     },
-    "watermark": "大型語言模型可能會犯錯。請核實重要資訊。"
+    "workspace": {
+      "activePrimary": "檔案編輯",
+      "activeSecondary": "可用",
+      "openEditorWord": "開啟 Word 檔案編輯器"
+    },
+    "watermark": "大型語言模型可能會犯錯。請核實重要資訊。",
+    "notifications": {
+      "humanInteraction": {
+        "body": "The assistant has completed the task and is waiting for your review."
+      }
+    }
   },
   "threadHistory": {
     "sidebar": {
@@ -156,10 +166,10 @@
     "thread": {
       "untitled": "未命名對話",
       "menu": {
-          "rename": "重新命名",
-          "share": "分享",
-          "delete": "刪除"
-        },
+        "rename": "重新命名",
+        "share": "分享",
+        "delete": "刪除"
+      },
       "actions": {
         "share": {
           "title": "分享聊天連結",

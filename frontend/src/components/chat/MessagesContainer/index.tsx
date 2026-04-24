@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 
 import {
   ChainlitContext,
+  currentThreadIdState,
   IFeedback,
   IMessageElement,
   IStep,
@@ -19,6 +20,8 @@ import {
 } from '@chainlit/react-client';
 
 import { Messages } from '@/components/chat/Messages';
+import { buildSideViewElementsSignature } from '@/lib/sideView';
+import { dismissedSideViewSignatureState } from '@/state/project';
 import { useTranslation } from 'components/i18n/Translator';
 
 interface Props {
@@ -33,6 +36,13 @@ const MessagesContainer = ({ navigate }: Props) => {
   const { uploadFile: _uploadFile } = useChatInteract();
   const setMessages = useSetRecoilState(messagesState);
   const setSideView = useSetRecoilState(sideViewState);
+  const currentThreadId = useRecoilValue(currentThreadIdState);
+  const dismissedSideViewSignature = useRecoilValue(
+    dismissedSideViewSignatureState
+  );
+  const setDismissedSideViewSignature = useSetRecoilState(
+    dismissedSideViewSignatureState
+  );
   const sessionId = useRecoilValue(sessionIdState);
 
   const { t } = useTranslation();
@@ -93,6 +103,18 @@ const MessagesContainer = ({ navigate }: Props) => {
 
   const knownSideElementsRef = useRef<Map<string, IMessageElement>>(new Map());
   const knownSideOrderRef = useRef<string[]>([]);
+  const previousThreadIdRef = useRef<string | undefined>(currentThreadId);
+
+  useEffect(() => {
+    if (previousThreadIdRef.current === currentThreadId) {
+      return;
+    }
+
+    previousThreadIdRef.current = currentThreadId;
+    knownSideElementsRef.current = new Map();
+    knownSideOrderRef.current = [];
+    setDismissedSideViewSignature(undefined);
+  }, [currentThreadId, setDismissedSideViewSignature]);
 
   useEffect(() => {
     const sideElements = elements.filter((e) => e.display === 'side');
@@ -100,7 +122,12 @@ const MessagesContainer = ({ navigate }: Props) => {
     if (sideElements.length === 0) {
       knownSideElementsRef.current = new Map();
       knownSideOrderRef.current = [];
-      setSideView(undefined);
+      if (dismissedSideViewSignature) {
+        setDismissedSideViewSignature(undefined);
+      }
+      setSideView((currentSideView) =>
+        currentSideView?.key ? currentSideView : undefined
+      );
       return;
     }
 
@@ -114,16 +141,31 @@ const MessagesContainer = ({ navigate }: Props) => {
       sideElements.some((e) => prevMap.get(e.id) !== e);
 
     if (hasChanged) {
+      const nextSignature = buildSideViewElementsSignature(sideElements);
       const newMap = new Map<string, IMessageElement>();
       sideElements.forEach((e) => newMap.set(e.id, e));
       knownSideElementsRef.current = newMap;
       knownSideOrderRef.current = currentIds;
+      if (
+        dismissedSideViewSignature &&
+        dismissedSideViewSignature === nextSignature
+      ) {
+        return;
+      }
+      if (dismissedSideViewSignature) {
+        setDismissedSideViewSignature(undefined);
+      }
       setSideView({
         title: sideElements[sideElements.length - 1].name,
         elements: sideElements
       });
     }
-  }, [elements]);
+  }, [
+    dismissedSideViewSignature,
+    elements,
+    setDismissedSideViewSignature,
+    setSideView
+  ]);
 
   const onElementRefClick = useCallback(
     (element: IMessageElement) => {
@@ -131,6 +173,7 @@ const MessagesContainer = ({ navigate }: Props) => {
         element.display === 'side' ||
         (element.display === 'page' && !navigate)
       ) {
+        setDismissedSideViewSignature(undefined);
         setSideView({ title: element.name, elements: [element] });
         return;
       }
@@ -143,7 +186,7 @@ const MessagesContainer = ({ navigate }: Props) => {
 
       return navigate?.(element.display === 'page' ? path : '#');
     },
-    [setSideView, navigate]
+    [navigate, setDismissedSideViewSignature, setSideView]
   );
 
   const onError = useCallback((error: string) => toast.error(error), [toast]);

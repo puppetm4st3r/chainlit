@@ -19,6 +19,9 @@ import { ThreadList } from './ThreadList';
 
 const BATCH_SIZE = 35;
 let _scrollTop = 0;
+const logRootFlowDiag = (event: string, details?: Record<string, unknown>) => {
+  console.warn(`[ChainlitRootFlowDiag] ${event}`, details || {});
+};
 
 export function ThreadHistory() {
   const navigate = useNavigate();
@@ -42,18 +45,42 @@ export function ThreadHistory() {
   // Handle first interaction
   useEffect(() => {
     const handleFirstInteraction = async () => {
+      logRootFlowDiag('thread_history:first_interaction_effect', {
+        firstInteraction,
+        threadId,
+        messageCount: messages.length,
+        pathname:
+          typeof window !== 'undefined' ? window.location.pathname : undefined
+      });
       if (!firstInteraction) return;
 
       const isActualResume =
         firstInteraction === 'resume' &&
         messages[0]?.output.toLowerCase() !== 'resume';
 
-      if (isActualResume) return;
+      if (isActualResume) {
+        logRootFlowDiag('thread_history:skip_actual_resume', {
+          firstInteraction,
+          threadId,
+          firstMessageOutput: messages[0]?.output
+        });
+        return;
+      }
 
       await fetchThreads(undefined, true);
+      logRootFlowDiag('thread_history:threads_fetched_after_first_interaction', {
+        firstInteraction,
+        threadId,
+        pathname:
+          typeof window !== 'undefined' ? window.location.pathname : undefined
+      });
 
       const currentPage = new URL(window.location.href);
       if (threadId && currentPage.pathname === '/') {
+        logRootFlowDiag('thread_history:navigate_to_thread', {
+          threadId,
+          pathname: currentPage.pathname
+        });
         navigate(`/thread/${threadId}`);
       }
     };

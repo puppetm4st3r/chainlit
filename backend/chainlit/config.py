@@ -65,6 +65,26 @@ public_dir = os.path.join(APP_ROOT, "public")
 config_file = os.path.join(config_dir, "config.toml")
 config_translation_dir = os.path.join(config_dir, "translations")
 
+
+def _parse_optional_bool_env(env_var_name: str) -> Optional[bool]:
+    """Parse a boolean environment override using common truthy and falsy strings."""
+    raw_value = os.environ.get(env_var_name)
+    if raw_value is None:
+        return None
+
+    normalized_value = raw_value.strip().lower()
+    if normalized_value in {"1", "true", "yes", "on"}:
+        return True
+    if normalized_value in {"0", "false", "no", "off"}:
+        return False
+
+    logger.warning(
+        "Ignoring invalid boolean value '%s' for %s.",
+        raw_value,
+        env_var_name,
+    )
+    return None
+
 # Default config file created if none exists
 DEFAULT_CONFIG_STR = f"""[project]
 # List of environment variables to be provided by each user to use the app.
@@ -241,6 +261,9 @@ default_avatar_file_url = ""
 # Avatar size in pixels (default: 20).
 # avatar_size = 20
 
+# Hide the Readme button, theme toggle, chat profile selector and user menu in the header.
+hide_topright_bar = false
+
 # Specify a custom build directory for the frontend.
 # This can be used to customize the frontend code.
 # Be careful: If this is a relative path, it should not start with a slash.
@@ -390,6 +413,7 @@ class UISettings(BaseModel):
     avatar_size: Optional[int] = None
     custom_build: Optional[str] = None
     header_links: Optional[List[HeaderLink]] = None
+    hide_topright_bar: bool = False
 
 
 class CodeSettings(BaseModel):
@@ -652,6 +676,12 @@ def load_settings():
             )
 
         lc_cache_path = os.path.join(config_dir, ".langchain.db")
+
+        hide_topright_bar_override = _parse_optional_bool_env(
+            "CHAINLIT_HIDE_TOPRIGHT_BAR"
+        )
+        if hide_topright_bar_override is not None:
+            ui_settings["hide_topright_bar"] = hide_topright_bar_override
 
         project_settings = ProjectSettings(
             lc_cache_path=lc_cache_path,

@@ -132,7 +132,17 @@
       "title": "Einstellungen",
       "customize": "Passe die Chat Einstellungen hier an"
     },
-    "watermark": "LLMs können Fehler machen. Überprüfe bitte stets die Inhalte."
+    "workspace": {
+      "activePrimary": "Dateibearbeitung",
+      "activeSecondary": "Verfügbar",
+      "openEditorWord": "Word-Datei-Editor öffnen"
+    },
+    "watermark": "LLMs können Fehler machen. Überprüfe bitte stets die Inhalte.",
+    "notifications": {
+      "humanInteraction": {
+        "body": "The assistant has completed the task and is waiting for your review."
+      }
+    }
   },
   "threadHistory": {
     "sidebar": {
@@ -156,10 +166,10 @@
     "thread": {
       "untitled": "Unbenannter Thread",
       "menu": {
-          "rename": "Umbenennen",
-          "share": "Teilen",
-          "delete": "Löschen"
-        },
+        "rename": "Umbenennen",
+        "share": "Teilen",
+        "delete": "Löschen"
+      },
       "actions": {
         "share": {
           "title": "Thread löschen bestätigen",

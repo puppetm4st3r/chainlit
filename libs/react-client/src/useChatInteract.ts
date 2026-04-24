@@ -63,7 +63,7 @@ const useChatInteract = () => {
     resetChatSettingsValue();
     setSideView(undefined);
     setCurrentThreadId(undefined);
-  }, [session]);
+  }, [askUser, session, sessionId]);
 
   const sendMessage = useCallback(
     (

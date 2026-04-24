@@ -235,6 +235,22 @@ export const sideViewState = atom<
   default: undefined
 });
 
+export const documentWorkspaceState = atom<
+  | {
+      hasActiveWorkspace: boolean;
+      enabled: boolean;
+      workspaceKey?: string;
+      workspaceNodeId?: string;
+      workspaceNodeName?: string;
+      filename?: string;
+      documentSource?: string;
+    }
+  | undefined
+>({
+  key: 'DocumentWorkspaceState',
+  default: undefined
+});
+
 export const currentThreadIdState = atom<string | undefined>({
   key: 'CurrentThreadId',
   default: undefined

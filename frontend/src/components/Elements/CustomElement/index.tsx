@@ -178,6 +178,7 @@ const CustomElement = memo(function ({ element }: { element: ICustomElement }) {
           import: { ...baseImports, ...localImports },
           props,
           apiClient,
+          sessionId,
           updateElement,
           deleteElement,
           callAction,

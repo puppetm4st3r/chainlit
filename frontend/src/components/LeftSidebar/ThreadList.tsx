@@ -144,13 +144,9 @@ export function ThreadList({
 
   const handleDeleteThread = async () => {
     if (!threadIdToDelete) return;
-    if (
+    const isDeletingCurrentThread =
       threadIdToDelete === idToResume ||
-      threadIdToDelete === currentThreadId
-    ) {
-      clear();
-      await new Promise((resolve) => setTimeout(resolve, 300));
-    }
+      threadIdToDelete === currentThreadId;
 
     toast.promise(apiClient.deleteThread(threadIdToDelete), {
       loading: (
@@ -159,9 +155,16 @@ export function ThreadList({
       success: () => {
         setThreadHistory((prev) => ({
           ...prev,
+          currentThreadId:
+            prev?.currentThreadId === threadIdToDelete
+              ? undefined
+              : prev?.currentThreadId,
           threads: prev?.threads?.filter((t) => t.id !== threadIdToDelete)
         }));
-        navigate('/');
+        if (isDeletingCurrentThread) {
+          clear();
+        }
+        navigate('/', { replace: isDeletingCurrentThread });
         return (
           <Translator path="threadHistory.thread.actions.delete.success" />
         );

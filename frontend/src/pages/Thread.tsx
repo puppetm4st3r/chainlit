@@ -15,6 +15,10 @@ import { Loader } from '@/components/Loader';
 import { ReadOnlyThread } from '@/components/ReadOnlyThread';
 import Chat from '@/components/chat';
 
+const logRootFlowDiag = (event: string, details?: Record<string, unknown>) => {
+  console.warn(`[ChainlitRootFlowDiag] ${event}`, details || {});
+};
+
 export default function ThreadPage() {
   const { id } = useParams();
   const location = useLocation();
@@ -27,11 +31,18 @@ export default function ThreadPage() {
   const isCurrentThread = threadId === id;
 
   useEffect(() => {
+    logRootFlowDiag('thread_page:route_effect', {
+      routeThreadId: id,
+      currentThreadId: threadId,
+      pathname: location.pathname,
+      isCurrentThread,
+      threadResumable: config?.threadResumable
+    });
     setThreadHistory((prev) => {
       if (prev?.currentThreadId === id) return prev;
       return { ...prev, currentThreadId: id };
     });
-  }, [id]);
+  }, [id, threadId, location.pathname, isCurrentThread, config?.threadResumable]);
 
   const isSharedRoute = location.pathname.startsWith('/share/');
 

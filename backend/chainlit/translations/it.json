@@ -132,7 +132,17 @@
       "title": "Impostazioni",
       "customize": "Personalizza le impostazioni della tua chat qui"
     },
-    "watermark": "Gli LLMS possono commettere errori. Verifica le info importanti."
+    "workspace": {
+      "activePrimary": "Modifica file",
+      "activeSecondary": "Disponibile",
+      "openEditorWord": "Apri l'editor di file Word"
+    },
+    "watermark": "Gli LLMS possono commettere errori. Verifica le info importanti.",
+    "notifications": {
+      "humanInteraction": {
+        "body": "The assistant has completed the task and is waiting for your review."
+      }
+    }
   },
   "threadHistory": {
     "sidebar": {
@@ -156,10 +166,10 @@
     "thread": {
       "untitled": "Conversazione senza titolo",
       "menu": {
-          "rename": "Rinomina",
-          "share": "Condividi",
-          "delete": "Elimina"
-        },
+        "rename": "Rinomina",
+        "share": "Condividi",
+        "delete": "Elimina"
+      },
       "actions": {
         "share": {
           "title": "Condividi link conversazione",

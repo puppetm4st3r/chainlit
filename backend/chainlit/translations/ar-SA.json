@@ -131,7 +131,17 @@
       "title": "لوحة الإعدادات",
       "customize": "خصص إعدادات المحادثة هنا"
     },
-    "watermark": "قد تخطئ نماذج الذكاء الاصطناعي. تحقق من المعلومات المهمة."
+    "workspace": {
+      "activePrimary": "تحرير الملفات",
+      "activeSecondary": "متاح",
+      "openEditorWord": "افتح محرر ملفات Word"
+    },
+    "watermark": "قد تخطئ نماذج الذكاء الاصطناعي. تحقق من المعلومات المهمة.",
+    "notifications": {
+      "humanInteraction": {
+        "body": "The assistant has completed the task and is waiting for your review."
+      }
+    }
   },
   "threadHistory": {
     "sidebar": {
@@ -155,10 +165,10 @@
     "thread": {
       "untitled": "محادثة بدون عنوان",
       "menu": {
-          "rename": "إعادة تسمية",
-          "share": "مشاركة",
-          "delete": "حذف"
-        },
+        "rename": "إعادة تسمية",
+        "share": "مشاركة",
+        "delete": "حذف"
+      },
       "actions": {
         "share": {
           "title": "مشاركة رابط المحادثة",

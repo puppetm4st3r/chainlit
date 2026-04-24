@@ -132,7 +132,17 @@
       "title": "פאנל הגדרות",
       "customize": "התאם אישית את הגדרות הצ'אט שלך כאן"
     },
-    "watermark": "מודלי שפה גדולים עלולים לעשות טעויות. כדאי לבדוק מידע חשוב."
+    "workspace": {
+      "activePrimary": "עריכת קבצים",
+      "activeSecondary": "זמין",
+      "openEditorWord": "פתח את עורך קבצי Word"
+    },
+    "watermark": "מודלי שפה גדולים עלולים לעשות טעויות. כדאי לבדוק מידע חשוב.",
+    "notifications": {
+      "humanInteraction": {
+        "body": "The assistant has completed the task and is waiting for your review."
+      }
+    }
   },
   "threadHistory": {
     "sidebar": {

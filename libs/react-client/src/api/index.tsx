@@ -287,49 +287,123 @@ export class ChainlitAPI extends APIBase {
     const promise = new Promise<{ id: string }>((resolve, reject) => {
       const formData = new FormData();
       formData.append('file', file);
+      let settled = false;
+      let uploadAborted = false;
+      let retryCount = 0;
 
       const ask_parent_id = parentId ? `&ask_parent_id=${parentId}` : '';
-      xhr.open(
-        'POST',
-        this.buildEndpoint(
-          `/project/file?session_id=${sessionId}${ask_parent_id}`
-        ),
-        true
+      const endpoint = this.buildEndpoint(
+        `/project/file?session_id=${sessionId}${ask_parent_id}`
       );
 
       const promptLanguage = resolveDefaultLanguage();
-      if (promptLanguage) {
-        xhr.setRequestHeader('X-Prompt-Language', promptLanguage);
-      }
 
-      // Track the progress of the upload
-      xhr.upload.onprogress = function (event) {
-        if (event.lengthComputable) {
-          const percentage = (event.loaded / event.total) * 100;
-          onProgress(percentage);
-        }
-      };
-
-      xhr.onload = function () {
-        if (xhr.status === 200) {
-          const response = JSON.parse(xhr.responseText);
-          resolve(response);
+      const rejectOnce = (error: unknown) => {
+        if (settled) {
           return;
         }
+        settled = true;
+        reject(error);
+      };
+
+      const resolveOnce = (value: { id: string }) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        resolve(value);
+      };
+
+      const parseJsonDetail = () => {
         const contentType = xhr.getResponseHeader('Content-Type');
-        if (contentType && contentType.includes('application/json')) {
-          const response = JSON.parse(xhr.responseText);
-          reject(response.detail);
-        } else {
-          reject('Upload failed');
+        if (!contentType || !contentType.includes('application/json')) {
+          return undefined;
+        }
+
+        try {
+          return JSON.parse(xhr.responseText)?.detail;
+        } catch {
+          return undefined;
         }
       };
 
-      xhr.onerror = function () {
-        reject('Upload error');
+      const refreshStickySession = async () => {
+        try {
+          await this.stickyCookie(sessionId);
+        } catch (error) {
+          console.warn('Failed to refresh sticky session before upload', error);
+        }
       };
 
-      xhr.send(formData);
+      const startUpload = async () => {
+        if (uploadAborted || settled) {
+          return;
+        }
+
+        if (retryCount === 0) {
+          await refreshStickySession();
+          if (uploadAborted || settled) {
+            return;
+          }
+        }
+
+        xhr.open('POST', endpoint, true);
+
+        if (promptLanguage) {
+          xhr.setRequestHeader('X-Prompt-Language', promptLanguage);
+        }
+
+        xhr.upload.onprogress = function (event) {
+          if (event.lengthComputable) {
+            const percentage = (event.loaded / event.total) * 100;
+            onProgress(percentage);
+          }
+        };
+
+        xhr.onload = async () => {
+          if (xhr.status === 200) {
+            const response = JSON.parse(xhr.responseText);
+            resolveOnce(response);
+            return;
+          }
+
+          const detail = parseJsonDetail();
+          const canRetryMissingSession =
+            xhr.status === 404 &&
+            detail === 'Session not found' &&
+            retryCount === 0 &&
+            !uploadAborted;
+
+          if (canRetryMissingSession) {
+            retryCount += 1;
+            await refreshStickySession();
+            if (uploadAborted || settled) {
+              return;
+            }
+            startUpload();
+            return;
+          }
+
+          if (detail) {
+            rejectOnce(detail);
+          } else {
+            rejectOnce('Upload failed');
+          }
+        };
+
+        xhr.onerror = function () {
+          rejectOnce('Upload error');
+        };
+
+        xhr.onabort = () => {
+          uploadAborted = true;
+          rejectOnce('Upload aborted');
+        };
+
+        xhr.send(formData);
+      };
+
+      void startUpload();
     });
 
     return { xhr, promise };

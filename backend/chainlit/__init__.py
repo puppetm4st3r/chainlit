@@ -137,6 +137,16 @@ async def update_chat_settings(settings: Dict[str, Any]):
     await context.emitter.update_chat_settings(settings)
 
 
+async def set_thread_title(title: str) -> bool:
+    """
+    Programmatically update the current thread title.
+
+    Args:
+        title (str): The thread title chosen by the backend application.
+    """
+    return await context.emitter.set_thread_title(title)
+
+
 @dataclass()
 class CopilotFunction:
     name: str
@@ -236,6 +246,7 @@ __all__ = [
     "run_sync",
     "send_window_message",
     "set_chat_profile",
+    "set_thread_title",
     "update_chat_settings",
     "set_chat_profiles",
     "set_starter_categories",

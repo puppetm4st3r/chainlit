@@ -9,6 +9,7 @@ import {
 } from '@chainlit/react-client';
 
 import Icon from '@/components/Icon';
+import { resolveAssistantAvatarUrl } from '@/lib/assistantAvatar';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -30,19 +31,14 @@ const MessageAvatar = ({ author, hide, isError, iconName }: Props) => {
   const { chatProfile } = useChatSession();
   const { config } = useConfig();
 
-  const selectedChatProfile = useMemo(() => {
-    return config?.chatProfiles.find((profile) => profile.name === chatProfile);
-  }, [config, chatProfile]);
-
   const avatarUrl = useMemo(() => {
-    // Use the same avatar logic for both steps and messages
-    if (config?.ui?.default_avatar_file_url) return config?.ui?.default_avatar_file_url;
-    const isAssistant = !author || author === config?.ui.name;
-    if (isAssistant && selectedChatProfile?.icon) {
-      return selectedChatProfile.icon;
-    }
-    return apiClient?.buildEndpoint(`/avatars/${author || 'default'}`);
-  }, [apiClient, selectedChatProfile, config, author]);
+    return resolveAssistantAvatarUrl({
+      apiClient,
+      config,
+      chatProfile,
+      author
+    });
+  }, [apiClient, chatProfile, config, author]);
 
   const avatarSize = config?.ui?.avatar_size;
   const avatarContainerSize = avatarSize ?? 48;

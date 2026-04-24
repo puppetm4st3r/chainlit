@@ -132,7 +132,17 @@
       "title": "Panneau des paramètres",
       "customize": "Personnalisez vos paramètres de chat ici"
     },
-    "watermark": "Les LLMs peuvent se tromper. Vérifiez les réponses."
+    "workspace": {
+      "activePrimary": "Édition de fichiers",
+      "activeSecondary": "Disponible",
+      "openEditorWord": "Ouvrir l’éditeur de fichiers Word"
+    },
+    "watermark": "Les LLMs peuvent se tromper. Vérifiez les réponses.",
+    "notifications": {
+      "humanInteraction": {
+        "body": "The assistant has completed the task and is waiting for your review."
+      }
+    }
   },
   "threadHistory": {
     "sidebar": {

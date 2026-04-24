@@ -132,7 +132,17 @@
       "title": "સેટિંગ્સ પેનલ",
       "customize": "તમારા ચેટ સેટિંગ્સ અહીં કસ્ટમાઇઝ કરો"
     },
-    "watermark": "LLM ભૂલો કરી શકે છે. મહત્વપૂર્ણ માહિતી તપાસવાનું વિચારો."
+    "workspace": {
+      "activePrimary": "ફાઇલ સંપાદન",
+      "activeSecondary": "ઉપલબ્ધ",
+      "openEditorWord": "વર્ડ ફાઇલ સંપાદક ખોલો"
+    },
+    "watermark": "LLM ભૂલો કરી શકે છે. મહત્વપૂર્ણ માહિતી તપાસવાનું વિચારો.",
+    "notifications": {
+      "humanInteraction": {
+        "body": "The assistant has completed the task and is waiting for your review."
+      }
+    }
   },
   "threadHistory": {
     "sidebar": {

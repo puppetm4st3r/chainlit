@@ -31,6 +31,10 @@ code {
     --secondary-foreground: 222.2 47.4% 11.2%;
     --muted: 0 0% 90%;
     --muted-foreground: 0 0% 36%;
+    --reference-link-bg: 0 0% 90%;
+    --reference-link-fg: 0 0% 18%;
+    --reference-link-border: 0 0% 58%;
+    --reference-link-hover: 0 0% 84%;
     --accent: 0 0% 95%;
     --accent-foreground: 222.2 47.4% 11.2%;
     --destructive: 0 84.2% 60.2%;
@@ -67,6 +71,10 @@ code {
     --secondary-foreground: 210 40% 98%;
     --muted: 0 1% 26%;
     --muted-foreground: 0 0% 71%;
+    --reference-link-bg: 0 0% 28%;
+    --reference-link-fg: 0 0% 93%;
+    --reference-link-border: 0 0% 42%;
+    --reference-link-hover: 0 0% 34%;
     --accent: 0 0% 26%;
     --accent-foreground: 210 40% 98%;
     --destructive: 0 62.8% 30.6%;

@@ -8,7 +8,8 @@ import {
   Dialog,
   DialogContent,
   DialogOverlay,
-  DialogPortal
+  DialogPortal,
+  DialogTitle
 } from '@/components/ui/dialog';
 
 const ImageElement = ({ element }: { element: IImageElement }) => {
@@ -88,6 +89,9 @@ const ImageElement = ({ element }: { element: IImageElement }) => {
         <DialogPortal>
           <DialogOverlay className="bg-black/80" />
           <DialogContent className="border-none bg-transparent shadow-none max-w-none p-0 w-screen h-screen overflow-hidden [&>button]:hidden">
+            <DialogTitle className="sr-only">
+              {element.name || 'Image preview'}
+            </DialogTitle>
             <div 
               className={`relative w-full h-full flex items-center justify-center ${
                 zoomLevel > 1 ? 'overflow-hidden' : 'overflow-auto'

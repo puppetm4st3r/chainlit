@@ -131,7 +131,17 @@
       "title": "Indstillingspanel",
       "customize": "Tilpas dine chatindstillinger her"
     },
-    "watermark": "Bygget med"
+    "workspace": {
+      "activePrimary": "Filredigering",
+      "activeSecondary": "Tilgængelig",
+      "openEditorWord": "Åbn Word-fileditor"
+    },
+    "watermark": "Bygget med",
+    "notifications": {
+      "humanInteraction": {
+        "body": "The assistant has completed the task and is waiting for your review."
+      }
+    }
   },
   "threadHistory": {
     "sidebar": {

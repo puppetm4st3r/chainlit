@@ -132,7 +132,17 @@
       "title": "Panel de configuración",
       "customize": "Personaliza la configuración de tu chat aquí"
     },
-    "watermark": "Los LLM pueden cometer errores. Verifica la información importante."
+    "workspace": {
+      "activePrimary": "Edición de archivos",
+      "activeSecondary": "Disponible",
+      "openEditorWord": "Abrir editor de archivos word"
+    },
+    "watermark": "Los LLM pueden cometer errores. Verifica la información importante.",
+    "notifications": {
+      "humanInteraction": {
+        "body": "El asistente ha completado la tarea y está esperando tu revisión."
+      }
+    }
   },
   "threadHistory": {
     "sidebar": {

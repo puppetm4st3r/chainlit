@@ -132,7 +132,17 @@
       "title": "సెట్టింగ్‌ల ప్యానెల్",
       "customize": "మీ చాట్ సెట్టింగ్‌లను ఇక్కడ అనుకూలీకరించండి"
     },
-    "watermark": "LLMలు తప్పులు చేయవచ్చు. ముఖ్యమైన సమాచారాన్ని తనిఖీ చేయడాన్ని పరిగణించండి."
+    "workspace": {
+      "activePrimary": "ఫైల్ సవరణ",
+      "activeSecondary": "అందుబాటులో",
+      "openEditorWord": "Word ఫైల్ ఎడిటర్‌ను తెరవండి"
+    },
+    "watermark": "LLMలు తప్పులు చేయవచ్చు. ముఖ్యమైన సమాచారాన్ని తనిఖీ చేయడాన్ని పరిగణించండి.",
+    "notifications": {
+      "humanInteraction": {
+        "body": "The assistant has completed the task and is waiting for your review."
+      }
+    }
   },
   "threadHistory": {
     "sidebar": {

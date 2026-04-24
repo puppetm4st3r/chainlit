@@ -1,10 +1,12 @@
-from unittest.mock import MagicMock
+import asyncio
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from chainlit.element import ElementDict
 from chainlit.emitter import ChainlitEmitter
 from chainlit.step import StepDict
+from chainlit.user import PersistedUser
 
 
 @pytest.fixture
@@ -209,3 +211,70 @@ async def test_send_toast_invalid_type(emitter: ChainlitEmitter) -> None:
     message = "This is a test message"
     with pytest.raises(ValueError, match="Invalid toast type: invalid"):
         await emitter.send_toast(message, type="invalid")  # type: ignore[arg-type]
+
+
+async def test_flush_thread_queues_creates_thread_without_auto_title(
+    emitter: ChainlitEmitter, mock_websocket_session: MagicMock
+) -> None:
+    mock_websocket_session.thread_id = "thread-1"
+    mock_websocket_session.chat_profile = None
+    mock_websocket_session.user = PersistedUser(
+        id="user-1",
+        createdAt="2024-01-01T00:00:00Z",
+        identifier="user@example.com",
+    )
+    mock_websocket_session.flush_method_queue = AsyncMock()
+    mock_data_layer = AsyncMock()
+
+    with patch("chainlit.emitter.get_data_layer", return_value=mock_data_layer):
+        await emitter.flush_thread_queues()
+        await asyncio.sleep(0)
+
+    mock_data_layer.update_thread.assert_called_once_with(
+        thread_id="thread-1",
+        user_id="user-1",
+        tags=None,
+    )
+    mock_websocket_session.flush_method_queue.assert_awaited_once()
+
+
+async def test_set_thread_title_persists_name_and_emits_runtime_update(
+    emitter: ChainlitEmitter, mock_websocket_session: MagicMock
+) -> None:
+    mock_websocket_session.thread_id = "thread-1"
+    mock_websocket_session.chat_profile = None
+    mock_websocket_session.user = PersistedUser(
+        id="user-1",
+        createdAt="2024-01-01T00:00:00Z",
+        identifier="user@example.com",
+    )
+    mock_data_layer = AsyncMock()
+
+    with patch("chainlit.emitter.get_data_layer", return_value=mock_data_layer):
+        result = await emitter.set_thread_title("  My first request  ")
+
+    assert result is True
+    mock_data_layer.update_thread.assert_called_once_with(
+        thread_id="thread-1",
+        name="My first request",
+        user_id="user-1",
+        tags=None,
+    )
+    mock_websocket_session.emit.assert_called_once_with(
+        "thread_title_updated",
+        {"thread_id": "thread-1", "name": "My first request"},
+    )
+
+
+async def test_set_thread_title_skips_runtime_update_without_data_layer(
+    emitter: ChainlitEmitter, mock_websocket_session: MagicMock
+) -> None:
+    mock_websocket_session.thread_id = "thread-1"
+    mock_websocket_session.chat_profile = None
+    mock_websocket_session.user = None
+
+    with patch("chainlit.emitter.get_data_layer", return_value=None):
+        result = await emitter.set_thread_title("My first request")
+
+    assert result is False
+    mock_websocket_session.emit.assert_not_called()

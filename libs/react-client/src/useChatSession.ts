@@ -18,6 +18,7 @@ import {
   chatSettingsValueState,
   commandsState,
   currentThreadIdState,
+  documentWorkspaceState,
   elementState,
   favoriteMessagesState,
   firstUserInteraction,
@@ -31,6 +32,7 @@ import {
   sessionState,
   sideViewState,
   tasklistState,
+  threadHistoryState,
   threadIdToResumeState,
   tokenCountState,
   wavRecorderState,
@@ -63,6 +65,29 @@ interface BufferedStreamToken extends IToken {
   key: string;
 }
 
+const logRootFlowDiag = (event: string, details?: Record<string, unknown>) => {
+  console.warn(`[ChainlitRootFlowDiag] ${event}`, details || {});
+};
+
+const stableSidebarElementsSignature = (elements: IMessageElement[]): string => {
+  try {
+    return JSON.stringify(elements, (_key, value) => {
+      if (Array.isArray(value) || !value || typeof value !== 'object') {
+        return value;
+      }
+
+      return Object.keys(value)
+        .sort()
+        .reduce<Record<string, unknown>>((accumulator, currentKey) => {
+          accumulator[currentKey] = (value as Record<string, unknown>)[currentKey];
+          return accumulator;
+        }, {});
+    });
+  } catch {
+    return '';
+  }
+};
+
 const useChatSession = () => {
   const client = useContext(ChainlitContext);
   const sessionId = useRecoilValue(sessionIdState);
@@ -84,6 +109,7 @@ const useChatSession = () => {
   const setCommands = useSetRecoilState(commandsState);
   const setModes = useSetRecoilState(modesState);
   const setSideView = useSetRecoilState(sideViewState);
+  const setDocumentWorkspace = useSetRecoilState(documentWorkspaceState);
   const setElements = useSetRecoilState(elementState);
   const setTasklists = useSetRecoilState(tasklistState);
   const setActions = useSetRecoilState(actionState);
@@ -93,6 +119,7 @@ const useChatSession = () => {
   const idToResume = useRecoilValue(threadIdToResumeState);
   const setThreadResumeError = useSetRecoilState(resumeThreadErrorState);
   const setFavoriteMessages = useSetRecoilState(favoriteMessagesState);
+  const setThreadHistory = useSetRecoilState(threadHistoryState);
 
   const [currentThreadId, setCurrentThreadId] =
     useRecoilState(currentThreadIdState);
@@ -233,12 +260,24 @@ const useChatSession = () => {
     };
   }, [cancelScheduledStreamFlush]);
 
-  // Use currentThreadId as thread id in websocket header
+  // Preserve the resume target on fresh sockets until the current thread is known.
   useEffect(() => {
     if (session?.socket) {
-      session.socket.auth['threadId'] = currentThreadId || '';
+      const activeThreadId = idToResume || currentThreadId || '';
+      (session.socket.auth as Record<string, unknown>)['threadId'] =
+        activeThreadId;
     }
-  }, [currentThreadId]);
+  }, [currentThreadId, idToResume, session, sessionId]);
+
+  useEffect(() => {
+    if (!idToResume) {
+      return;
+    }
+    if (idToResume === currentThreadId) {
+      return;
+    }
+    setDocumentWorkspace(undefined);
+  }, [currentThreadId, idToResume, sessionId, setDocumentWorkspace]);
 
   const _connect = useCallback(
     async ({
@@ -254,6 +293,14 @@ const useChatSession = () => {
         pathname && pathname !== '/'
           ? `${pathname}/ws/socket.io`
           : '/ws/socket.io';
+      logRootFlowDiag('socket:connect_start', {
+        sessionId,
+        idToResume,
+        currentThreadId,
+        chatProfile,
+        pathname:
+          typeof window !== 'undefined' ? window.location.pathname : undefined
+      });
 
       try {
         await client.stickyCookie(sessionId);
@@ -297,6 +344,14 @@ const useChatSession = () => {
       });
 
       socket.on('connect', () => {
+        const socketAuth = socket.auth as { threadId?: string } | undefined;
+        logRootFlowDiag('socket:connect', {
+          sessionId,
+          socketId: socket.id,
+          authThreadId: socketAuth?.threadId || '',
+          idToResume,
+          currentThreadId
+        });
         socket.emit('connection_successful');
         setSession((s) => ({ ...s!, error: false }));
         socket.emit('fetch_favorites');
@@ -352,7 +407,7 @@ const useChatSession = () => {
         );
       });
 
-      socket.on('connect_error', (_) => {
+      socket.on('connect_error', (error: Error) => {
         setSession((s) => ({ ...s!, error: true }));
       });
 
@@ -419,6 +474,14 @@ const useChatSession = () => {
         const isReadOnlyView = Boolean(
           (thread as any)?.metadata?.viewer_read_only
         );
+        const isSwitchingToDifferentThread = Boolean(
+          thread?.id &&
+            thread.id !== currentThreadId &&
+            (!idToResume || thread.id === idToResume)
+        );
+        if (isSwitchingToDifferentThread) {
+          setDocumentWorkspace(undefined);
+        }
         if (!isReadOnlyView && idToResume && thread.id !== idToResume) {
           window.location.href = `/thread/${thread.id}`;
         }
@@ -459,8 +522,49 @@ const useChatSession = () => {
       socket.on(
         'first_interaction',
         (event: { interaction: string; thread_id: string }) => {
+          logRootFlowDiag('socket:first_interaction', {
+            sessionId,
+            interaction: event.interaction,
+            eventThreadId: event.thread_id,
+            currentThreadId,
+            idToResume
+          });
           setFirstUserInteraction(event.interaction);
           setCurrentThreadId(event.thread_id);
+        }
+      );
+
+      socket.on(
+        'thread_title_updated',
+        (event: { thread_id: string; name: string }) => {
+          setThreadHistory((previousHistory) => {
+            const previousThreads = previousHistory?.threads;
+            if (!previousThreads?.length) {
+              return previousHistory;
+            }
+
+            let hasChanged = false;
+            const nextThreads = previousThreads.map((thread) => {
+              if (thread.id !== event.thread_id || thread.name === event.name) {
+                return thread;
+              }
+
+              hasChanged = true;
+              return {
+                ...thread,
+                name: event.name
+              };
+            });
+
+            if (!hasChanged) {
+              return previousHistory;
+            }
+
+            return {
+              ...previousHistory,
+              threads: nextThreads
+            };
+          });
         }
       );
 
@@ -558,6 +662,25 @@ const useChatSession = () => {
         setFavoriteMessages(steps);
       });
 
+      socket.on(
+        'document_workspace_state',
+        (workspaceState: {
+          hasActiveWorkspace: boolean;
+          enabled: boolean;
+          workspaceKey?: string;
+          workspaceNodeId?: string;
+          workspaceNodeName?: string;
+          filename?: string;
+          documentSource?: string;
+        }) => {
+          if (!workspaceState?.hasActiveWorkspace) {
+            setDocumentWorkspace(undefined);
+            return;
+          }
+          setDocumentWorkspace(workspaceState);
+        }
+      );
+
       socket.on('set_sidebar_title', (title: string) => {
         setSideView((prev) => {
           if (prev?.title === title) return prev;
@@ -580,7 +703,15 @@ const useChatSession = () => {
               }
             });
             setSideView((prev) => {
-              if (prev?.key === key) return prev;
+              if (prev?.key === key) {
+                const previousSignature = stableSidebarElementsSignature(
+                  prev?.elements ?? []
+                );
+                const nextSignature = stableSidebarElementsSignature(elements);
+                if (previousSignature === nextSignature) {
+                  return prev;
+                }
+              }
               return { title: prev?.title || '', elements: elements, key };
             });
           }
@@ -676,7 +807,9 @@ const useChatSession = () => {
       chatProfile,
       language,
       enqueueBufferedStreamToken,
-      flushBufferedStreamTokens
+      flushBufferedStreamTokens,
+      currentThreadId,
+      setDocumentWorkspace
     ]
   );
 

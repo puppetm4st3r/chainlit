@@ -131,7 +131,17 @@
       "title": "設定パネル",
       "customize": "ここでチャット設定をカスタマイズします"
     },
-    "watermark": "大規模言語モデルは間違いを犯す可能性があります。重要な情報については確認を検討してください。"
+    "workspace": {
+      "activePrimary": "ファイル編集",
+      "activeSecondary": "利用可能",
+      "openEditorWord": "Wordファイルエディターを開く"
+    },
+    "watermark": "大規模言語モデルは間違いを犯す可能性があります。重要な情報については確認を検討してください。",
+    "notifications": {
+      "humanInteraction": {
+        "body": "The assistant has completed the task and is waiting for your review."
+      }
+    }
   },
   "threadHistory": {
     "sidebar": {

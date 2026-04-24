@@ -132,7 +132,17 @@
       "title": "ക്രമീകരണങ്ങൾ പാനൽ",
       "customize": "ഈ സമയം നിങ്ങളുടെ ചാറ്റ് ക്രമീകരണങ്ങൾ കസ്റ്റമൈസ് ചെയ്യുക"
     },
-    "watermark": "LLM കൾക്ക് തെറ്റുകൾ വരുത്താം. പ്രധാനപ്പെട്ട വിവരങ്ങൾ പരിശോധിക്കുന്നത് പരിഗണിക്കുക."
+    "workspace": {
+      "activePrimary": "ഫയൽ തിരുത്തൽ",
+      "activeSecondary": "ലഭ്യം",
+      "openEditorWord": "Word ഫയൽ എഡിറ്റർ തുറക്കുക"
+    },
+    "watermark": "LLM കൾക്ക് തെറ്റുകൾ വരുത്താം. പ്രധാനപ്പെട്ട വിവരങ്ങൾ പരിശോധിക്കുന്നത് പരിഗണിക്കുക.",
+    "notifications": {
+      "humanInteraction": {
+        "body": "The assistant has completed the task and is waiting for your review."
+      }
+    }
   },
   "threadHistory": {
     "sidebar": {

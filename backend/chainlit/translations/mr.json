@@ -132,7 +132,17 @@
       "title": "सेटिंग्ज पॅनल",
       "customize": "या वेळी तुमच्या चॅट सेटिंग्ज कस्टमाइझ करा"
     },
-    "watermark": "LLM चुका करू शकतात. महत्त्वाची माहिती तपासण्याचा विचार करा."
+    "workspace": {
+      "activePrimary": "फाइल संपादन",
+      "activeSecondary": "उपलब्ध",
+      "openEditorWord": "Word फाइल संपादक उघडा"
+    },
+    "watermark": "LLM चुका करू शकतात. महत्त्वाची माहिती तपासण्याचा विचार करा.",
+    "notifications": {
+      "humanInteraction": {
+        "body": "The assistant has completed the task and is waiting for your review."
+      }
+    }
   },
   "threadHistory": {
     "sidebar": {

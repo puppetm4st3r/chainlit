@@ -1,9 +1,9 @@
 import { cn } from '@/lib/utils';
-import { ArrowLeft } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useRecoilState } from 'recoil';
 
 import { sideViewState } from '@chainlit/react-client';
+import { dispatchCanvasShellCloseRequest } from '@/lib/canvas';
 
 import { Card, CardContent } from '@/components/ui/card';
 import { ResizableHandle, ResizablePanel } from '@/components/ui/resizable';
@@ -17,12 +17,15 @@ import {
 import { useIsMobile } from '@/hooks/use-mobile';
 
 import { Element } from './Elements';
-import { Button } from './ui/button';
 
 export default function ElementSideView() {
   const [sideView, setSideView] = useRecoilState(sideViewState);
   const isMobile = useIsMobile();
   const [isVisible, setIsVisible] = useState(false);
+  const handleCloseSideView = () => {
+    dispatchCanvasShellCloseRequest(sideView?.elements);
+    setSideView(undefined);
+  };
 
   const isCanvas = Boolean(
     sideView?.elements?.some(
@@ -45,7 +48,7 @@ export default function ElementSideView() {
 
   if (isMobile) {
     return (
-      <Sheet open onOpenChange={(open) => !open && setSideView(undefined)}>
+      <Sheet open onOpenChange={(open) => !open && handleCloseSideView()}>
         <SheetContent
           className={cn('md:hidden flex flex-col', isCanvas && 'p-0')}
         >
@@ -74,7 +77,7 @@ export default function ElementSideView() {
     <>
       <ResizableHandle className="sm:hidden md:flex" />
       <ResizablePanel
-        minSize={isCanvas ? 30 : 10}
+        minSize={20}
         defaultSize={70}
         className={`md:flex flex-col flex-grow sm:hidden transform transition-transform duration-300 ease-in-out ${
           isVisible ? 'translate-x-0' : 'translate-x-full'
@@ -82,23 +85,6 @@ export default function ElementSideView() {
       >
         <aside className="relative flex-grow overflow-y-auto mr-4 mb-4">
           <Card className="overflow-y-auto h-full relative flex flex-col">
-            <div
-              id="side-view-title"
-              className={cn(
-                'text-lg font-semibold text-foreground px-6 py-4 flex items-center',
-                isCanvas && 'absolute top-0 z-10 bg-transparent'
-              )}
-            >
-              <Button
-                className="-ml-2"
-                onClick={() => setSideView(undefined)}
-                size="icon"
-                variant={isCanvas ? 'default' : 'ghost'}
-              >
-                <ArrowLeft />
-              </Button>
-              {isCanvas ? null : sideView.title}
-            </div>
             <CardContent
               id="side-view-content"
               className={cn(

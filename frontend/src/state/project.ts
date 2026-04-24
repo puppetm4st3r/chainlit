@@ -9,3 +9,8 @@ export const chatSettingsSidebarOpenState = atom<boolean>({
   key: 'chatSettingsSidebarOpen',
   default: false
 });
+
+export const dismissedSideViewSignatureState = atom<string | undefined>({
+  key: 'dismissedSideViewSignature',
+  default: undefined
+});

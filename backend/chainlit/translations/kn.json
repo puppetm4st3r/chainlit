@@ -132,7 +132,17 @@
       "title": "ಸೆಟ್ಟಿಂಗ್‌ಗಳ ಪ್ಯಾನೆಲ್",
       "customize": "ಈಗ ನಿಮ್ಮ ಚಾಟ್ ಸೆಟ್ಟಿಂಗ್‌ಗಳನ್ನು ಕಸ್ಟಮೈಸ್ ಮಾಡಿ"
     },
-    "watermark": "LLM ಗಳು ತಪ್ಪುಗಳನ್ನು ಮಾಡಬಹುದು. ಪ್ರಮುಖ ಮಾಹಿತಿಯನ್ನು ಪರಿಶೀಲಿಸುವುದನ್ನು ಪರಿಗಣಿಸಿ."
+    "workspace": {
+      "activePrimary": "ಫೈಲ್ ಸಂಪಾದನೆ",
+      "activeSecondary": "ಲಭ್ಯ",
+      "openEditorWord": "Word ಫೈಲ್ ಸಂಪಾದಕವನ್ನು ತೆರೆಯಿರಿ"
+    },
+    "watermark": "LLM ಗಳು ತಪ್ಪುಗಳನ್ನು ಮಾಡಬಹುದು. ಪ್ರಮುಖ ಮಾಹಿತಿಯನ್ನು ಪರಿಶೀಲಿಸುವುದನ್ನು ಪರಿಗಣಿಸಿ.",
+    "notifications": {
+      "humanInteraction": {
+        "body": "The assistant has completed the task and is waiting for your review."
+      }
+    }
   },
   "threadHistory": {
     "sidebar": {

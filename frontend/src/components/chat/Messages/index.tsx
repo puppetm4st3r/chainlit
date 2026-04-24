@@ -11,6 +11,7 @@ import {
 import BlinkingCursor from '@/components/BlinkingCursor';
 import { useLayoutMaxWidth } from 'hooks/useLayoutMaxWidth';
 
+import { MessageSiblingsContext } from './MessageSiblingsContext';
 import { Message } from './Message';
 import { MessageAvatar } from './Message/Avatar';
 
@@ -62,7 +63,7 @@ const Messages = memo(
     }, [scorableRun]);
 
     return (
-      <>
+      <MessageSiblingsContext.Provider value={messages}>
         {messages.map((m, index) => {
           // Get previous message for grouping logic
           // For child steps/messages at same level (index > 0), use previous sibling
@@ -166,7 +167,6 @@ const Messages = memo(
                           <MessageAvatar
                             author={m.metadata?.avatarName || m.name}
                             isError={m.isError}
-                            isStep={true}
                           />
                           <div className="flex flex-col flex-grow w-0">
                             {(showToolCoTLoader || showHiddenCoTLoader) ? (
@@ -208,13 +208,11 @@ const Messages = memo(
                 scorableRun={_scorableRun}
                 isScorable={isScorable}
                 shouldGroup={shouldGroup}
-                messages={messages}
-                index={index}
               />
             );
           }
         })}
-      </>
+      </MessageSiblingsContext.Provider>
     );
   }
 );

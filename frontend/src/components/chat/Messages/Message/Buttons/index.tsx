@@ -19,11 +19,9 @@ interface Props {
   run?: IStep;
   contentRef?: React.RefObject<HTMLDivElement>;
   elements?: IMessageElement[];
-  messages?: IStep[];
-  index?: number;
 }
 
-const MessageButtons = ({ message, actions, run, contentRef, elements, messages, index }: Props) => {
+const MessageButtons = ({ message, actions, run, contentRef, elements }: Props) => {
   const { config } = useConfig();
   const { firstInteraction } = useChatMessages();
 
@@ -50,7 +48,7 @@ const MessageButtons = ({ message, actions, run, contentRef, elements, messages,
       ) : null}
       {run ? <FeedbackButtons message={run} /> : null}
       {/* TTS playback for assistant messages */}
-      {!isUser && hasContent ? <TTSButton message={message} elements={elements} messages={messages} index={index} /> : null}
+      {!isUser && hasContent ? <TTSButton message={message} elements={elements} /> : null}
       {messageActions.length ? (
         <MessageActions actions={messageActions} />
       ) : null}

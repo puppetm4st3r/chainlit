@@ -132,7 +132,17 @@
       "title": "设置面板",
       "customize": "在此自定义您的聊天设置"
     },
-    "watermark": "大语言模型可能会犯错。请核实重要信息。"
+    "workspace": {
+      "activePrimary": "文件编辑",
+      "activeSecondary": "可用",
+      "openEditorWord": "打开 Word 文件编辑器"
+    },
+    "watermark": "大语言模型可能会犯错。请核实重要信息。",
+    "notifications": {
+      "humanInteraction": {
+        "body": "The assistant has completed the task and is waiting for your review."
+      }
+    }
   },
   "threadHistory": {
     "sidebar": {

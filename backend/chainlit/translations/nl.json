@@ -132,7 +132,17 @@
       "title": "Instellingenpaneel",
       "customize": "Pas hier je chatinstellingen aan"
     },
-    "watermark": "LLM's kunnen fouten maken. Overweeg het controleren van belangrijke informatie."
+    "workspace": {
+      "activePrimary": "Bestandsbewerking",
+      "activeSecondary": "Beschikbaar",
+      "openEditorWord": "Word-bestandseditor openen"
+    },
+    "watermark": "LLM's kunnen fouten maken. Overweeg het controleren van belangrijke informatie.",
+    "notifications": {
+      "humanInteraction": {
+        "body": "The assistant has completed the task and is waiting for your review."
+      }
+    }
   },
   "threadHistory": {
     "sidebar": {

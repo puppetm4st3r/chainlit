@@ -14,6 +14,8 @@ import { Volume2, Square } from 'lucide-react';
 import { Loader } from '@/components/Loader';
 import Translator from '@/components/i18n/Translator';
 
+import { useMessageSiblings } from '../../MessageSiblingsContext';
+
 // Import the browser-optimized API to avoid Node.js dependencies in the bundle
 import { EdgeTTS } from '@edge-tts/universal/browser';
 
@@ -108,16 +110,15 @@ interface Props {
   message: IStep;
   voiceName?: string;
   elements?: IMessageElement[];
-  messages?: IStep[];
-  index?: number;
 }
 
 /**
  * Play Text-to-Speech for an assistant message using Microsoft Edge TTS.
  * Uses the browser entrypoint from @edge-tts/universal to prevent bundler conflicts.
  */
-export function TTSButton({ message, voiceName, elements, messages, index }: Props) {
+export function TTSButton({ message, voiceName, elements }: Props) {
   const { config } = useConfig();
+  const siblingMessages = useMessageSiblings();
   const [isLoading, setIsLoading] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const objectUrlRef = useRef<string | null>(null);
@@ -184,36 +185,49 @@ export function TTSButton({ message, voiceName, elements, messages, index }: Pro
   }, [config?.ui?.name]);
 
   const resolveFullText = useCallback(() => {
-    if (!messages || index === undefined) return message.output;
-    
-    const currentAuthor = getMessageAuthor(message, messages);
-    let startIndex = index;
-    let endIndex = index;
-    
+    if (!siblingMessages?.length) {
+      return message.output;
+    }
+
+    const currentIndex = siblingMessages.findIndex((candidate) => candidate.id === message.id);
+    if (currentIndex === -1) {
+      return message.output;
+    }
+
+    const currentAuthor = getMessageAuthor(message, siblingMessages);
+    let startIndex = currentIndex;
+    let endIndex = currentIndex;
+
     // Scan backwards
-    for (let i = index - 1; i >= 0; i--) {
-      if (getMessageAuthor(messages[i], messages) === currentAuthor && !['on_chat_start', 'on_message', 'on_audio_end'].includes(messages[i].name)) {
+    for (let i = currentIndex - 1; i >= 0; i--) {
+      if (
+        getMessageAuthor(siblingMessages[i], siblingMessages) === currentAuthor &&
+        !['on_chat_start', 'on_message', 'on_audio_end'].includes(siblingMessages[i].name)
+      ) {
         startIndex = i;
       } else {
         break;
       }
     }
-    
+
     // Scan forwards
-    for (let i = index + 1; i < messages.length; i++) {
-      if (getMessageAuthor(messages[i], messages) === currentAuthor && !['on_chat_start', 'on_message', 'on_audio_end'].includes(messages[i].name)) {
+    for (let i = currentIndex + 1; i < siblingMessages.length; i++) {
+      if (
+        getMessageAuthor(siblingMessages[i], siblingMessages) === currentAuthor &&
+        !['on_chat_start', 'on_message', 'on_audio_end'].includes(siblingMessages[i].name)
+      ) {
         endIndex = i;
       } else {
         break;
       }
     }
 
-    return messages
+    return siblingMessages
       .slice(startIndex, endIndex + 1)
-      .map(m => m.output)
+      .map((m) => m.output)
       .filter(Boolean)
       .join('\n\n');
-  }, [message, messages, index, getMessageAuthor]);
+  }, [message, siblingMessages, getMessageAuthor]);
 
   const handleClick = useCallback(async () => {
     if (!canPlay) return;
@@ -315,7 +329,11 @@ export function TTSButton({ message, voiceName, elements, messages, index }: Pro
             try {
               const url = await synthToUrl(paragraphs[i], selectedVoice);
               if (cancelledRef.current) {
-                try { URL.revokeObjectURL(url); } catch {}
+                try {
+                  URL.revokeObjectURL(url);
+                } catch {
+                  // Ignore revoke failures during teardown.
+                }
                 break;
               }
               queuedUrlsRef.current.push(url);

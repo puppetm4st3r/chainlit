@@ -97,6 +97,10 @@ class BaseChainlitEmitter:
     async def init_thread(self, interaction: str):
         pass
 
+    async def set_thread_title(self, title: str) -> bool:
+        """Stub method to persist and emit a thread title update."""
+        return False
+
     async def process_message(self, payload: MessagePayload) -> Message:
         """Stub method to process user message."""
         return Message(content="")
@@ -241,29 +245,33 @@ class ChainlitEmitter(BaseChainlitEmitter):
     def clear(self, event: Literal["clear_ask", "clear_call_fn"]):
         return self.emit(event, {})
 
-    async def flush_thread_queues(self, interaction: str):
+    def _get_thread_user_id(self) -> Optional[str]:
+        """Resolve the persisted user id for thread updates when available."""
+        if isinstance(self.session.user, PersistedUser):
+            return self.session.user.id
+        return None
+
+    def _get_thread_tags(self) -> Optional[List[str]]:
+        """Resolve the thread tags that should be attached on persistence."""
+        should_tag_thread = (
+            self.session.chat_profile and config.features.auto_tag_thread
+        )
+        return [self.session.chat_profile] if should_tag_thread else None
+
+    async def flush_thread_queues(self):
         if data_layer := get_data_layer():
-            if isinstance(self.session.user, PersistedUser):
-                user_id = self.session.user.id
-            else:
-                user_id = None
             try:
-                should_tag_thread = (
-                    self.session.chat_profile and config.features.auto_tag_thread
-                )
-                tags = [self.session.chat_profile] if should_tag_thread else None
                 await data_layer.update_thread(
                     thread_id=self.session.thread_id,
-                    name=interaction,
-                    user_id=user_id,
-                    tags=tags,
+                    user_id=self._get_thread_user_id(),
+                    tags=self._get_thread_tags(),
                 )
             except Exception as e:
                 logger.error(f"Error updating thread: {e}")
             asyncio.create_task(self.session.flush_method_queue())
 
     async def init_thread(self, interaction: str):
-        await self.flush_thread_queues(interaction)
+        await self.flush_thread_queues()
         await self.emit(
             "first_interaction",
             {
@@ -271,6 +279,37 @@ class ChainlitEmitter(BaseChainlitEmitter):
                 "thread_id": self.session.thread_id,
             },
         )
+
+    async def set_thread_title(self, title: str) -> bool:
+        """Persist the thread title and notify the UI when it changes."""
+        normalized_title = str(title or "").strip()
+        if not normalized_title:
+            return False
+
+        data_layer = get_data_layer()
+        if not data_layer:
+            logger.warning("Skipping thread title update because no data layer is configured.")
+            return False
+
+        try:
+            await data_layer.update_thread(
+                thread_id=self.session.thread_id,
+                name=normalized_title,
+                user_id=self._get_thread_user_id(),
+                tags=self._get_thread_tags(),
+            )
+        except Exception as e:
+            logger.error(f"Error updating thread title: {e}")
+            return False
+
+        await self.emit(
+            "thread_title_updated",
+            {
+                "thread_id": self.session.thread_id,
+                "name": normalized_title,
+            },
+        )
+        return True
 
     async def process_message(self, payload: MessagePayload):
         step_dict = payload["message"]
@@ -538,7 +577,7 @@ class ChainlitEmitter(BaseChainlitEmitter):
         # check that the type is valid using ToastType
         if type not in get_args(ToastType):
             raise ValueError(f"Invalid toast type: {type}")
-        await return self.emit("toast", {"message": message, "type": type})
+        return await self.emit("toast", {"message": message, "type": type})
 
     async def set_chat_profile(self, profile_name: str):
         """Send a chat profile selection to the UI."""

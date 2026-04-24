@@ -58,6 +58,7 @@ export interface IChainlitConfig {
     logo_file_url?: string;
     default_avatar_file_url?: string;
     avatar_size?: number;
+    hide_topright_bar?: boolean;
     header_links?: {
       name: string;
       display_name: string;

@@ -8,6 +8,7 @@ import { useAuth, useChatSession, useConfig } from '@chainlit/react-client';
 
 import ChatSettingsModal from './components/ChatSettings';
 import { ThemeProvider } from './components/ThemeProvider';
+import WorkflowHelpDialog from './components/workflow-help/WorkflowHelpDialog';
 import { Loader } from '@/components/Loader';
 import { Toaster } from '@/components/ui/sonner';
 import { useHumanInteractionNotification } from '@/hooks/useHumanInteractionNotification';
@@ -24,10 +25,6 @@ declare global {
     };
   }
 }
-
-const logRootFlowDiag = (event: string, details?: Record<string, unknown>) => {
-  console.warn(`[ChainlitRootFlowDiag] ${event}`, details || {});
-};
 
 const buildConnectInvocationKey = (
   sessionId: string,
@@ -68,56 +65,22 @@ function App() {
 
   useEffect(() => {
     connectRef.current = connect;
-    logRootFlowDiag('app:connect_ref_updated', {
-      sessionId,
-      pathname:
-        typeof window !== 'undefined' ? window.location.pathname : undefined
-    });
   }, [connect]);
 
   useEffect(() => {
-    logRootFlowDiag('app:connect_effect', {
-      isAuthenticated,
-      isReady,
-      chatProfileOk,
-      sessionId,
-      pathname:
-        typeof window !== 'undefined' ? window.location.pathname : undefined
-    });
     if (!isAuthenticated || !isReady || !chatProfileOk) {
-      logRootFlowDiag('app:connect_skipped', {
-        isAuthenticated,
-        isReady,
-        chatProfileOk,
-        sessionId
-      });
       return;
     }
 
-    logRootFlowDiag('app:connect_attempt', {
-      sessionId,
-      pathname:
-        typeof window !== 'undefined' ? window.location.pathname : undefined
-    });
     const connectInvocationKey = buildConnectInvocationKey(
       sessionId,
       chatProfile,
       userEnv
     );
     if (lastConnectInvocationKeyRef.current === connectInvocationKey) {
-      logRootFlowDiag('app:connect_duplicate_skipped', {
-        sessionId,
-        pathname:
-          typeof window !== 'undefined' ? window.location.pathname : undefined
-      });
       return;
     }
     lastConnectInvocationKeyRef.current = connectInvocationKey;
-    logRootFlowDiag('app:connect_invoked', {
-      sessionId,
-      pathname:
-        typeof window !== 'undefined' ? window.location.pathname : undefined
-    });
     connectRef.current({
       transports: window.transports,
       userEnv
@@ -155,6 +118,7 @@ function App() {
       <Toaster richColors className="toast" position="top-right" />
 
       <ChatSettingsModal />
+      <WorkflowHelpDialog />
       <RouterProvider router={router} />
 
       <div

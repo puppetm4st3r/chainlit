@@ -1,3 +1,5 @@
+import { useChatData } from '@chainlit/react-client';
+
 import { Button } from '@/components/ui/button';
 import {
   Tooltip,
@@ -12,6 +14,11 @@ import { useSidebar } from '../ui/sidebar';
 
 export default function SidebarTrigger() {
   const { setOpen, open, openMobile, setOpenMobile, isMobile } = useSidebar();
+  const { conversationHistoryVisible } = useChatData();
+
+  if (conversationHistoryVisible === false) {
+    return null;
+  }
 
   return (
     <TooltipProvider>

@@ -611,6 +611,38 @@ class TestConnectionSuccessfulIdempotency:
             "on_chat_start must be scheduled exactly once per WebsocketSession"
         )
         assert session.chat_started is True
+        assert session.reset_pre_persistence_state.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_reconnect_without_persisted_thread_clears_prethreshold_state(
+        self, mock_session_factory
+    ):
+        """Reconnects before persistence should drop staged pre-threshold session state."""
+        on_chat_start = AsyncMock()
+
+        session = mock_session_factory(has_first_interaction=False)
+        session.restored = True
+        session.chat_started = False
+        session.current_task = None
+        session.thread_id_to_resume = None
+
+        mock_context = Mock()
+        mock_context.session = session
+        mock_context.emitter = AsyncMock()
+
+        mock_config = Mock()
+        mock_config.code.on_chat_start = on_chat_start
+        mock_config.code.on_chat_resume = None
+
+        with (
+            patch("chainlit.socket.init_ws_context", return_value=mock_context),
+            patch("chainlit.socket.config", mock_config),
+            patch("chainlit.socket.chat_context.clear") as clear_chat_context,
+        ):
+            await connection_successful("sid-1")
+
+        session.reset_pre_persistence_state.assert_called_once()
+        clear_chat_context.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_on_chat_start_fires_once_on_fresh_session(
@@ -672,6 +704,100 @@ class TestConnectionSuccessfulIdempotency:
             await connection_successful("sid-1")
 
         assert on_chat_start.call_count == 1
+
+
+class TestConnectionSuccessfulResumeIdempotency:
+    """Regression tests: on_chat_resume must fire exactly once per
+    WebsocketSession, even when connection_successful is dispatched multiple
+    times by a Socket.IO reconnect against a restored session. A resumed
+    session must never fall back to on_chat_start on later reconnects.
+    """
+
+    @pytest.mark.asyncio
+    async def test_on_chat_resume_not_duplicated_on_reconnect(
+        self, mock_session_factory
+    ):
+        """Reconnect against a resumed session must not re-run the resume."""
+        on_chat_resume = AsyncMock()
+        on_chat_start = AsyncMock()
+
+        session = mock_session_factory(has_first_interaction=True)
+        session.restored = True
+        session.chat_started = False
+        session.chat_resumed = False
+        session.current_task = None
+        session.thread_id_to_resume = "thread_123"
+
+        mock_context = Mock()
+        mock_context.session = session
+        mock_context.emitter = AsyncMock()
+
+        mock_config = Mock()
+        mock_config.code.on_chat_start = on_chat_start
+        mock_config.code.on_chat_resume = on_chat_resume
+
+        with (
+            patch("chainlit.socket.init_ws_context", return_value=mock_context),
+            patch("chainlit.socket.config", mock_config),
+            patch(
+                "chainlit.socket.resume_thread",
+                AsyncMock(return_value={"id": "thread_123", "steps": []}),
+            ),
+        ):
+            await connection_successful("sid-1")
+            # Simulate reconnect: same session object, chat_resumed now True.
+            await connection_successful("sid-1")
+
+        assert on_chat_resume.call_count == 1, (
+            "on_chat_resume must run exactly once per WebsocketSession"
+        )
+        assert session.chat_resumed is True
+        assert on_chat_start.call_count == 0, (
+            "a resumed session must never fall back to on_chat_start"
+        )
+
+    @pytest.mark.asyncio
+    async def test_reconnect_redelivers_snapshot_without_rerunning_heavy_resume(
+        self, mock_session_factory
+    ):
+        """Reconnects must re-deliver the UI snapshot (so a freshly connected client
+        re-renders) while the expensive on_chat_resume runs exactly once."""
+        on_chat_resume = AsyncMock()
+        resume_thread_mock = AsyncMock(
+            return_value={"id": "thread_123", "steps": []}
+        )
+
+        session = mock_session_factory(has_first_interaction=True)
+        session.restored = True
+        session.chat_started = False
+        session.chat_resumed = False
+        session.current_task = None
+        session.thread_id_to_resume = "thread_123"
+
+        mock_context = Mock()
+        mock_context.session = session
+        mock_context.emitter = AsyncMock()
+
+        mock_config = Mock()
+        mock_config.code.on_chat_start = AsyncMock()
+        mock_config.code.on_chat_resume = on_chat_resume
+
+        with (
+            patch("chainlit.socket.init_ws_context", return_value=mock_context),
+            patch("chainlit.socket.config", mock_config),
+            patch("chainlit.socket.resume_thread", resume_thread_mock),
+        ):
+            await connection_successful("sid-1")
+            await connection_successful("sid-1")
+            await connection_successful("sid-1")
+
+        # The expensive application restore runs once; the UI snapshot is re-emitted
+        # on every (re)connection so the thread always renders after a transport drop.
+        assert on_chat_resume.call_count == 1
+        assert resume_thread_mock.call_count == 3
+        assert mock_context.emitter.resume_thread.call_count == 3
+        assert mock_config.code.on_chat_start.call_count == 0
+
 
 class TestConnect:
     """Test suite for websocket connect authorization."""

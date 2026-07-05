@@ -19,6 +19,7 @@
   "auth": {
     "login": {
       "title": "ಅಪ್ಲಿಕೇಶನ್‌ಗೆ ಪ್ರವೇಶಿಸಲು ಲಾಗಿನ್ ಮಾಡಿ",
+      "privateIntegrationTokenBootstrap": "Bootstrap integration token",
       "form": {
         "email": {
           "label": "ಇಮೇಲ್ ವಿಳಾಸ",
@@ -228,6 +229,7 @@
         "settings": "ಸೆಟ್ಟಿಂಗ್‌ಗಳು",
         "settingsKey": "S",
         "apiKeys": "API ಕೀಗಳು",
+        "administration": "ನಿರ್ವಹಣೆ",
         "logout": "ಲಾಗ್ ಔಟ್"
       }
     }

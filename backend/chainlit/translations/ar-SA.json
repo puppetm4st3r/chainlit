@@ -19,6 +19,7 @@
   "auth": {
     "login": {
       "title": "قم بتسجيل الدخول للوصول إلى التطبيق",
+      "privateIntegrationTokenBootstrap": "Bootstrap integration token",
       "form": {
         "email": {
           "label": "البريد الإلكتروني",
@@ -227,6 +228,7 @@
         "settings": "الإعدادات",
         "settingsKey": "S",
         "apiKeys": "مفاتيح API",
+        "administration": "الإدارة",
         "logout": "تسجيل الخروج"
       }
     }

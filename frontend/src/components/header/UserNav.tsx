@@ -1,7 +1,7 @@
 import capitalize from 'lodash/capitalize';
-import { LogOut } from 'lucide-react';
+import { LogOut, Shield } from 'lucide-react';
 
-import { useAuth } from '@chainlit/react-client';
+import { useAuth, useConfig } from '@chainlit/react-client';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -24,11 +24,15 @@ import { useTranslation } from 'react-i18next';
 
 export default function UserNav() {
   const { user, logout } = useAuth();
+  const { config } = useConfig();
   const { language, setLanguage } = useLanguage();
   const { i18n } = useTranslation();
 
   if (!user) return null;
   const displayName = user?.display_name || user?.identifier;
+  const adminUrl = config?.ui?.admin_url;
+  const canOpenAdministration =
+    !!adminUrl && user.metadata.roles?.includes('root');
 
   const languages = [
     { code: 'en-US', label: 'English (US)' },
@@ -72,6 +76,17 @@ export default function UserNav() {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        {canOpenAdministration ? (
+          <>
+            <DropdownMenuItem asChild>
+              <a href={adminUrl}>
+                <Translator path="navigation.user.menu.administration" />
+                <Shield className="ml-auto" />
+              </a>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        ) : null}
         <DropdownMenuSub>
           <DropdownMenuSubTrigger>Language</DropdownMenuSubTrigger>
           <DropdownMenuSubContent>

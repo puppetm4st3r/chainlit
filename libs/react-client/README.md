@@ -111,11 +111,15 @@ This hook provides access to various chat-related data and states.
 - `chatSettingsDefaultValue`: The default value for chat settings.
 - `chatSettingsInputs`: The current chat settings inputs.
 - `chatSettingsValue`: The current value of chat settings.
+- `composerInputRestriction`: The active composer mode (`mix`, `only_modes`, or `selection_only`) and optional runtime placeholder override.
 - `connected`: A boolean indicating if the WebSocket connection is established.
+- `conversationHistoryVisible`: Whether the runtime currently allows the past-conversation history UI to be shown.
 - `disabled`: A boolean indicating if the chat is disabled.
 - `elements`: An array of chat elements.
 - `error`: A boolean indicating if there is an error in the session.
 - `loading`: A boolean indicating if the chat is in a loading state.
+- `newChatButtonVisible`: Alias of `conversationHistoryVisible` for consumers that only need to gate the new chat entry point.
+- `spontaneousFileUploadEnabled`: Whether uploads are currently enabled for the active session.
 - `tasklists`: An array of tasklist elements.
 
 #### Example
@@ -176,3 +180,21 @@ const InteractionComponent = () => {
   );
 };
 ```
+
+### `ChainlitAPI`
+
+The `ChainlitAPI` client also exposes project-level helpers in addition to the realtime hooks.
+
+#### Methods
+
+- `deleteThread(threadId)`: Deletes a single persisted thread.
+- `deleteThreads()`: Deletes every persisted thread owned by the current user and returns the backend summary payload.
+
+### Config additions
+
+- `IAuthConfig.privateIntegrationTokenBootstrapUrl`: Optional login-page link for private integration token bootstrap flows.
+- `IChainlitConfig.ui.admin_url`: Optional administration URL surfaced to root users.
+
+### Mode payloads
+
+Mode selections are modeled as arrays of option ids (`Record<string, string[]>`) so the same contract can represent both single-select and multi-select mode pickers.

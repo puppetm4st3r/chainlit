@@ -19,6 +19,7 @@
   "auth": {
     "login": {
       "title": "앱에 접근하려면 로그인하세요",
+      "privateIntegrationTokenBootstrap": "Bootstrap integration token",
       "form": {
         "email": {
           "label": "이메일 주소",
@@ -228,6 +229,7 @@
         "settings": "설정",
         "settingsKey": "S",
         "apiKeys": "API 키",
+        "administration": "관리",
         "logout": "로그아웃"
       }
     }

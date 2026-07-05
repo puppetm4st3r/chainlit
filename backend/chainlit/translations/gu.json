@@ -19,6 +19,7 @@
   "auth": {
     "login": {
       "title": "એપ્લિકેશન ઍક્સેસ કરવા માટે લૉગિન કરો",
+      "privateIntegrationTokenBootstrap": "Bootstrap integration token",
       "form": {
         "email": {
           "label": "ઈમેલ એડ્રેસ",
@@ -228,6 +229,7 @@
         "settings": "સેટિંગ્સ",
         "settingsKey": "S",
         "apiKeys": "API કી",
+        "administration": "વહીવટ",
         "logout": "લૉગઆઉટ"
       }
     }

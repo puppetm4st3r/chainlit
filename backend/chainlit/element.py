@@ -207,23 +207,75 @@ class Element:
         else:
             return "file"
 
-    async def _create(self, persist=True) -> bool:
+    def _requires_blob_storage_persistence(self) -> bool:
+        """Return whether the element must become a blob-backed persisted file."""
+        return self.type != "link" and not self.url and (
+            self.path is not None or self.content is not None or self.chainlit_key is not None
+        )
+
+    async def _ensure_blob_storage_identity(self) -> None:
+        """Ensure blob-backed elements reuse a single canonical id across persistence layers."""
+        if not self._requires_blob_storage_persistence():
+            return
+
+        if self.chainlit_key:
+            if self.chainlit_key != self.id:
+                raise ValueError(
+                    "Blob-backed elements require matching id and chainlit_key values"
+                )
+            return
+
+        file_dict = await context.session.persist_file(
+            name=self.name,
+            path=self.path,
+            content=self.content,
+            mime=self.mime or "",
+            file_id=self.id,
+        )
+        persisted_file_id = str(file_dict["id"] or "").strip()
+        if persisted_file_id != self.id:
+            raise ValueError(
+                "Persisted blob-backed elements must reuse the element id as chainlit_key"
+            )
+        self.chainlit_key = persisted_file_id
+
+    def _apply_persisted_element(self, persisted_element: Optional[ElementDict]) -> None:
+        """Copy durable storage metadata from the persisted element into the in-memory model."""
+        if not isinstance(persisted_element, dict):
+            return
+
+        persisted_url = persisted_element.get("url")
+        persisted_object_key = persisted_element.get("objectKey")
+        persisted_chainlit_key = persisted_element.get("chainlitKey")
+        if isinstance(persisted_url, str) and persisted_url.strip():
+            self.url = persisted_url
+        if isinstance(persisted_object_key, str) and persisted_object_key.strip():
+            self.object_key = persisted_object_key
+        if isinstance(persisted_chainlit_key, str) and persisted_chainlit_key.strip():
+            self.chainlit_key = persisted_chainlit_key
+
+    async def _create(self, persist=True, await_data_layer: bool = False) -> bool:
+        """Create the element and optionally await durable data-layer persistence."""
         if self.persisted and not self.updatable:
             return True
 
+        await self._ensure_blob_storage_identity()
+
         if (data_layer := get_data_layer()) and persist:
             try:
-                asyncio.create_task(data_layer.create_element(self))
+                if await_data_layer and self._requires_blob_storage_persistence():
+                    await data_layer.create_element(self)
+                    persisted_element = await data_layer.get_element(self.thread_id, self.id)
+                    if not isinstance(persisted_element, dict):
+                        raise RuntimeError(
+                            f"Element '{self.id}' persistence did not complete synchronously"
+                        )
+                    self._apply_persisted_element(persisted_element)
+                else:
+                    asyncio.create_task(data_layer.create_element(self))
             except Exception as e:
                 logger.error(f"Failed to create element: {e!s}")
-        if not self.url and (not self.chainlit_key or self.updatable):
-            file_dict = await context.session.persist_file(
-                name=self.name,
-                path=self.path,
-                content=self.content,
-                mime=self.mime or "",
-            )
-            self.chainlit_key = file_dict["id"]
+                raise
 
         self.persisted = True
 
@@ -235,7 +287,8 @@ class Element:
             await data_layer.delete_element(self.id, self.thread_id)
         await context.emitter.emit("remove_element", {"id": self.id})
 
-    async def send(self, for_id: str, persist=True):
+    async def send(self, for_id: str, persist=True, await_data_layer: bool = False):
+        """Send the element to the UI and optionally await durable data-layer persistence."""
         self.for_id = for_id
 
         if not self.mime:
@@ -248,7 +301,7 @@ class Element:
             elif self.url:
                 self.mime = mimetypes.guess_type(self.url)[0]
 
-        await self._create(persist=persist)
+        await self._create(persist=persist, await_data_layer=await_data_layer)
 
         if not self.url and not self.chainlit_key:
             raise ValueError("Must provide url or chainlit key to send element")

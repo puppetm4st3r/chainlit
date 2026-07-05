@@ -19,6 +19,7 @@
   "auth": {
     "login": {
       "title": "Увійдіть для доступу до додатку",
+      "privateIntegrationTokenBootstrap": "Bootstrap integration token",
       "form": {
         "email": {
           "label": "Електронна пошта",
@@ -193,6 +194,7 @@
         "settings": "Налаштування",
         "settingsKey": "S",
         "apiKeys": "API ключі",
+        "administration": "Адміністрування",
         "logout": "Вийти"
       }
     }

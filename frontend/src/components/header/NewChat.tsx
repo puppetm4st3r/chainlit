@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-import { useChatInteract, useConfig } from '@chainlit/react-client';
+import { useChatData, useChatInteract, useConfig } from '@chainlit/react-client';
 
 import { Translator } from '@/components/i18n';
 import { Button } from '@/components/ui/button';
@@ -76,6 +76,11 @@ const NewChatButton = ({ navigate, onConfirm, ...buttonProps }: Props) => {
   const [open, setOpen] = useState(false);
   const { clear } = useChatInteract();
   const { config } = useConfig();
+  const { conversationHistoryVisible } = useChatData();
+
+  if (conversationHistoryVisible === false) {
+    return null;
+  }
 
   const handleClickOpen = () => {
     if (config?.ui?.confirm_new_chat === false) {

@@ -19,6 +19,7 @@
   "auth": {
     "login": {
       "title": "యాప్‌ని ఉపయోగించడానికి లాగిన్ చేయండి",
+      "privateIntegrationTokenBootstrap": "Bootstrap integration token",
       "form": {
         "email": {
           "label": "ఇమెయిల్ చిరునామా",
@@ -228,6 +229,7 @@
         "settings": "సెట్టింగ్‌లు",
         "settingsKey": "S",
         "apiKeys": "API కీలు",
+        "administration": "నిర్వహణ",
         "logout": "లాగ్ అవుట్"
       }
     }

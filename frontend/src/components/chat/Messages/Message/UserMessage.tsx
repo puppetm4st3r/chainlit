@@ -1,7 +1,7 @@
 import { cn } from '@/lib/utils';
 import { MessageContext } from 'contexts/MessageContext';
 import { Star } from 'lucide-react';
-import { memo, useContext, useMemo, useState } from 'react';
+import { memo, useContext, useState } from 'react';
 import { useSetRecoilState } from 'recoil';
 
 import {
@@ -18,6 +18,15 @@ import { Button } from '@/components/ui/button';
 import { Translator } from 'components/i18n';
 
 import { InlinedElements } from './Content/InlinedElements';
+
+/** Canvas/file prompts: hide the full payload in the thread and show a compact chip. */
+const FILE_COMMAND_USER_PREFIX = 'FileCommand:';
+
+function isFileCommandUserOutput(output: unknown): boolean {
+  return (
+    typeof output === 'string' && output.trimStart().startsWith(FILE_COMMAND_USER_PREFIX)
+  );
+}
 
 interface Props {
   message: IStep;
@@ -38,12 +47,11 @@ const UserMessage = memo(function UserMessage({
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
 
-  const inlineElements = useMemo(() => {
-    return elements.filter(
-      (el) => el.forId === message.id && el.display === 'inline'
-    );
-  }, [message.id, elements]);
+  const inlineElements = elements.filter(
+    (el) => el.forId === message.id && el.display === 'inline'
+  );
   const favoritesEnabled = !!config?.features?.favorites;
+  const showFileCommandChip = isFileCommandUserOutput(message.output) && !isEditing;
 
   const handleEdit = () => {
     if (editValue) {
@@ -100,11 +108,14 @@ const UserMessage = memo(function UserMessage({
             'px-5 py-2.5 relative bg-accent dark:bg-card rounded-2xl border',
             inlineElements.length ? 'rounded-tr-lg' : '',
             isEditing ? 'w-full flex-grow' : 'max-w-[70%] flex-grow-0',
-            editable ? '' : 'ml-auto'
+            editable ? '' : 'ml-auto',
+            showFileCommandChip && 'px-3 py-2 bg-transparent dark:bg-transparent border-none'
           )}
-          style={{
-            borderColor: 'hsl(var(--accent-border))'
-          }}
+          style={
+            showFileCommandChip
+              ? undefined
+              : { borderColor: 'hsl(var(--accent-border))' }
+          }
         >
           {isEditing ? (
             <div className="bg-accent flex flex-col">
@@ -136,7 +147,19 @@ const UserMessage = memo(function UserMessage({
                   {message.command}
                 </div>
               ) : null}
-              {children}
+              {showFileCommandChip ? (
+                <span
+                  className={cn(
+                    'inline-flex max-w-full items-center rounded-[4px] border border-solid px-2.5 py-1 text-sm font-medium',
+                    'bg-[#e0f7fa] text-[#0d47a1] border-[#0d47a1]',
+                    'dark:bg-[#0d47a1] dark:border-[#e0f7fa] dark:text-[#e0f7fa]'
+                  )}
+                >
+                  <Translator path="chat.userMessage.fileCommandChip" />
+                </span>
+              ) : (
+                children
+              )}
             </div>
           )}
         </div>

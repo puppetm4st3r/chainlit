@@ -19,6 +19,7 @@
   "auth": {
     "login": {
       "title": "Inicia sesión para acceder a la aplicación",
+        "privateIntegrationTokenBootstrap": "Generar token de integración",
       "form": {
         "email": {
           "label": "Correo electrónico",
@@ -157,10 +158,23 @@
         "previous7days": "Últimos 7 días",
         "previous30days": "Últimos 30 días"
       },
+      "project": {
+        "label": "Proyecto",
+        "menuTitle": "Seleccionar proyecto"
+      },
       "empty": "No se encontraron conversaciones",
       "actions": {
         "close": "Cerrar barra lateral",
-        "open": "Abrir barra lateral"
+        "open": "Abrir barra lateral",
+        "deleteAll": {
+          "tooltip": "Eliminar todas las conversaciones",
+          "title": "¿Eliminar todas las conversaciones?",
+          "description": "Esto eliminará permanentemente todas las conversaciones de tu historial.",
+          "warning": "Esta acción no se puede deshacer. Se eliminarán los mensajes, elementos y feedback asociados a estas conversaciones.",
+          "confirm": "Eliminar todas las conversaciones",
+          "inProgress": "Eliminando todas las conversaciones",
+          "success": "Todas las conversaciones fueron eliminadas"
+        }
       }
     },
     "thread": {
@@ -228,6 +242,7 @@
         "settings": "Configuración",
         "settingsKey": "S",
         "apiKeys": "Claves API",
+        "administration": "Administración",
         "logout": "Cerrar sesión"
       }
     }
@@ -238,6 +253,18 @@
     "success": {
       "saved": "Guardado exitosamente"
     }
+  },
+  "workflowHelp": {
+    "button": "Guía de uso",
+    "titleFallback": "Guía de uso",
+    "openInNewTab": "Abrir en nueva pestaña",
+    "embedHint": "Revisa esta guía de uso antes de continuar.",
+    "fallbackNotice": "Si la página no se muestra correctamente dentro del diálogo, usa \"Abrir en nueva pestaña\".",
+    "doNotShowAutomatically": "No volver a mostrar automáticamente",
+    "scrollRequirement": "Desplázate por la guía para habilitar la acción de continuar.",
+    "scrollToContinue": "Desplázate para continuar",
+    "continueCountdown": "Continuar ({{count}}s)",
+    "close": "Cerrar"
   },
   "alerts": {
     "info": "Información",

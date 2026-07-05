@@ -399,6 +399,8 @@ class SQLAlchemyDataLayer(BaseDataLayer):
         }
         parameters["metadata"] = json.dumps(step_dict.get("metadata", {}))
         parameters["generation"] = json.dumps(step_dict.get("generation", {}))
+        if "modes" in parameters:
+            parameters["modes"] = json.dumps(step_dict.get("modes", {}))
         columns = ", ".join(f'"{key}"' for key in parameters.keys())
         values = ", ".join(f":{key}" for key in parameters.keys())
         updates = ", ".join(
@@ -449,6 +451,7 @@ class SQLAlchemyDataLayer(BaseDataLayer):
                 s."input" AS step_input,
                 s."output" AS step_output,
                 s."createdAt" AS step_createdat,
+                s."modes" AS step_modes,
                 s."start" AS step_start,
                 s."end" AS step_end,
                 s."generation" AS step_generation,
@@ -492,6 +495,11 @@ class SQLAlchemyDataLayer(BaseDataLayer):
                 else {}
             ),
             tags=step_feedback.get("step_tags"),
+            modes=(
+                json.loads(step_feedback["step_modes"])
+                if isinstance(step_feedback.get("step_modes"), str)
+                else step_feedback.get("step_modes")
+            ),
             input=(
                 step_feedback.get("step_input", "")
                 if step_feedback.get("step_showinput") not in [None, "false"]
@@ -727,6 +735,7 @@ class SQLAlchemyDataLayer(BaseDataLayer):
                 s."input" AS step_input,
                 s."output" AS step_output,
                 s."createdAt" AS step_createdat,
+                s."modes" AS step_modes,
                 s."start" AS step_start,
                 s."end" AS step_end,
                 s."generation" AS step_generation,
@@ -807,6 +816,11 @@ class SQLAlchemyDataLayer(BaseDataLayer):
                             else {}
                         ),
                         tags=step_feedback.get("step_tags"),
+                        modes=(
+                            json.loads(step_feedback["step_modes"])
+                            if isinstance(step_feedback.get("step_modes"), str)
+                            else step_feedback.get("step_modes")
+                        ),
                         input=(
                             step_feedback.get("step_input", "")
                             if step_feedback.get("step_showinput")
@@ -888,6 +902,7 @@ class SQLAlchemyDataLayer(BaseDataLayer):
                     s."input" AS step_input,
                     s."output" AS step_output,
                     s."createdAt" AS step_createdat,
+                    s."modes" AS step_modes,
                     s."start" AS step_start,
                     s."end" AS step_end,
                     s."generation" AS step_generation,
@@ -930,6 +945,11 @@ class SQLAlchemyDataLayer(BaseDataLayer):
                             isError=row.get("step_iserror"),
                             metadata=meta_dict,
                             tags=row.get("step_tags"),
+                            modes=(
+                                json.loads(row["step_modes"])
+                                if isinstance(row.get("step_modes"), str)
+                                else row.get("step_modes")
+                            ),
                             input=(
                                 row.get("step_input", "")
                                 if row.get("step_showinput") not in [None, "false"]

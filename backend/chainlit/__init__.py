@@ -13,7 +13,7 @@ if env_found:
     logger.info(f"Loaded {env_file} file")
 
 import asyncio
-from typing import TYPE_CHECKING, Any, Dict
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
 from literalai import ChatGeneration, CompletionGeneration, GenerationMessage
 from pydantic.dataclasses import dataclass
@@ -137,6 +137,35 @@ async def update_chat_settings(settings: Dict[str, Any]):
     await context.emitter.update_chat_settings(settings)
 
 
+async def set_spontaneous_file_upload(enabled: Optional[bool] = None):
+    """
+    Override spontaneous file uploads for the active session.
+
+    Args:
+        enabled (Optional[bool]): ``True`` enables uploads, ``False`` disables them,
+            and ``None`` restores the TOML default for the current session.
+    """
+    await context.emitter.set_spontaneous_file_upload(enabled)
+
+
+async def set_conversation_history_visibility(enabled: Optional[bool] = None):
+    """
+    Override the visibility of the past-conversation history surface for the active session.
+
+    Args:
+        enabled (Optional[bool]): ``True`` shows the history UI, ``False`` hides it,
+            and ``None`` restores the frontend default for the current session.
+    """
+    await context.emitter.set_conversation_history_visibility(enabled)
+
+
+async def set_new_chat_button_visibility(enabled: Optional[bool] = None):
+    """
+    Backward-compatible alias for the broader past-conversation history surface.
+    """
+    await set_conversation_history_visibility(enabled)
+
+
 async def set_thread_title(title: str) -> bool:
     """
     Programmatically update the current thread title.
@@ -246,6 +275,9 @@ __all__ = [
     "run_sync",
     "send_window_message",
     "set_chat_profile",
+    "set_conversation_history_visibility",
+    "set_new_chat_button_visibility",
+    "set_spontaneous_file_upload",
     "set_thread_title",
     "update_chat_settings",
     "set_chat_profiles",

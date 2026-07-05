@@ -10,3 +10,4 @@ export * from './thread';
 export * from './history';
 export * from './config';
 export * from './mcp';
+export * from './workflowHelp';

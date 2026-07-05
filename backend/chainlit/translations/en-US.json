@@ -19,6 +19,7 @@
   "auth": {
     "login": {
       "title": "Login to access the app",
+        "privateIntegrationTokenBootstrap": "Bootstrap integration token",
       "form": {
         "email": {
           "label": "Email address",
@@ -165,7 +166,16 @@
       "empty": "No threads found",
       "actions": {
         "close": "Close sidebar",
-        "open": "Open sidebar"
+        "open": "Open sidebar",
+        "deleteAll": {
+          "tooltip": "Delete all threads",
+          "title": "Delete all threads?",
+          "description": "This will permanently delete every thread in your history.",
+          "warning": "This action cannot be undone. Messages, elements, and feedback associated with these threads will be removed.",
+          "confirm": "Delete all threads",
+          "inProgress": "Deleting all threads",
+          "success": "All threads deleted"
+        }
       }
     },
     "thread": {
@@ -233,6 +243,7 @@
         "settings": "Settings",
         "settingsKey": "S",
         "apiKeys": "API Keys",
+        "administration": "Administration",
         "logout": "Logout"
       }
     }
@@ -243,6 +254,18 @@
     "success": {
       "saved": "Saved successfully"
     }
+  },
+  "workflowHelp": {
+    "button": "Usage guide",
+    "titleFallback": "Usage guide",
+    "openInNewTab": "Open in new tab",
+    "embedHint": "Review this usage guide before continuing.",
+    "fallbackNotice": "If the page does not render correctly inside the dialog, use \"Open in new tab\".",
+    "doNotShowAutomatically": "Do not show automatically again",
+    "scrollRequirement": "Scroll through the guide to enable the continue action.",
+    "scrollToContinue": "Scroll to continue",
+    "continueCountdown": "Continue ({{count}}s)",
+    "close": "Close"
   },
   "alerts": {
     "info": "Info",

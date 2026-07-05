@@ -1,6 +1,6 @@
 import json
 import uuid
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -91,6 +91,61 @@ class TestElementBase:
 
             assert element.for_id == "message_123"
             ctx.emitter.send_element.assert_called_once()
+
+    async def test_element_send_awaits_blob_persistence(self, mock_chainlit_context):
+        """Test that upload-backed elements can await durable persistence before emission."""
+        async with mock_chainlit_context as ctx:
+            ctx.session.persist_file = AsyncMock(return_value={"id": "element-1"})
+            fake_data_layer = AsyncMock()
+            fake_data_layer.get_element = AsyncMock(
+                return_value={
+                    "id": "element-1",
+                    "chainlitKey": "element-1",
+                    "url": "https://example.com/file.pdf?sig=1",
+                    "objectKey": "user-1/element-1/test.pdf",
+                }
+            )
+            element = File(
+                id="element-1",
+                name="test.pdf",
+                content=b"test content",
+                mime="application/pdf",
+            )
+
+            with patch("chainlit.element.get_data_layer", return_value=fake_data_layer):
+                await element.send(for_id="message_123", await_data_layer=True)
+
+            ctx.session.persist_file.assert_awaited_once_with(
+                name="test.pdf",
+                path=None,
+                content=b"test content",
+                mime="application/pdf",
+                file_id="element-1",
+            )
+            fake_data_layer.create_element.assert_awaited_once_with(element)
+            fake_data_layer.get_element.assert_awaited_once_with(
+                ctx.session.thread_id,
+                "element-1",
+            )
+            sent_payload = ctx.emitter.send_element.call_args.args[0]
+            assert sent_payload["url"] == "https://example.com/file.pdf?sig=1"
+            assert sent_payload["objectKey"] == "user-1/element-1/test.pdf"
+
+    async def test_element_send_rejects_mismatched_blob_identity(self, mock_chainlit_context):
+        """Test that blob-backed elements fail fast when id and chainlit_key diverge."""
+        async with mock_chainlit_context as ctx:
+            element = File(
+                id="element-1",
+                name="test.pdf",
+                path="/tmp/test.pdf",
+                mime="application/pdf",
+                chainlit_key="file-1",
+            )
+
+            with pytest.raises(ValueError, match="matching id and chainlit_key"):
+                await element.send(for_id="message_123", await_data_layer=True)
+
+            ctx.emitter.send_element.assert_not_called()
 
     async def test_element_remove(self, mock_chainlit_context):
         """Test Element.remove() method."""
@@ -471,7 +526,7 @@ class TestElementEdgeCases:
 
             element = File(name="test_file", content=b"test content")
 
-            with pytest.raises(ValueError, match="Must provide url or chainlit key"):
+            with pytest.raises(ValueError, match="element id as chainlit_key"):
                 await element.send(for_id="message_123", persist=False)
 
     async def test_element_from_dict_with_missing_fields(self, mock_chainlit_context):

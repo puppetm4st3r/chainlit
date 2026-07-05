@@ -3,7 +3,7 @@ import os
 import pathlib
 from pathlib import Path
 from typing import Callable
-from unittest.mock import AsyncMock, Mock, create_autospec, mock_open
+from unittest.mock import AsyncMock, Mock, call, create_autospec, mock_open
 
 import pytest
 from fastapi.testclient import TestClient
@@ -15,7 +15,7 @@ from chainlit.config import (
     SpontaneousFileUploadFeature,
 )
 from chainlit.server import app
-from chainlit.types import AskFileSpec
+from chainlit.types import AskFileSpec, PageInfo, PaginatedResponse
 from chainlit.user import PersistedUser
 
 
@@ -81,6 +81,69 @@ def test_project_translations_bcp47_language(
     mock_load_translation.reset_mock()
 
 
+@pytest.mark.parametrize(
+    ("client_host", "expected_url"),
+    [
+        ("127.0.0.1", "/public/management_app/index.html"),
+        ("localhost", "/public/management_app/index.html"),
+        ("10.1.2.3", "/public/management_app/index.html"),
+        ("192.168.1.50", "/public/management_app/index.html"),
+        ("172.16.5.10", "/public/management_app/index.html"),
+        ("8.8.8.8", None),
+    ],
+)
+def test_auth_config_exposes_private_m2m_bootstrap_url_only_for_private_clients(
+    client_host: str,
+    expected_url: str | None,
+    monkeypatch: pytest.MonkeyPatch,
+    test_config: ChainlitConfig,
+):
+    monkeypatch.setenv("PRIVATE_ADMIN_LOGIN_ENABLED", "true")
+    monkeypatch.setattr(
+        test_config.ui, "admin_url", "/public/management_app/index.html"
+    )
+
+    with TestClient(app, client=(client_host, 50000)) as client:
+        response = client.get("/auth/config")
+
+    assert response.status_code == 200
+    data = response.json()
+    if expected_url:
+        assert data["privateIntegrationTokenBootstrapUrl"] == expected_url
+    else:
+        assert "privateIntegrationTokenBootstrapUrl" not in data
+
+
+def test_auth_config_hides_private_m2m_bootstrap_url_when_disabled(
+    monkeypatch: pytest.MonkeyPatch,
+    test_config: ChainlitConfig,
+):
+    monkeypatch.delenv("PRIVATE_ADMIN_LOGIN_ENABLED", raising=False)
+    monkeypatch.setattr(
+        test_config.ui, "admin_url", "/public/management_app/index.html"
+    )
+
+    with TestClient(app, client=("127.0.0.1", 50000)) as client:
+        response = client.get("/auth/config")
+
+    assert response.status_code == 200
+    assert "privateIntegrationTokenBootstrapUrl" not in response.json()
+
+
+def test_auth_config_hides_private_m2m_bootstrap_url_without_admin_url(
+    monkeypatch: pytest.MonkeyPatch,
+    test_config: ChainlitConfig,
+):
+    monkeypatch.setenv("PRIVATE_ADMIN_LOGIN_ENABLED", "true")
+    monkeypatch.setattr(test_config.ui, "admin_url", None)
+
+    with TestClient(app, client=("127.0.0.1", 50000)) as client:
+        response = client.get("/auth/config")
+
+    assert response.status_code == 200
+    assert "privateIntegrationTokenBootstrapUrl" not in response.json()
+
+
 @pytest.fixture
 def mock_get_current_user():
     """Override get_current_user() dependency."""
@@ -114,6 +177,74 @@ async def test_project_settings(test_client: TestClient, mock_get_current_user: 
     assert "debugUrl" in data
     assert data["chatProfiles"] == []
     assert data["starters"] == []
+
+
+def test_project_settings_forces_topright_bar_visible_for_root(
+    test_client: TestClient,
+    mock_get_current_user: Mock,
+    test_config: ChainlitConfig,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """Root users must keep access to the profile menu even when the bar is hidden."""
+    monkeypatch.setattr(test_config.ui, "hide_topright_bar", True)
+    mock_get_current_user.return_value = PersistedUser(
+        identifier="root@example.com",
+        id="root-user-id",
+        createdAt="2026-01-01T00:00:00Z",
+        metadata={"roles": ["web", "root"]},
+    )
+
+    response = test_client.get("/project/settings")
+
+    assert response.status_code == 200, response.json()
+    assert response.json()["ui"]["hide_topright_bar"] is False
+
+
+async def test_delete_user_threads_deletes_only_current_user_history(
+    test_client: TestClient,
+    mock_get_current_user: Mock,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """Delete all threads returned by the current user's history query."""
+    data_layer = AsyncMock()
+    data_layer.list_threads.side_effect = [
+        PaginatedResponse(
+            pageInfo=PageInfo(
+                hasNextPage=True,
+                startCursor="thread-1",
+                endCursor="thread-2",
+            ),
+            data=[{"id": "thread-1"}, {"id": "thread-2"}],
+        ),
+        PaginatedResponse(
+            pageInfo=PageInfo(
+                hasNextPage=False,
+                startCursor="thread-3",
+                endCursor="thread-3",
+            ),
+            data=[{"id": "thread-3"}],
+        ),
+    ]
+    monkeypatch.setattr("chainlit.server.get_data_layer", lambda: data_layer)
+    mock_get_current_user.return_value = PersistedUser(
+        identifier="user@example.com",
+        id="user-id",
+        createdAt="2026-01-01T00:00:00Z",
+        metadata={"roles": ["web"]},
+    )
+
+    response = test_client.request("DELETE", "/project/threads", json={})
+
+    assert response.status_code == 200, response.json()
+    assert response.json() == {"success": True, "deletedThreadCount": 3}
+    assert data_layer.list_threads.await_count == 2
+    data_layer.delete_thread.assert_has_awaits(
+        [
+            call("thread-1"),
+            call("thread-2"),
+            call("thread-3"),
+        ]
+    )
 
 
 def test_project_settings_path_traversal(

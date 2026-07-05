@@ -5,8 +5,10 @@ import NewChatButton from '@/components/header/NewChat';
 
 const mockClear = vi.fn();
 const mockUseConfig = vi.fn();
+const mockUseChatData = vi.fn();
 
 vi.mock('@chainlit/react-client', () => ({
+  useChatData: () => mockUseChatData(),
   useChatInteract: () => ({ clear: mockClear }),
   useConfig: () => mockUseConfig()
 }));
@@ -19,6 +21,7 @@ describe('NewChatButton', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUseConfig.mockReturnValue({ config: {} });
+    mockUseChatData.mockReturnValue({ conversationHistoryVisible: true });
   });
 
   it('renders the button correctly', () => {
@@ -26,6 +29,14 @@ describe('NewChatButton', () => {
     const button = screen.getByRole('button');
     expect(button).toBeInTheDocument();
     expect(button.querySelector('svg')).toBeInTheDocument();
+  });
+
+  it('returns null when runtime hides past conversation history', () => {
+    mockUseChatData.mockReturnValue({ conversationHistoryVisible: false });
+
+    render(<NewChatButton />);
+
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
   it('opens dialog by default when config is undefined', () => {

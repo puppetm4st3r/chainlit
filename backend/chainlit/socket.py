@@ -118,6 +118,39 @@ async def resume_thread(session: WebsocketSession):
         return thread
 
 
+# Metadata keys the UI needs to render a resumed thread. Everything else (e.g. heavy
+# workflow snapshots) is backend-only and must not be shipped in the resume payload.
+_UI_THREAD_METADATA_KEYS = ("chat_profile", "chat_settings", "viewer_read_only")
+
+
+def to_ui_resume_thread(thread):
+    """Return a UI-safe copy of a thread for the ``resume_thread`` emit.
+
+    The persisted thread metadata can carry large backend-only blobs (workflow
+    runtime snapshots) that easily exceed the Socket.IO client buffer
+    (``maxHttpBufferSize``, 1MB by default), which makes the client drop the
+    transport before the thread is rendered. This keeps only the metadata keys
+    the client actually consumes and parses it into an object so the client can
+    read ``metadata.chat_profile`` / ``chat_settings`` directly.
+    """
+    ui_thread = dict(thread)
+    metadata = thread.get("metadata")
+    if isinstance(metadata, str):
+        try:
+            metadata = json.loads(metadata)
+        except Exception:
+            metadata = {}
+    if isinstance(metadata, dict):
+        ui_thread["metadata"] = {
+            key: metadata[key]
+            for key in _UI_THREAD_METADATA_KEYS
+            if key in metadata
+        }
+    else:
+        ui_thread["metadata"] = {}
+    return ui_thread
+
+
 def load_user_env(user_env):
     if user_env:
         user_env_dict = json.loads(user_env)
@@ -425,6 +458,11 @@ async def connection_successful(sid):
     await context.emitter.clear("clear_call_fn")
 
     if context.session.restored and not context.session.has_first_interaction:
+        context.session.reset_pre_persistence_state()
+        try:
+            chat_context.clear()
+        except Exception:
+            logger.debug("Skipping pre-persistence chat_context reset without an active context.")
         if config.code.on_chat_start and not context.session.chat_started:
             context.session.chat_started = True
             task = asyncio.create_task(config.code.on_chat_start())
@@ -434,18 +472,31 @@ async def connection_successful(sid):
     if context.session.thread_id_to_resume and config.code.on_chat_resume:
         thread = await resume_thread(context.session)
         if thread:
-            context.session.has_first_interaction = True
+            # The UI snapshot is (re)delivered on every (re)connection so a freshly
+            # connected client always re-renders the resumed thread, even if a prior
+            # emit was lost to a transport drop. The expensive application restore
+            # (on_chat_resume) is still guarded to run exactly once per session.
             await context.emitter.emit(
                 "first_interaction",
                 {"interaction": "resume", "thread_id": thread.get("id")},
             )
-            await config.code.on_chat_resume(thread)
 
-            for step in thread.get("steps", []):
-                if "message" in step["type"]:
-                    chat_context.add(Message.from_dict(step))
+            if not context.session.chat_resumed:
+                # Flag flipped before the await: atomic under asyncio's single-thread
+                # scheduler, so concurrent reconnects never re-run the heavy restore.
+                context.session.chat_resumed = True
+                # A resumed chat is a lifecycle entry on its own: ensure the fresh-session
+                # on_chat_start fallback never fires for this session on later reconnects.
+                context.session.chat_started = True
+                context.session.mark_thread_persistence_ready()
+                await config.code.on_chat_resume(thread)
 
-            await context.emitter.resume_thread(thread)
+                for step in thread.get("steps", []):
+                    if "message" in step["type"]:
+                        chat_context.add(Message.from_dict(step))
+
+            ui_thread = to_ui_resume_thread(thread)
+            await context.emitter.resume_thread(ui_thread)
             return
         else:
             await context.emitter.send_resume_thread_error("Thread not found.")
@@ -518,7 +569,6 @@ async def process_message(session: WebsocketSession, payload: MessagePayload):
         message = await context.emitter.process_message(payload)
 
         if config.code.on_message:
-            await asyncio.sleep(0.001)
             await config.code.on_message(message)
     except asyncio.CancelledError:
         pass
@@ -678,9 +728,8 @@ async def audio_end(sid):
         context = init_ws_context(session)
         await context.emitter.task_start()
 
-        if not session.has_first_interaction:
-            session.has_first_interaction = True
-            asyncio.create_task(context.emitter.init_thread("audio"))
+        if not session.is_thread_persistence_ready():
+            asyncio.create_task(context.emitter.ensure_thread_persistence("audio"))
 
         config: ChainlitConfig = session.get_config()  # type: ignore
 

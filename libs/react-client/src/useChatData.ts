@@ -7,8 +7,11 @@ import {
   chatSettingsDefaultValueSelector,
   chatSettingsInputsState,
   chatSettingsValueState,
+  composerInputRestrictionState,
   elementState,
+  conversationHistoryVisibleState,
   loadingState,
+  spontaneousFileUploadEnabledState,
   sessionState,
   tasklistState
 } from './state';
@@ -28,6 +31,13 @@ const useChatData = () => {
   const session = useRecoilValue(sessionState);
   const askUser = useRecoilValue(askUserState);
   const callFn = useRecoilValue(callFnState);
+  const composerInputRestriction = useRecoilValue(composerInputRestrictionState);
+  const spontaneousFileUploadEnabled = useRecoilValue(
+    spontaneousFileUploadEnabledState
+  );
+  const conversationHistoryVisible = useRecoilValue(
+    conversationHistoryVisibleState
+  );
   const chatSettingsInputs = useRecoilValue(chatSettingsInputsState);
   const chatSettingsValue = useRecoilValue(chatSettingsValueState);
   const chatSettingsDefaultValue = useRecoilValue(
@@ -49,7 +59,11 @@ const useChatData = () => {
     chatSettingsDefaultValue,
     chatSettingsInputs,
     chatSettingsValue,
+    composerInputRestriction,
     connected,
+    conversationHistoryVisible,
+    newChatButtonVisible: conversationHistoryVisible,
+    spontaneousFileUploadEnabled,
     disabled,
     elements,
     error: session?.error,

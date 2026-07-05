@@ -17,6 +17,7 @@ import {
   IStep,
   ITasklistElement,
   IUser,
+  IWorkflowHelp,
   ThreadHistory
 } from './types';
 import { groupByDate } from './utils/group';
@@ -26,6 +27,41 @@ export interface ISession {
   socket: Socket;
   error?: boolean;
 }
+
+export type ComposerInputRestrictionMode =
+  | 'mix'
+  | 'only_modes'
+  | 'selection_only';
+
+export interface IComposerInputRestriction {
+  mode: ComposerInputRestrictionMode;
+  placeholder?: string;
+}
+
+export const DEFAULT_COMPOSER_INPUT_RESTRICTION: IComposerInputRestriction = {
+  mode: 'mix'
+};
+
+export const normalizeComposerInputRestriction = (
+  value?: Partial<IComposerInputRestriction> | null
+): IComposerInputRestriction => {
+  const rawMode = typeof value?.mode === 'string' ? value.mode.trim() : '';
+  const mode: ComposerInputRestrictionMode =
+    rawMode === 'only_modes' || rawMode === 'selection_only' ? rawMode : 'mix';
+  const placeholder =
+    typeof value?.placeholder === 'string' && value.placeholder.trim()
+      ? value.placeholder.trim()
+      : undefined;
+
+  if (mode === 'mix') {
+    return DEFAULT_COMPOSER_INPUT_RESTRICTION;
+  }
+
+  return {
+    mode,
+    ...(placeholder ? { placeholder } : {})
+  };
+};
 
 export const threadIdToResumeState = atom<string | undefined>({
   key: 'ThreadIdToResume',
@@ -75,6 +111,23 @@ export const commandsState = atom<ICommand[]>({
   key: 'Commands',
   default: []
 });
+
+export const composerInputRestrictionState = atom<IComposerInputRestriction>({
+  key: 'ComposerInputRestriction',
+  default: DEFAULT_COMPOSER_INPUT_RESTRICTION
+});
+
+export const spontaneousFileUploadEnabledState = atom<boolean | undefined>({
+  key: 'SpontaneousFileUploadEnabled',
+  default: undefined
+});
+
+export const conversationHistoryVisibleState = atom<boolean | undefined>({
+  key: 'ConversationHistoryVisible',
+  default: undefined
+});
+
+export const newChatButtonVisibleState = conversationHistoryVisibleState;
 
 export const modesState = atom<IMode[]>({
   key: 'Modes',
@@ -248,6 +301,11 @@ export const documentWorkspaceState = atom<
   | undefined
 >({
   key: 'DocumentWorkspaceState',
+  default: undefined
+});
+
+export const workflowHelpState = atom<IWorkflowHelp | undefined>({
+  key: 'WorkflowHelpState',
   default: undefined
 });
 

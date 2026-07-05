@@ -71,6 +71,7 @@ async def data_layer(mock_storage_client: BaseStorageClient, tmp_path: Path):
                     "input" TEXT,
                     "output" TEXT,
                     "createdAt" TEXT,
+                    "modes" JSONB,
                     "start" TEXT,
                     "end" TEXT,
                     "generation" JSONB,

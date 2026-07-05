@@ -76,6 +76,89 @@ class McpSession:
 ClientType = Literal["webapp", "copilot", "teams", "slack", "discord"]
 
 
+def get_runtime_spontaneous_file_upload_override(
+    session: Optional["BaseSession"] = None,
+) -> Optional[bool]:
+    """Return the session-scoped spontaneous upload override, if any."""
+    override = getattr(session, "spontaneous_file_upload_enabled_override", None)
+    if override is None:
+        return None
+    return bool(override)
+
+
+def get_runtime_conversation_history_visibility_override(
+    session: Optional["BaseSession"] = None,
+) -> Optional[bool]:
+    """Return the session-scoped conversation-history visibility override, if any."""
+    override = getattr(session, "conversation_history_visible_override", None)
+    if override is None:
+        override = getattr(session, "new_chat_button_visible_override", None)
+    if override is None:
+        return None
+    return bool(override)
+
+
+def get_runtime_new_chat_button_visibility_override(
+    session: Optional["BaseSession"] = None,
+) -> Optional[bool]:
+    """Backward-compatible alias for the conversation-history visibility override."""
+    return get_runtime_conversation_history_visibility_override(session)
+
+
+def validate_runtime_spontaneous_file_upload_config() -> None:
+    """Ensure the TOML config provides the non-optional upload spec fields."""
+    from chainlit.config import config
+
+    upload_config = config.features.spontaneous_file_upload
+    missing_fields: list[str] = []
+    if upload_config is None:
+        missing_fields = ["accept", "max_files", "max_size_mb"]
+    else:
+        if upload_config.accept is None:
+            missing_fields.append("accept")
+        if upload_config.max_files is None:
+            missing_fields.append("max_files")
+        if upload_config.max_size_mb is None:
+            missing_fields.append("max_size_mb")
+
+    if missing_fields:
+        raise ValueError(
+            "Cannot enable spontaneous file upload at runtime because the Chainlit TOML configuration is missing: "
+            + ", ".join(missing_fields)
+        )
+
+
+def resolve_effective_spontaneous_file_upload_enabled(
+    session: Optional["BaseSession"] = None,
+) -> bool:
+    """Resolve the effective spontaneous upload state from TOML plus session override."""
+    from chainlit.config import config
+
+    upload_config = config.features.spontaneous_file_upload
+    default_enabled = bool(upload_config.enabled) if upload_config else False
+    override = get_runtime_spontaneous_file_upload_override(session)
+    if override is None:
+        return default_enabled
+    return override
+
+
+def resolve_effective_conversation_history_visible(
+    session: Optional["BaseSession"] = None,
+) -> bool:
+    """Resolve the effective conversation-history visibility from session override."""
+    override = get_runtime_conversation_history_visibility_override(session)
+    if override is None:
+        return True
+    return override
+
+
+def resolve_effective_new_chat_button_visible(
+    session: Optional["BaseSession"] = None,
+) -> bool:
+    """Backward-compatible alias for conversation-history visibility."""
+    return resolve_effective_conversation_history_visible(session)
+
+
 class JSONEncoderIgnoreNonSerializable(json.JSONEncoder):
     def default(self, o):
         try:
@@ -106,6 +189,8 @@ class BaseSession:
     client_type: ClientType
     current_task: Optional[asyncio.Task] = None
     chat_started: bool = False
+    # Idempotency guard: thread resume must run once per session and survive reconnects.
+    chat_resumed: bool = False
 
     def __init__(
         self,
@@ -132,17 +217,96 @@ class BaseSession:
         self.client_type = client_type
         self.token = token
         self.has_first_interaction = False
+        self.thread_persistence_ready = False
+        self.thread_persistence_in_progress = False
+        self.assistant_persistence_turn_count = 0
+        self._assistant_persistence_message_ids: set[str] = set()
+        self.pending_thread_metadata_patches: Dict[str, Any] = {}
         self.chat_started = False
+        self.chat_resumed = False
         self.user_env = user_env or {}
         self.environ = environ or {}
         self.chat_profile = chat_profile
 
         self.files: Dict[str, FileDict] = {}
         self.files_spec: Dict[str, AskFileSpec] = {}
+        self.spontaneous_file_upload_enabled_override: Optional[bool] = None
+        self.conversation_history_visible_override: Optional[bool] = None
+        self.new_chat_button_visible_override: Optional[bool] = None
 
         self.id = id
 
         self.chat_settings: Dict[str, Any] = {}
+
+    def is_thread_persistence_ready(self) -> bool:
+        """Return whether the active session already owns a persisted thread row."""
+        return bool(getattr(self, "thread_persistence_ready", False))
+
+    def mark_thread_persistence_ready(self) -> None:
+        """Mark the active session as owning a persisted thread row."""
+        self.thread_persistence_ready = True
+        self.thread_persistence_in_progress = False
+        self.has_first_interaction = True
+
+    def begin_thread_persistence(self) -> bool:
+        """Start a persistence attempt unless the thread is already ready or inflight."""
+        if self.is_thread_persistence_ready() or self.thread_persistence_in_progress:
+            return False
+        self.thread_persistence_in_progress = True
+        return True
+
+    def abort_thread_persistence(self) -> None:
+        """Reset the in-flight flag after a failed persistence attempt."""
+        self.thread_persistence_in_progress = False
+
+    def should_stage_thread_metadata(self, thread_id: str) -> bool:
+        """Return whether thread metadata must remain staged in session memory."""
+        normalized_thread_id = str(thread_id or "").strip()
+        if not normalized_thread_id:
+            return False
+        return (
+            normalized_thread_id == str(getattr(self, "thread_id", "") or "").strip()
+            and not self.is_thread_persistence_ready()
+        )
+
+    def register_logical_assistant_message(self, message_id: str) -> int:
+        """Count one assistant logical message exactly once per message id."""
+        normalized_message_id = str(message_id or "").strip()
+        if not normalized_message_id:
+            return self.assistant_persistence_turn_count
+        if normalized_message_id in self._assistant_persistence_message_ids:
+            return self.assistant_persistence_turn_count
+        self._assistant_persistence_message_ids.add(normalized_message_id)
+        self.assistant_persistence_turn_count += 1
+        return self.assistant_persistence_turn_count
+
+    def stage_thread_metadata_patch(self, metadata_patch: Dict[str, Any]) -> None:
+        """Merge a top-level metadata patch into the in-memory pre-persistence buffer."""
+        if not isinstance(metadata_patch, dict):
+            raise ValueError("metadata_patch must be a dictionary")
+
+        for key, value in metadata_patch.items():
+            normalized_key = str(key or "").strip()
+            if not normalized_key or value is None:
+                continue
+            self.pending_thread_metadata_patches[normalized_key] = value
+
+    def consume_pending_thread_metadata_patches(self) -> Dict[str, Any]:
+        """Return and clear staged thread metadata patches for the active session."""
+        pending_patch = dict(self.pending_thread_metadata_patches)
+        self.pending_thread_metadata_patches = {}
+        return pending_patch
+
+    def reset_pre_persistence_state(self) -> None:
+        """Drop any staged thread state that has not crossed the persistence threshold."""
+        self.has_first_interaction = False
+        self.thread_persistence_ready = False
+        self.thread_persistence_in_progress = False
+        self.assistant_persistence_turn_count = 0
+        self._assistant_persistence_message_ids.clear()
+        self.pending_thread_metadata_patches = {}
+        if hasattr(self, "thread_queues") and isinstance(self.thread_queues, dict):
+            self.thread_queues.clear()
 
     @property
     def files_dir(self):
@@ -156,6 +320,7 @@ class BaseSession:
         mime: str,
         path: Optional[str] = None,
         content: Optional[Union[bytes, str]] = None,
+        file_id: Optional[str] = None,
     ) -> FileReference:
         if not path and not content:
             raise ValueError(
@@ -164,7 +329,7 @@ class BaseSession:
 
         self.files_dir.mkdir(exist_ok=True)
 
-        file_id = str(uuid.uuid4())
+        file_id = str(file_id or uuid.uuid4())
 
         file_path = self.files_dir / file_id
 
@@ -391,9 +556,9 @@ class WebsocketSession(BaseSession):
     async def flush_method_queue(self):
         for method_name, queue in self.thread_queues.items():
             while queue:
-                method, self, args, kwargs = queue.popleft()
+                method, target, args, kwargs = queue.popleft()
                 try:
-                    await method(self, *args, **kwargs)
+                    await method(target, *args, **kwargs)
                 except Exception as e:
                     logger.error(f"Error while flushing {method_name}: {e}")
 

@@ -191,3 +191,38 @@ def test_load_settings_ignores_invalid_hide_topright_bar_env(
     settings = chainlit_config.load_settings()
 
     assert settings["ui"].hide_topright_bar is False
+
+
+def test_load_settings_reads_admin_url_from_toml(monkeypatch, tmp_path: Path):
+    config_dir = tmp_path / ".chainlit"
+    config_dir.mkdir()
+    config_path = config_dir / "config.toml"
+    config_path.write_text(
+        chainlit_config.DEFAULT_CONFIG_STR.replace(
+            '# admin_url = ""',
+            'admin_url = "/public/management_app/index.html"',
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(chainlit_config, "config_dir", str(config_dir))
+    monkeypatch.setattr(chainlit_config, "config_file", str(config_path))
+
+    settings = chainlit_config.load_settings()
+
+    assert settings["ui"].admin_url == "/public/management_app/index.html"
+
+
+def test_load_settings_overrides_admin_url_from_env(monkeypatch, tmp_path: Path):
+    config_dir = tmp_path / ".chainlit"
+    config_dir.mkdir()
+    config_path = config_dir / "config.toml"
+    config_path.write_text(chainlit_config.DEFAULT_CONFIG_STR, encoding="utf-8")
+
+    monkeypatch.setattr(chainlit_config, "config_dir", str(config_dir))
+    monkeypatch.setattr(chainlit_config, "config_file", str(config_path))
+    monkeypatch.setenv("CHAINLIT_ADMIN_URL", "https://admin.example.com")
+
+    settings = chainlit_config.load_settings()
+
+    assert settings["ui"].admin_url == "https://admin.example.com"

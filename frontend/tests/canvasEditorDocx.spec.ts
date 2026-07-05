@@ -24,7 +24,11 @@ function loadCanvasEditorDocxModule() {
       sessionId?: string;
       errorLabels: Record<string, string>;
       applyMarkdownToEditor: (markdown: string) => void;
-      sendCanvasSave: (markdown: string, source: string) => void;
+      markImportedDocumentPersisted?: (args: {
+        markdown: string;
+        revision?: number;
+      }) => void;
+      setWidgetConfig?: (updater: (currentConfig: Record<string, unknown>) => Record<string, unknown>) => void;
     }) => Promise<void>;
     exportCanvasDocx: (args: {
       apiClient?: { buildEndpoint?: (path: string) => string };
@@ -32,6 +36,14 @@ function loadCanvasEditorDocxModule() {
       errorLabels: Record<string, string>;
       filename?: string;
       content?: string;
+      commentThreads?: Record<string, unknown>[];
+      detachedCommentThreadIds?: string[];
+    }) => Promise<void>;
+    startCanvasTrackedChanges?: (args: {
+      apiClient?: { buildEndpoint?: (path: string) => string };
+      sessionId?: string;
+      content?: string;
+      errorLabels: Record<string, string>;
     }) => Promise<void>;
     stopCanvasTrackedChanges?: (args: {
       apiClient?: { buildEndpoint?: (path: string) => string };
@@ -55,13 +67,31 @@ describe('canvas editor DOCX helpers', () => {
       buildEndpoint: vi.fn((path: string) => path)
     };
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(JSON.stringify({ markdown: '# Converted' }), {
+      new Response(
+        JSON.stringify({
+          markdown: '# Converted',
+          filename: 'draft.docx',
+          revision: 7,
+          trackedChanges: { available: true, enabled: false, checkpointCount: 0 },
+          commentThreads: [
+            {
+              commentThreadId: 'comment-thread-1',
+              status: 'open',
+              anchor: { quote: 'Converted', prefix: '# ', suffix: '' },
+              comments: [],
+              docxCommentId: ''
+            }
+          ]
+        }),
+        {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
-      })
+        }
+      )
     );
     const applyMarkdownToEditor = vi.fn();
-    const sendCanvasSave = vi.fn();
+    const markImportedDocumentPersisted = vi.fn();
+    const setWidgetConfig = vi.fn();
 
     await docxModule.importCanvasDocx({
       event: {
@@ -77,7 +107,8 @@ describe('canvas editor DOCX helpers', () => {
         docxUploadFailed: 'DOCX upload failed:'
       },
       applyMarkdownToEditor,
-      sendCanvasSave
+      markImportedDocumentPersisted,
+      setWidgetConfig
     });
 
     expect(apiClient.buildEndpoint).toHaveBeenCalledWith('/api/canvas/document-workspace/import');
@@ -91,7 +122,11 @@ describe('canvas editor DOCX helpers', () => {
       'X-Requested-With': 'XMLHttpRequest'
     });
     expect(applyMarkdownToEditor).toHaveBeenCalledWith('# Converted');
-    expect(sendCanvasSave).toHaveBeenCalledWith('# Converted', 'docx_import');
+    expect(setWidgetConfig).toHaveBeenCalledTimes(1);
+    expect(markImportedDocumentPersisted).toHaveBeenCalledWith({
+      markdown: '# Converted',
+      revision: 7
+    });
   });
 
   it('exports DOCX through the unified backend route', async () => {
@@ -124,10 +159,21 @@ describe('canvas editor DOCX helpers', () => {
       apiClient,
       sessionId: 'session-1',
       errorLabels: {
-        docxGenerationFailed: 'DOCX generation failed:'
+        docxGenerationFailed: 'DOCX generation failed:',
+        detachedCommentsExport: 'Detached comments block export.'
       },
       filename: 'draft.docx',
-      content: '# Draft'
+      content: '# Draft\u00a0 copy',
+      commentThreads: [
+        {
+          commentThreadId: 'comment-thread-1',
+          status: 'open',
+          anchor: { quote: 'Draft\u00a0 copy', prefix: '# ', suffix: '' },
+          comments: [],
+          docxCommentId: ''
+        }
+      ],
+      detachedCommentThreadIds: []
     });
 
     expect(apiClient.buildEndpoint).toHaveBeenCalledWith('/api/canvas/document-workspace/export-docx');
@@ -139,11 +185,72 @@ describe('canvas editor DOCX helpers', () => {
       'Content-Type': 'application/json',
       'x-session-id': 'session-1'
     });
-    expect(requestInit?.body).toBe(JSON.stringify({ content: '# Draft', filename: 'draft.docx' }));
+    expect(requestInit?.body).toBe(
+      JSON.stringify({
+        content: '# Draft  copy',
+        filename: 'draft.docx',
+        commentThreads: [
+          {
+            commentThreadId: 'comment-thread-1',
+            status: 'open',
+            anchor: { quote: 'Draft  copy', prefix: '# ', suffix: '' },
+            comments: [],
+            docxCommentId: ''
+          }
+        ],
+        detachedCommentThreadIds: []
+      })
+    );
     expect(createObjectUrlSpy).toHaveBeenCalledTimes(1);
     expect(clickSpy).toHaveBeenCalledTimes(1);
     expect(appendChildSpy).toHaveBeenCalledTimes(1);
     expect(removeChildSpy).toHaveBeenCalledTimes(1);
     expect(revokeObjectUrlSpy).toHaveBeenCalledWith('blob:tracked-docx');
+  });
+
+  it('blocks export when detached comments are present', async () => {
+    const docxModule = loadCanvasEditorDocxModule();
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await docxModule.exportCanvasDocx({
+      sessionId: 'session-1',
+      errorLabels: {
+        docxGenerationFailed: 'DOCX generation failed:',
+        detachedCommentsExport: 'Detached comments block export.'
+      },
+      filename: 'draft.docx',
+      content: '# Draft',
+      commentThreads: [],
+      detachedCommentThreadIds: ['comment-thread-1']
+    });
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(consoleErrorSpy).toHaveBeenCalledWith('Detached comments block export.');
+  });
+
+  it('decodes preserved spaces before starting tracked changes', async () => {
+    const docxModule = loadCanvasEditorDocxModule();
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    );
+
+    await docxModule.startCanvasTrackedChanges?.({
+      sessionId: 'session-1',
+      content: 'foo\u00a0 bar',
+      errorLabels: {
+        trackedChangesActionFailed: 'Tracked changes failed'
+      }
+    });
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(fetchSpy.mock.calls[0]?.[1]?.body).toBe(
+      JSON.stringify({
+        content: 'foo  bar'
+      })
+    );
   });
 });

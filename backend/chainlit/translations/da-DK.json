@@ -19,6 +19,7 @@
   "auth": {
     "login": {
       "title": "Log ind for at få adgang til appen",
+      "privateIntegrationTokenBootstrap": "Bootstrap integration token",
       "form": {
         "email": {
           "label": "E-mailadresse",
@@ -227,6 +228,7 @@
         "settings": "Indstillinger",
         "settingsKey": "S",
         "apiKeys": "API-nøgler",
+        "administration": "Administration",
         "logout": "Log ud"
       }
     }

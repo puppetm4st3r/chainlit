@@ -32,6 +32,7 @@ export interface IAuthConfig {
   oauthProviders: string[];
   default_theme?: 'light' | 'dark';
   ui?: IChainlitConfig['ui'];
+  privateIntegrationTokenBootstrapUrl?: string;
 }
 
 export interface IChainlitConfig {
@@ -59,6 +60,7 @@ export interface IChainlitConfig {
     default_avatar_file_url?: string;
     avatar_size?: number;
     hide_topright_bar?: boolean;
+    admin_url?: string;
     header_links?: {
       name: string;
       display_name: string;

@@ -71,6 +71,12 @@ interface ParsedTooltipReference {
   relevanceScore: number | null;
 }
 
+type ReferenceTarget = 'new' | 'same';
+
+function normalizeReferenceTarget(value: unknown): ReferenceTarget {
+  return value === 'same' ? 'same' : 'new';
+}
+
 function parseTooltipRelevanceScore(section: string) {
   const normalizedSection = String(section || '').trim();
   if (!normalizedSection.startsWith(REFERENCE_TOOLTIP_SCORE_SECTION_PREFIX)) {
@@ -235,7 +241,13 @@ function computeReferenceTooltipViewportPosition(anchorRect: DOMRect | null, too
   };
 }
 
-function ReferenceTooltipBody({ references }: { references: ParsedTooltipReference[] }) {
+function ReferenceTooltipBody({
+  references,
+  referenceTarget
+}: {
+  references: ParsedTooltipReference[];
+  referenceTarget: ReferenceTarget;
+}) {
   if (!references.length) {
     return null;
   }
@@ -304,8 +316,8 @@ function ReferenceTooltipBody({ references }: { references: ParsedTooltipReferen
               {reference.url ? (
                 <a
                   href={reference.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  target={referenceTarget === 'new' ? '_blank' : undefined}
+                  rel={referenceTarget === 'new' ? 'noopener noreferrer' : undefined}
                   className="group -mx-1 block rounded-md px-1 py-1 transition-colors hover:bg-black/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-stone-500/40 dark:hover:bg-white/5 dark:focus-visible:ring-zinc-300/30"
                   title={reference.documentName || reference.label}
                 >
@@ -450,6 +462,7 @@ function ConversationReferenceTooltipLayer() {
     tooltipKey: string;
     tooltip: string;
     references: ParsedTooltipReference[];
+    referenceTarget: ReferenceTarget;
     anchorElement: HTMLElement;
   } | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState({ left: 0, top: 0 });
@@ -504,6 +517,7 @@ function ConversationReferenceTooltipLayer() {
         tooltipKey?: string;
         tooltip?: string;
         references?: unknown;
+        referenceTarget?: unknown;
         anchorElement?: HTMLElement;
       }>;
       const detail = customEvent.detail || {};
@@ -534,6 +548,7 @@ function ConversationReferenceTooltipLayer() {
             tooltipKey,
             tooltip: String(detail.tooltip || ''),
             references: resolvedReferences,
+            referenceTarget: normalizeReferenceTarget(detail.referenceTarget),
             anchorElement,
           };
         });
@@ -615,7 +630,10 @@ function ConversationReferenceTooltipLayer() {
       onFocusCapture={() => clearCloseTimer()}
       onBlurCapture={() => scheduleClose(activeTooltip.tooltipKey)}
     >
-      <ReferenceTooltipBody references={activeTooltip.references} />
+      <ReferenceTooltipBody
+        references={activeTooltip.references}
+        referenceTarget={activeTooltip.referenceTarget}
+      />
     </div>,
     document.body
   );
@@ -624,11 +642,13 @@ function ConversationReferenceTooltipLayer() {
 function ConversationReferenceLink({
   tooltip,
   references,
+  referenceTarget,
   tooltipKey,
   children
 }: {
   tooltip: string;
   references: unknown;
+  referenceTarget: ReferenceTarget;
   tooltipKey: string;
   children: ReactNode;
 }) {
@@ -644,6 +664,7 @@ function ConversationReferenceLink({
           tooltipKey,
           tooltip,
           references,
+          referenceTarget,
           anchorElement: anchorRef.current
         }
       })
@@ -805,7 +826,7 @@ const Markdown = ({
           return (
             <code
               {...omit(props, ['node'])}
-              className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold"
+              className="relative rounded bg-[hsl(var(--markdown-code-bg))] px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold"
             />
           );
         },
@@ -858,6 +879,7 @@ const Markdown = ({
                 <ConversationReferenceLink
                   tooltip={String(title)}
                   references={(anyEl as any).props?.references}
+                  referenceTarget={normalizeReferenceTarget((anyEl as any).props?.reference_target)}
                   tooltipKey={String((anyEl as any).chainlitKey || title || name)}
                 >
                   {contentNode}

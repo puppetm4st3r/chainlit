@@ -42,6 +42,7 @@ const Input = forwardRef<InputMethods, Props>(
   (
     {
       placeholder,
+      readOnly,
       id,
       className,
       autoFocus,
@@ -110,6 +111,17 @@ const Input = forwardRef<InputMethods, Props>(
         textareaRef.current.focus();
       }
     }, [autoFocus]);
+
+    useEffect(() => {
+      if (!readOnly || !value) {
+        return;
+      }
+
+      setValue('');
+      setCommandInput('');
+      setShowCommands(false);
+      onChange('');
+    }, [readOnly, value, onChange]);
 
     const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
       const newValue = e.target.value;
@@ -180,8 +192,10 @@ const Input = forwardRef<InputMethods, Props>(
           onCompositionStart={() => setIsComposing(true)}
           onCompositionEnd={() => setIsComposing(false)}
           placeholder={placeholder}
+          aria-readonly={readOnly ? 'true' : 'false'}
           className={cn(
             'w-full resize-none bg-transparent placeholder:text-muted-foreground focus:outline-none',
+            readOnly && 'cursor-not-allowed opacity-70',
             className
           )}
           maxHeight={250}

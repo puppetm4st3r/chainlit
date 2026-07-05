@@ -19,6 +19,7 @@
   "auth": {
     "login": {
       "title": "התחבר כדי לגשת לאפליקציה",
+      "privateIntegrationTokenBootstrap": "Bootstrap integration token",
       "form": {
         "email": {
           "label": "כתובת אימייל",
@@ -228,6 +229,7 @@
         "settings": "הגדרות",
         "settingsKey": "ה",
         "apiKeys": "מפתחות API",
+        "administration": "ניהול",
         "logout": "התנתק"
       }
     }

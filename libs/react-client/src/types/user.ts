@@ -10,6 +10,7 @@ export interface IUserMetadata extends Record<string, any> {
   tags?: string[];
   image?: string;
   provider?: AuthProvider;
+  roles?: string[];
 }
 
 export interface IUser {

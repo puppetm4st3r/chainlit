@@ -19,6 +19,7 @@
   "auth": {
     "login": {
       "title": "Συνδεθείτε για να αποκτήσετε πρόσβαση στην εφαρμογή",
+      "privateIntegrationTokenBootstrap": "Bootstrap integration token",
       "form": {
         "email": {
           "label": "Διεύθυνση ηλεκτρονικού ταχυδρομείου",
@@ -228,6 +229,7 @@
         "settings": "Ρυθμίσεις",
         "settingsKey": "S",
         "apiKeys": "Κλειδιά API",
+        "administration": "Διαχείριση",
         "logout": "Αποσύνδεση"
       }
     }

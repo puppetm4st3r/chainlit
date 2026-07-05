@@ -49,7 +49,7 @@ class StepDict(TypedDict, total=False):
     threadId: str
     parentId: Optional[str]
     command: Optional[str]
-    modes: Optional[Dict[str, str]]
+    modes: Optional[Dict[str, List[str]]]
     streaming: bool
     waitForAnswer: Optional[bool]
     isError: Optional[bool]
@@ -90,6 +90,7 @@ def step(
     show_input: Union[bool, str] = "json",
     default_open: bool = False,
     auto_collapse: bool = False,
+    thread_id: Optional[str] = None,
 ):
     """Step decorator for async and sync functions."""
 
@@ -109,6 +110,7 @@ def step(
                     name=name,
                     id=id,
                     parent_id=parent_id,
+                    thread_id=thread_id,
                     tags=tags,
                     language=language,
                     icon=icon,
@@ -140,6 +142,7 @@ def step(
                     name=name,
                     id=id,
                     parent_id=parent_id,
+                    thread_id=thread_id,
                     tags=tags,
                     language=language,
                     icon=icon,

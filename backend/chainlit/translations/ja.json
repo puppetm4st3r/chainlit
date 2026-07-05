@@ -19,6 +19,7 @@
   "auth": {
     "login": {
       "title": "アプリにログイン",
+      "privateIntegrationTokenBootstrap": "Bootstrap integration token",
       "form": {
         "email": {
           "label": "メールアドレス",
@@ -227,6 +228,7 @@
         "settings": "設定",
         "settingsKey": "S",
         "apiKeys": "APIキー",
+        "administration": "管理",
         "logout": "ログアウト"
       }
     }

@@ -19,6 +19,7 @@
   "auth": {
     "login": {
       "title": "登录以访问应用",
+      "privateIntegrationTokenBootstrap": "Bootstrap integration token",
       "form": {
         "email": {
           "label": "电子邮箱",
@@ -228,6 +229,7 @@
         "settings": "设置",
         "settingsKey": "S",
         "apiKeys": "API密钥",
+        "administration": "管理",
         "logout": "退出登录"
       }
     }

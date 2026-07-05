@@ -31,6 +31,7 @@ code {
     --secondary-foreground: 222.2 47.4% 11.2%;
     --muted: 0 0% 90%;
     --muted-foreground: 0 0% 36%;
+    --markdown-code-bg: 210 20% 93%;
     --reference-link-bg: 0 0% 90%;
     --reference-link-fg: 0 0% 18%;
     --reference-link-border: 0 0% 58%;
@@ -71,6 +72,7 @@ code {
     --secondary-foreground: 210 40% 98%;
     --muted: 0 1% 26%;
     --muted-foreground: 0 0% 71%;
+    --markdown-code-bg: 220 8% 25%;
     --reference-link-bg: 0 0% 28%;
     --reference-link-fg: 0 0% 93%;
     --reference-link-border: 0 0% 42%;

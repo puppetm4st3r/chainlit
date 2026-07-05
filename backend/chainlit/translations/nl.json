@@ -19,6 +19,7 @@
   "auth": {
     "login": {
       "title": "Inloggen om toegang te krijgen tot de app",
+      "privateIntegrationTokenBootstrap": "Bootstrap integration token",
       "form": {
         "email": {
           "label": "E-mailadres",
@@ -228,6 +229,7 @@
         "settings": "Instellingen",
         "settingsKey": "I",
         "apiKeys": "API-sleutels",
+        "administration": "Beheer",
         "logout": "Uitloggen"
       }
     }

@@ -20,6 +20,11 @@ import {
 } from '@chainlit/react-client';
 
 import { Messages } from '@/components/chat/Messages';
+import {
+  getCanvasShellCloseDetail,
+  isCanvasShellElement,
+  logCanvasCloseDiag
+} from '@/lib/canvas';
 import { buildSideViewElementsSignature } from '@/lib/sideView';
 import { dismissedSideViewSignatureState } from '@/state/project';
 import { useTranslation } from 'components/i18n/Translator';
@@ -27,6 +32,22 @@ import { useTranslation } from 'components/i18n/Translator';
 interface Props {
   navigate?: (to: string) => void;
 }
+
+const keepSingleCanvasShellElement = (
+  sideElements: IMessageElement[]
+): IMessageElement[] => {
+  const latestCanvasElement = [...sideElements]
+    .reverse()
+    .find(isCanvasShellElement);
+
+  if (!latestCanvasElement) {
+    return sideElements;
+  }
+
+  return sideElements.filter(
+    (element) => !isCanvasShellElement(element) || element === latestCanvasElement
+  );
+};
 
 const MessagesContainer = ({ navigate }: Props) => {
   const apiClient = useContext(ChainlitContext);
@@ -36,6 +57,7 @@ const MessagesContainer = ({ navigate }: Props) => {
   const { uploadFile: _uploadFile } = useChatInteract();
   const setMessages = useSetRecoilState(messagesState);
   const setSideView = useSetRecoilState(sideViewState);
+  const currentSideView = useRecoilValue(sideViewState);
   const currentThreadId = useRecoilValue(currentThreadIdState);
   const dismissedSideViewSignature = useRecoilValue(
     dismissedSideViewSignatureState
@@ -117,11 +139,20 @@ const MessagesContainer = ({ navigate }: Props) => {
   }, [currentThreadId, setDismissedSideViewSignature]);
 
   useEffect(() => {
-    const sideElements = elements.filter((e) => e.display === 'side');
+    const sideElements = keepSingleCanvasShellElement(
+      elements.filter((e) => e.display === 'side')
+    );
+    const nextSignature = buildSideViewElementsSignature(sideElements);
+    const canvasDetail = getCanvasShellCloseDetail(sideElements);
 
     if (sideElements.length === 0) {
       knownSideElementsRef.current = new Map();
       knownSideOrderRef.current = [];
+      if (dismissedSideViewSignature) {
+        logCanvasCloseDiag('messages_container:side_elements_cleared', {
+          dismissedSignature: dismissedSideViewSignature
+        });
+      }
       if (dismissedSideViewSignature) {
         setDismissedSideViewSignature(undefined);
       }
@@ -141,7 +172,14 @@ const MessagesContainer = ({ navigate }: Props) => {
       sideElements.some((e) => prevMap.get(e.id) !== e);
 
     if (hasChanged) {
-      const nextSignature = buildSideViewElementsSignature(sideElements);
+      if (canvasDetail) {
+        logCanvasCloseDiag('messages_container:side_elements_changed', {
+          signature: nextSignature,
+          dismissedSignature: dismissedSideViewSignature,
+          canvas: canvasDetail,
+          elementIds: currentIds
+        });
+      }
       const newMap = new Map<string, IMessageElement>();
       sideElements.forEach((e) => newMap.set(e.id, e));
       knownSideElementsRef.current = newMap;
@@ -150,10 +188,37 @@ const MessagesContainer = ({ navigate }: Props) => {
         dismissedSideViewSignature &&
         dismissedSideViewSignature === nextSignature
       ) {
+        if (canvasDetail) {
+          logCanvasCloseDiag('messages_container:reopen_suppressed_by_dismissed_signature', {
+            signature: nextSignature,
+            canvas: canvasDetail
+          });
+        }
         return;
       }
       if (dismissedSideViewSignature) {
         setDismissedSideViewSignature(undefined);
+      }
+      if (currentSideView?.key) {
+        if (canvasDetail) {
+          logCanvasCloseDiag(
+            'messages_container:skip_override_keyed_side_view',
+            {
+              activeKey: currentSideView.key,
+              signature: nextSignature,
+              canvas: canvasDetail,
+              elementIds: currentIds
+            }
+          );
+        }
+        return;
+      }
+      if (canvasDetail) {
+        logCanvasCloseDiag('messages_container:set_side_view_from_elements', {
+          signature: nextSignature,
+          canvas: canvasDetail,
+          elementIds: currentIds
+        });
       }
       setSideView({
         title: sideElements[sideElements.length - 1].name,
@@ -161,6 +226,7 @@ const MessagesContainer = ({ navigate }: Props) => {
       });
     }
   }, [
+    currentSideView,
     dismissedSideViewSignature,
     elements,
     setDismissedSideViewSignature,

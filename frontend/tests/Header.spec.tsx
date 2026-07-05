@@ -1,8 +1,10 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { Header } from '@/components/header';
 
+const mockUseAuth = vi.fn();
+const mockUseChatData = vi.fn();
 const mockUseConfig = vi.fn();
 const mockWindowMessage = vi.fn();
 const mockUseRecoilValue = vi.fn();
@@ -17,8 +19,8 @@ vi.mock('@chainlit/react-client', async () => {
   return {
     ...actual,
     useAudio: () => ({ audioConnection: 'off' }),
-    useAuth: () => ({ data: { requireLogin: false } }),
-    useChatData: () => ({ chatSettingsInputs: [] }),
+    useAuth: () => mockUseAuth(),
+    useChatData: () => mockUseChatData(),
     useChatInteract: () => ({ windowMessage: mockWindowMessage }),
     useConfig: () => mockUseConfig()
   };
@@ -40,6 +42,10 @@ vi.mock('react-router-dom', () => ({
 
 vi.mock('@/components/ui/sidebar', () => ({
   useSidebar: () => ({ open: false, openMobile: false, isMobile: false })
+}));
+
+vi.mock('@/hooks/useDismissSideView', () => ({
+  useDismissSideView: () => mockSetSideView
 }));
 
 vi.mock('@/components/AudioPresence', () => ({
@@ -106,6 +112,10 @@ vi.mock('@/components/header/UserNav', () => ({
   default: () => <div data-testid="user-nav" />
 }));
 
+vi.mock('@/components/header/WorkflowHelpButton', () => ({
+  default: () => <div data-testid="workflow-help-button" />
+}));
+
 describe('Header', () => {
   const configureDefaultRecoilValues = () => {
     mockUseRecoilValue.mockImplementation((atom: { key?: string }) => {
@@ -118,6 +128,17 @@ describe('Header', () => {
       return undefined;
     });
   };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUseAuth.mockReturnValue({ data: { requireLogin: false } });
+    mockUseChatData.mockReturnValue({
+      chatSettingsInputs: [],
+      conversationHistoryVisible: true
+    });
+    mockUseConfig.mockReturnValue({ config: { ui: {} } });
+    configureDefaultRecoilValues();
+  });
 
   it('dispatches a shell close request before hiding an open canvas side view', () => {
     mockUseConfig.mockReturnValue({ config: { ui: {} } });
@@ -154,7 +175,19 @@ describe('Header', () => {
 
     fireEvent.click(closeButton!);
 
-    expect(mockSetSideView).toHaveBeenCalledWith(undefined);
+    expect(mockSetSideView).toHaveBeenCalledWith([
+      {
+        id: 'canvas-1',
+        type: 'custom',
+        name: 'Canvas Editor',
+        display: 'side',
+        forId: 'message-1',
+        props: {
+          workspaceKey: 'workspace-1',
+          widgetInstanceId: 'widget-1'
+        }
+      }
+    ]);
     expect(dispatchEventSpy).toHaveBeenCalledTimes(1);
     const closeEvent = dispatchEventSpy.mock.calls[0]?.[0] as CustomEvent;
     expect(closeEvent.type).toBe('chainlit:canvas-shell-close-request');
@@ -164,12 +197,27 @@ describe('Header', () => {
     });
   });
 
+  it('hides sidebar trigger and new-chat entry points when past conversation history is hidden at runtime', () => {
+    configureDefaultRecoilValues();
+    mockUseAuth.mockReturnValue({ data: { requireLogin: true } });
+    mockUseChatData.mockReturnValue({
+      chatSettingsInputs: [],
+      conversationHistoryVisible: false
+    });
+    mockUseConfig.mockReturnValue({ config: { dataPersistence: true, ui: {} } });
+
+    render(<Header />);
+
+    expect(screen.queryByTestId('sidebar-trigger')).not.toBeInTheDocument();
+  });
+
   it('renders readme button, theme toggle, chat profiles and user nav by default', () => {
     configureDefaultRecoilValues();
     mockUseConfig.mockReturnValue({ config: { ui: {} } });
 
     render(<Header />);
 
+    expect(screen.getByTestId('workflow-help-button')).toBeInTheDocument();
     expect(screen.getByTestId('readme-button')).toBeInTheDocument();
     expect(screen.getByTestId('theme-toggle')).toBeInTheDocument();
     expect(screen.getByTestId('chat-profiles')).toBeInTheDocument();
@@ -210,7 +258,9 @@ describe('Header', () => {
     expect(screen.getByText('chat.workspace.activeSecondary')).toBeInTheDocument();
     expect(screen.getByText('chat.workspace.openEditorWord')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByText('chat.workspace.openEditorWord'));
+    const workspaceButton = document.querySelector('#document-workspace-header-button');
+    expect(workspaceButton).not.toBeNull();
+    fireEvent.click(workspaceButton!);
 
     expect(mockWindowMessage).toHaveBeenCalledWith({
       type: 'canvas:open_active_workspace'

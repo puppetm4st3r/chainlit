@@ -1,4 +1,4 @@
-import { FileSpec, useConfig } from '@chainlit/react-client';
+import { FileSpec, useChatData, useConfig } from '@chainlit/react-client';
 
 import { Translator } from '@/components/i18n';
 import { PaperClip } from '@/components/icons/PaperClip';
@@ -26,6 +26,7 @@ export const UploadButton = ({
   onFileUploadError
 }: UploadButtonProps) => {
   const { config } = useConfig();
+  const { spontaneousFileUploadEnabled } = useChatData();
   const upload = useUpload({
     spec: fileSpec,
     onResolved: (payloads: File[]) => onFileUpload(payloads),
@@ -36,7 +37,12 @@ export const UploadButton = ({
   if (!upload) return null;
   const { getRootProps, getInputProps } = upload;
 
-  if (!config?.features.spontaneous_file_upload?.enabled) return null;
+  const effectiveSpontaneousFileUploadEnabled =
+    spontaneousFileUploadEnabled ??
+    config?.features.spontaneous_file_upload?.enabled ??
+    false;
+
+  if (!effectiveSpontaneousFileUploadEnabled) return null;
 
   return (
     <TooltipProvider>

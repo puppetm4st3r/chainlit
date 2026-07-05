@@ -5,7 +5,10 @@ import {
   askUserState,
   chatSettingsInputsState,
   chatSettingsValueState,
+  composerInputRestrictionState,
   currentThreadIdState,
+  spontaneousFileUploadEnabledState,
+  documentWorkspaceState,
   elementState,
   favoriteMessagesState,
   firstUserInteraction,
@@ -35,6 +38,12 @@ const useChatInteract = () => {
   const resetChatSettings = useResetRecoilState(chatSettingsInputsState);
   const resetSessionId = useResetRecoilState(sessionIdState);
   const resetChatSettingsValue = useResetRecoilState(chatSettingsValueState);
+  const resetComposerInputRestriction = useResetRecoilState(
+    composerInputRestrictionState
+  );
+  const resetSpontaneousFileUploadEnabled = useResetRecoilState(
+    spontaneousFileUploadEnabledState
+  );
 
   const setFirstUserInteraction = useSetRecoilState(firstUserInteraction);
   const setLoading = useSetRecoilState(loadingState);
@@ -47,6 +56,7 @@ const useChatInteract = () => {
   const setSideView = useSetRecoilState(sideViewState);
   const setCurrentThreadId = useSetRecoilState(currentThreadIdState);
   const setFavoriteMessages = useSetRecoilState(favoriteMessagesState);
+  const setDocumentWorkspace = useSetRecoilState(documentWorkspaceState);
 
   const clear = useCallback(() => {
     session?.socket.emit('clear_session');
@@ -61,9 +71,18 @@ const useChatInteract = () => {
     setTokenCount(0);
     resetChatSettings();
     resetChatSettingsValue();
+    resetComposerInputRestriction();
+    resetSpontaneousFileUploadEnabled();
     setSideView(undefined);
+    setDocumentWorkspace(undefined);
     setCurrentThreadId(undefined);
-  }, [askUser, session, sessionId]);
+  }, [
+    askUser,
+    session,
+    sessionId,
+    setDocumentWorkspace,
+    resetSpontaneousFileUploadEnabled
+  ]);
 
   const sendMessage = useCallback(
     (

@@ -16,30 +16,40 @@ def mock_modes():
         Mode(
             id="model",
             name="Model",
+            description="Choose the language model",
             options=[
                 ModeOption(
                     id="gpt-4",
                     name="GPT-4",
                     description="Most capable model",
+                    tooltip="Best quality",
                     icon="sparkles",
-                    default=True,
+                    selected=True,
                 ),
                 ModeOption(
                     id="gpt-3.5-turbo",
                     name="GPT-3.5 Turbo",
                     description="Fast and efficient",
                     icon="bolt",
-                    default=False,
                 ),
             ],
         ),
         Mode(
             id="reasoning",
             name="Reasoning",
+            multi=True,
             options=[
-                ModeOption(id="high", name="High", description="Maximum depth"),
                 ModeOption(
-                    id="medium", name="Medium", description="Balanced", default=True
+                    id="high",
+                    name="High",
+                    description="Maximum depth",
+                    selected=True,
+                ),
+                ModeOption(
+                    id="medium",
+                    name="Medium",
+                    description="Balanced",
+                    selected=True,
                 ),
                 ModeOption(id="low", name="Low", description="Quick responses"),
             ],
@@ -58,8 +68,9 @@ class TestModeOption:
         assert option.id == "test"
         assert option.name == "Test Option"
         assert option.description is None
+        assert option.tooltip is None
         assert option.icon is None
-        assert option.default is False
+        assert option.selected is False
 
     def test_mode_option_all_fields(self):
         """Test ModeOption with all fields."""
@@ -67,15 +78,17 @@ class TestModeOption:
             id="gpt-4",
             name="GPT-4",
             description="Most capable model",
+            tooltip="Best quality",
             icon="sparkles",
-            default=True,
+            selected=True,
         )
 
         assert option.id == "gpt-4"
         assert option.name == "GPT-4"
         assert option.description == "Most capable model"
+        assert option.tooltip == "Best quality"
         assert option.icon == "sparkles"
-        assert option.default is True
+        assert option.selected is True
 
     def test_mode_option_to_dict(self):
         """Test ModeOption serialization."""
@@ -83,8 +96,9 @@ class TestModeOption:
             id="test",
             name="Test",
             description="Test desc",
+            tooltip="Tooltip",
             icon="star",
-            default=True,
+            selected=True,
         )
 
         option_dict = option.to_dict()
@@ -92,8 +106,9 @@ class TestModeOption:
         assert option_dict["id"] == "test"
         assert option_dict["name"] == "Test"
         assert option_dict["description"] == "Test desc"
+        assert option_dict["tooltip"] == "Tooltip"
         assert option_dict["icon"] == "star"
-        assert option_dict["default"] is True
+        assert option_dict["selected"] is True
 
 
 @pytest.mark.asyncio
@@ -106,6 +121,7 @@ class TestMode:
 
         assert mode.id == "model"
         assert mode.name == "Model"
+        assert mode.description == "Choose the language model"
         assert len(mode.options) == 2
 
     def test_mode_to_dict(self, mock_modes):
@@ -115,21 +131,18 @@ class TestMode:
 
         assert mode_dict["id"] == "model"
         assert mode_dict["name"] == "Model"
+        assert mode_dict["description"] == "Choose the language model"
         assert len(mode_dict["options"]) == 2
         assert mode_dict["options"][0]["id"] == "gpt-4"
 
-    def test_mode_default_option(self, mock_modes):
-        """Test finding default option in mode."""
+    def test_mode_selected_options(self, mock_modes):
+        """Test finding selected options in a single-select mode."""
         mode = mock_modes[0]
-
-        default_option = next(
-            (opt for opt in mode.options if opt.default), mode.options[0]
-        )
-
-        assert default_option.id == "gpt-4"
+        selected_options = mode.get_selected_options()
+        assert [option.id for option in selected_options] == ["gpt-4"]
 
     def test_mode_fallback_to_first(self, mock_modes):
-        """Test fallback to first option when no default set."""
+        """Test fallback to first option when no single-select option is selected."""
         mode = Mode(
             id="test",
             name="Test",
@@ -139,13 +152,15 @@ class TestMode:
             ],
         )
 
-        default_option = next(
-            (opt for opt in mode.options if opt.default),
-            mode.options[0] if mode.options else None,
-        )
+        selected_options = mode.get_selected_options()
+        assert len(selected_options) == 1
+        assert selected_options[0].id == "opt1"
 
-        assert default_option is not None
-        assert default_option.id == "opt1"
+    def test_mode_multi_select_keeps_multiple_selected_options(self, mock_modes):
+        """Test multi-select modes return all active options."""
+        mode = mock_modes[1]
+        selected_options = mode.get_selected_options()
+        assert [option.id for option in selected_options] == ["high", "medium"]
 
 
 @pytest.mark.asyncio
@@ -155,7 +170,7 @@ class TestMessageWithModes:
     async def test_message_with_modes(self, mock_chainlit_context):
         """Test that Message can be created with modes field."""
         async with mock_chainlit_context:
-            modes = {"model": "gpt-4", "reasoning": "high"}
+            modes = {"model": ["gpt-4"], "reasoning": ["high", "medium"]}
             message = cl.Message(content="Test message", modes=modes)
 
             assert message.modes == modes
@@ -164,7 +179,7 @@ class TestMessageWithModes:
     async def test_message_to_dict_includes_modes(self, mock_chainlit_context):
         """Test that Message.to_dict() includes the modes field."""
         async with mock_chainlit_context:
-            modes = {"model": "gpt-4", "reasoning": "medium"}
+            modes = {"model": ["gpt-4"], "reasoning": ["medium"]}
             message = cl.Message(content="Test", modes=modes)
             message_dict = message.to_dict()
 
@@ -177,14 +192,14 @@ class TestMessageWithModes:
             message_dict = {
                 "id": "test-id",
                 "content": "Test message",
-                "modes": {"model": "gpt-3.5-turbo", "reasoning": "low"},
+                "modes": {"model": ["gpt-3.5-turbo"], "reasoning": ["low"]},
                 "type": "user_message",
                 "createdAt": "2024-01-01T00:00:00",
                 "output": "Test message",
             }
             message = cl.Message.from_dict(message_dict)
 
-            assert message.modes == {"model": "gpt-3.5-turbo", "reasoning": "low"}
+            assert message.modes == {"model": ["gpt-3.5-turbo"], "reasoning": ["low"]}
             assert message.content == "Test message"
 
     async def test_message_without_modes(self, mock_chainlit_context):
@@ -199,7 +214,7 @@ class TestMessageWithModes:
     async def test_message_send_with_modes(self, mock_chainlit_context):
         """Test that sending a message with modes works."""
         async with mock_chainlit_context as ctx:
-            modes = {"model": "gpt-4", "reasoning": "high"}
+            modes = {"model": ["gpt-4"], "reasoning": ["high", "medium"]}
             message = cl.Message(content="Test", modes=modes)
 
             with patch("chainlit.message.chat_context") as mock_chat_ctx:
@@ -252,7 +267,7 @@ class TestEmitterSetModes:
         mode = Mode(
             id="model",
             name="Model",
-            options=[ModeOption(id="gpt-4", name="GPT-4", default=True)],
+            options=[ModeOption(id="gpt-4", name="GPT-4", selected=True)],
         )
 
         await emitter.set_modes([mode])
@@ -262,6 +277,40 @@ class TestEmitterSetModes:
         assert call_args[0][0] == "set_modes"
         assert len(call_args[0][1]) == 1
         assert call_args[0][1][0]["id"] == "model"
+
+
+@pytest.mark.asyncio
+class TestEmitterSetInputRestriction:
+    """Test suite for emitter set_input_restriction functionality."""
+
+    async def test_set_input_restriction_with_placeholder(
+        self, mock_websocket_session: MagicMock
+    ) -> None:
+        emitter = ChainlitEmitter(mock_websocket_session)
+
+        await emitter.set_input_restriction(
+            "selection_only", "Start a new conversation to continue."
+        )
+
+        mock_websocket_session.emit.assert_called_once_with(
+            "set_input_restriction",
+            {
+                "mode": "selection_only",
+                "placeholder": "Start a new conversation to continue.",
+            },
+        )
+
+    async def test_set_input_restriction_without_placeholder(
+        self, mock_websocket_session: MagicMock
+    ) -> None:
+        emitter = ChainlitEmitter(mock_websocket_session)
+
+        await emitter.set_input_restriction("mix")
+
+        mock_websocket_session.emit.assert_called_once_with(
+            "set_input_restriction",
+            {"mode": "mix"},
+        )
 
 
 @pytest.mark.asyncio

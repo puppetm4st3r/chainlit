@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
-import { ChainlitContext, IThread } from '@chainlit/react-client';
+import { ChainlitContext, IThread, useChatData } from '@chainlit/react-client';
 
 import { Loader } from '@/components/Loader';
 import { Search } from '@/components/icons/Search';
@@ -36,6 +36,7 @@ export default function SearchChats() {
   const [threads, setThreads] = useState<IThread[]>([]);
   const [loading, setLoading] = useState(false);
 
+  const { conversationHistoryVisible } = useChatData();
   const apiClient = useContext(ChainlitContext);
 
   // Debounced search function
@@ -86,6 +87,10 @@ export default function SearchChats() {
       debouncedSearch.cancel();
     };
   }, [searchQuery, debouncedSearch]);
+
+  if (conversationHistoryVisible === false) {
+    return null;
+  }
 
   return (
     <>

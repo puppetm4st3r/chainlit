@@ -40,7 +40,7 @@ class MessageBase(ABC):
     persisted = False
     is_error = False
     command: Optional[str] = None
-    modes: Optional[Dict[str, str]] = None
+    modes: Optional[Dict[str, List[str]]] = None
     parent_id: Optional[str] = None
     language: Optional[str] = None
     metadata: Optional[Dict] = None
@@ -224,7 +224,7 @@ class Message(MessageBase):
         id: Optional[str] = None,
         parent_id: Optional[str] = None,
         command: Optional[str] = None,
-        modes: Optional[Dict[str, str]] = None,
+        modes: Optional[Dict[str, List[str]]] = None,
         created_at: Union[str, None] = None,
     ):
         time.sleep(0.001)

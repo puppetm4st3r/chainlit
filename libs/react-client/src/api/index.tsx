@@ -275,6 +275,12 @@ export class ChainlitAPI extends APIBase {
     return res.json();
   }
 
+  async deleteThreads() {
+    const res = await this.delete(`/project/threads`, {});
+
+    return res.json();
+  }
+
   uploadFile(
     file: File,
     onProgress: (progress: number) => void,

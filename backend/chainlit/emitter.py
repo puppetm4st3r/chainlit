@@ -7,11 +7,18 @@ from socketio.exceptions import TimeoutError
 from chainlit.chat_context import chat_context
 from chainlit.config import config
 from chainlit.data import get_data_layer
-from chainlit.element import Element, ElementDict, File
+from chainlit.element import Element, ElementDict
 from chainlit.logger import logger
 from chainlit.message import Message
 from chainlit.mode import Mode
-from chainlit.session import BaseSession, WebsocketSession
+from chainlit.session import (
+    BaseSession,
+    WebsocketSession,
+    resolve_effective_conversation_history_visible,
+    resolve_effective_new_chat_button_visible,
+    resolve_effective_spontaneous_file_upload_enabled,
+    validate_runtime_spontaneous_file_upload_config,
+)
 from chainlit.step import StepDict
 from chainlit.types import (
     AskActionResponse,
@@ -28,6 +35,7 @@ from chainlit.types import (
 )
 from chainlit.user import PersistedUser
 from chainlit.utils import utc_now
+
 
 
 class BaseChainlitEmitter:
@@ -123,6 +131,18 @@ class BaseChainlitEmitter:
         """Stub method to update the token count for the UI."""
         pass
 
+    def set_spontaneous_file_upload(self, enabled: Optional[bool] = None):
+        """Stub method to synchronize spontaneous file upload state in the UI."""
+        pass
+
+    def set_conversation_history_visibility(self, visible: Optional[bool] = None):
+        """Stub method to synchronize conversation-history visibility in the UI."""
+        pass
+
+    def set_new_chat_button_visibility(self, visible: Optional[bool] = None):
+        """Backward-compatible stub for conversation-history visibility."""
+        return self.set_conversation_history_visibility(visible)
+
     async def task_start(self):
         """Stub method to send a task start signal to the UI."""
         pass
@@ -153,6 +173,14 @@ class BaseChainlitEmitter:
 
     async def set_modes(self, modes: List[Mode]):
         """Stub method to send the available modes to the UI."""
+        pass
+
+    async def set_input_restriction(
+        self,
+        mode: Literal["mix", "only_modes", "selection_only"],
+        placeholder: Optional[str] = None,
+    ):
+        """Stub method to synchronize composer restriction state in the UI."""
         pass
 
     async def send_window_message(self, data: Any):
@@ -229,6 +257,7 @@ class ChainlitEmitter(BaseChainlitEmitter):
 
     def send_step(self, step_dict: StepDict):
         """Send a message to the UI."""
+        self._track_assistant_persistence_threshold(step_dict)
         return self.emit("new_message", step_dict)
 
     def update_step(self, step_dict: StepDict):
@@ -258,7 +287,50 @@ class ChainlitEmitter(BaseChainlitEmitter):
         )
         return [self.session.chat_profile] if should_tag_thread else None
 
-    async def flush_thread_queues(self):
+    def _get_interaction_label(self, step_dict: StepDict) -> str:
+        """Return the best-effort visible label for a logical interaction."""
+        return str(
+            step_dict.get("output") or step_dict.get("name") or step_dict.get("type") or ""
+        ).strip()
+
+    async def ensure_thread_persistence(self, interaction: str) -> None:
+        """Cross the persistence threshold once and flush the staged thread state."""
+        if not self.session.begin_thread_persistence():
+            return
+        try:
+            persisted = await self.init_thread(interaction)
+        except Exception:
+            self.session.abort_thread_persistence()
+            raise
+        if not persisted:
+            self.session.abort_thread_persistence()
+            return
+        if not self.session.is_thread_persistence_ready():
+            self.session.abort_thread_persistence()
+            self.session.has_first_interaction = True
+
+    def _track_assistant_persistence_threshold(self, step_dict: StepDict) -> None:
+        """Persist only after the second logical assistant message for the session."""
+        if self.session.is_thread_persistence_ready():
+            return
+        if str(step_dict.get("type") or "").strip() != "assistant_message":
+            return
+        metadata = step_dict.get("metadata") or {}
+        if isinstance(metadata, dict) and metadata.get(
+            "countsTowardThreadPersistenceThreshold"
+        ) is False:
+            return
+        interaction = self._get_interaction_label(step_dict)
+        if not interaction:
+            return
+        logical_turn_count = self.session.register_logical_assistant_message(
+            str(step_dict.get("id") or "").strip()
+        )
+        if logical_turn_count < 2:
+            return
+        asyncio.create_task(self.ensure_thread_persistence(interaction))
+
+    async def flush_thread_queues(self) -> bool:
         if data_layer := get_data_layer():
             try:
                 await data_layer.update_thread(
@@ -268,10 +340,34 @@ class ChainlitEmitter(BaseChainlitEmitter):
                 )
             except Exception as e:
                 logger.error(f"Error updating thread: {e}")
-            asyncio.create_task(self.session.flush_method_queue())
+                return False
 
-    async def init_thread(self, interaction: str):
-        await self.flush_thread_queues()
+            pending_metadata_patch = self.session.consume_pending_thread_metadata_patches()
+            if pending_metadata_patch:
+                patcher = getattr(data_layer, "patch_thread_metadata", None)
+                try:
+                    if callable(patcher):
+                        await patcher(self.session.thread_id, pending_metadata_patch)
+                    else:
+                        await data_layer.update_thread(
+                            thread_id=self.session.thread_id,
+                            user_id=self._get_thread_user_id(),
+                            metadata=pending_metadata_patch,
+                            tags=self._get_thread_tags(),
+                        )
+                except Exception as e:
+                    logger.error(f"Error updating thread metadata: {e}")
+                    return False
+
+            asyncio.create_task(self.session.flush_method_queue())
+            self.session.mark_thread_persistence_ready()
+            return True
+        return True
+
+    async def init_thread(self, interaction: str) -> bool:
+        persisted = await self.flush_thread_queues()
+        if not persisted:
+            return False
         await self.emit(
             "first_interaction",
             {
@@ -279,6 +375,7 @@ class ChainlitEmitter(BaseChainlitEmitter):
                 "thread_id": self.session.thread_id,
             },
         )
+        return True
 
     async def set_thread_title(self, title: str) -> bool:
         """Persist the thread title and notify the UI when it changes."""
@@ -311,6 +408,32 @@ class ChainlitEmitter(BaseChainlitEmitter):
         )
         return True
 
+    async def _send_uploaded_elements(
+        self,
+        *,
+        files: List[FileDict],
+        for_id: str,
+        display: Literal["inline", "side", "page"] = "inline",
+    ) -> List[Element]:
+        """Persist upload-backed file elements before exposing them to application code."""
+        elements = [
+            Element.from_dict(
+                {
+                    "id": file["id"],
+                    "name": file["name"],
+                    "path": str(file["path"]),
+                    "chainlitKey": file["id"],
+                    "display": display,
+                    "type": Element.infer_type_from_mime(file["type"]),
+                    "mime": file["type"],
+                }
+            )
+            for file in files
+        ]
+        for element in elements:
+            await element.send(for_id=for_id, await_data_layer=True)
+        return elements
+
     async def process_message(self, payload: MessagePayload):
         step_dict = payload["message"]
         file_refs = payload.get("fileReferences")
@@ -322,11 +445,10 @@ class ChainlitEmitter(BaseChainlitEmitter):
         message.created_at = utc_now()
         chat_context.add(message)
 
-        asyncio.create_task(message._create())
+        await message._create()
 
-        if not self.session.has_first_interaction:
-            self.session.has_first_interaction = True
-            asyncio.create_task(self.init_thread(message.content))
+        if not self.session.is_thread_persistence_ready():
+            await self.ensure_thread_persistence(message.content)
 
         if file_refs:
             files = [
@@ -334,29 +456,10 @@ class ChainlitEmitter(BaseChainlitEmitter):
                 for file in file_refs
                 if file["id"] in self.session.files
             ]
-
-            elements = [
-                Element.from_dict(
-                    {
-                        "id": file["id"],
-                        "name": file["name"],
-                        "path": str(file["path"]),
-                        "chainlitKey": file["id"],
-                        "display": "inline",
-                        "type": Element.infer_type_from_mime(file["type"]),
-                        "mime": file["type"],
-                    }
-                )
-                for file in files
-            ]
-
-            message.elements = elements
-
-            async def send_elements():
-                for element in message.elements:
-                    await element.send(for_id=message.id)
-
-            asyncio.create_task(send_elements())
+            message.elements = await self._send_uploaded_elements(
+                files=files,
+                for_id=message.id,
+            )
 
         return message
 
@@ -399,72 +502,9 @@ class ChainlitEmitter(BaseChainlitEmitter):
                     ]
                     final_res = files
                     interaction = ",".join([file["name"] for file in files])
-                    if get_data_layer():
-                        # Create File elements
-                        elements = [
-                            File(
-                                id=file["id"],
-                                name=file["name"],
-                                path=str(file["path"]),
-                                mime=file["type"],
-                                chainlit_key=file["id"],
-                                for_id=step_dict["id"],
-                            )
-                            for file in files
-                        ]
-                        
-                        # Send elements and construct URLs efficiently
-                        async def send_elements_with_urls():
-                            for element in elements:
-                                await element.send(for_id=step_dict["id"])
-                            
-                            # Execute flush to persist elements immediately
-                            await self.session.flush_method_queue()
-                            
-                            # Get data layer and storage provider for direct URL construction
-                            data_layer = get_data_layer()
-                            if data_layer and hasattr(data_layer, 'storage_provider') and data_layer.storage_provider:
-                                for element in elements:
-                                    try:
-                                        # Construct object_key directly (same pattern as in create_element)
-                                        user_id = "unknown"  # Default user_id as used in data_layer
-                                        if hasattr(data_layer, '_get_user_id_by_thread'):
-                                            try:
-                                                user_id = await data_layer._get_user_id_by_thread(element.thread_id) or "unknown"
-                                            except:
-                                                pass
-                                        
-                                        # Build object_key matching the pattern from create_element
-                                        object_key = f"{user_id}/{element.id}"
-                                        if element.name:
-                                            object_key += f"/{element.name}"
-                                        
-                                        # Get SAS token directly from storage provider
-                                        sas_token = await data_layer.storage_provider.get_read_url(object_key)
-                                        
-                                        # Construct base URL (matching the pattern from AzureBlobStorageClient)
-                                        storage_provider = data_layer.storage_provider
-                                        if hasattr(storage_provider, 'blob_endpoint') and storage_provider.blob_endpoint:
-                                            base_url = f"{storage_provider.blob_endpoint}/{storage_provider.container_name}/{object_key}"
-                                        elif hasattr(storage_provider, 'storage_account') and hasattr(storage_provider, 'container_name'):
-                                            base_url = f"https://{storage_provider.storage_account}.blob.core.windows.net/{storage_provider.container_name}/{object_key}"
-                                        else:
-                                            # Fallback - this should not happen with the custom data layer
-                                            logger.warning(f"Could not construct base URL for element {element.id}")
-                                            continue
-                                        
-                                        # Combine base URL with SAS token
-                                        complete_url = f"{base_url}?{sas_token}"
-                                        
-                                        # Update element URL and send to frontend
-                                        element.url = complete_url
-                                        await element.send(for_id=step_dict["id"])
-                                        logger.info(f"Updated element {element.id} with direct SAS token URL")
-                                        
-                                    except Exception as e:
-                                        logger.error(f"Failed to construct URL for element {element.id}: {e}")
-                        
-                        await send_elements_with_urls()
+                    if not self.session.is_thread_persistence_ready() and interaction:
+                        await self.ensure_thread_persistence(interaction=interaction)
+                    await self._send_uploaded_elements(files=files, for_id=step_dict["id"])
                 elif spec.type == "action":
                     action_res = cast(AskActionResponse, user_res)
                     final_res = action_res
@@ -473,9 +513,8 @@ class ChainlitEmitter(BaseChainlitEmitter):
                     final_res = cast(AskElementResponse, user_res)
                     interaction = "custom_element"
 
-                if not self.session.has_first_interaction and interaction:
-                    self.session.has_first_interaction = True
-                    await self.init_thread(interaction=interaction)
+                if not self.session.is_thread_persistence_ready() and interaction:
+                    await self.ensure_thread_persistence(interaction=interaction)
 
             await self.clear("clear_ask")
             return final_res
@@ -524,6 +563,7 @@ class ChainlitEmitter(BaseChainlitEmitter):
 
     def stream_start(self, step_dict: StepDict):
         """Send a stream start signal to the UI."""
+        self._track_assistant_persistence_threshold(step_dict)
         return self.emit(
             "stream_start",
             step_dict,
@@ -560,6 +600,41 @@ class ChainlitEmitter(BaseChainlitEmitter):
             "set_modes",
             [mode.to_dict() for mode in modes],
         )
+
+    def set_input_restriction(
+        self,
+        mode: Literal["mix", "only_modes", "selection_only"],
+        placeholder: Optional[str] = None,
+    ):
+        """Synchronize composer restriction state in the UI."""
+        payload: Dict[str, Any] = {"mode": mode}
+        if isinstance(placeholder, str) and placeholder.strip():
+            payload["placeholder"] = placeholder.strip()
+        return self.emit("set_input_restriction", payload)
+
+    def set_spontaneous_file_upload(self, enabled: Optional[bool] = None):
+        """Synchronize spontaneous file upload availability in the UI."""
+        if enabled is True:
+            validate_runtime_spontaneous_file_upload_config()
+
+        self.session.spontaneous_file_upload_enabled_override = enabled
+        return self.emit(
+            "set_spontaneous_file_upload",
+            resolve_effective_spontaneous_file_upload_enabled(self.session),
+        )
+
+    def set_conversation_history_visibility(self, visible: Optional[bool] = None):
+        """Synchronize conversation-history visibility in the UI."""
+        self.session.conversation_history_visible_override = visible
+        self.session.new_chat_button_visible_override = visible
+        return self.emit(
+            "set_conversation_history_visibility",
+            resolve_effective_conversation_history_visible(self.session),
+        )
+
+    def set_new_chat_button_visibility(self, visible: Optional[bool] = None):
+        """Backward-compatible alias for conversation-history visibility in the UI."""
+        return self.set_conversation_history_visibility(visible)
 
     def set_favorites(self, steps: List[StepDict]):
         """Send the favorite messages to the UI."""

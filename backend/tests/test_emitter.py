@@ -56,6 +56,76 @@ async def test_send_step(
     mock_websocket_session.emit.assert_called_once_with("new_message", step_dict)
 
 
+async def test_send_step_does_not_initialize_thread_on_first_assistant_turn(
+    emitter: ChainlitEmitter, mock_websocket_session: MagicMock
+) -> None:
+    step_dict: StepDict = {
+        "id": "assistant-first-step",
+        "type": "assistant_message",
+        "name": "Assistant",
+        "output": "Hello from the assistant first turn",
+    }
+    mock_websocket_session.has_first_interaction = False
+    mock_websocket_session.register_logical_assistant_message.return_value = 1
+    emitter.ensure_thread_persistence = AsyncMock()  # type: ignore[method-assign]
+
+    await emitter.send_step(step_dict)
+    await asyncio.sleep(0)
+
+    assert mock_websocket_session.has_first_interaction is False
+    emitter.ensure_thread_persistence.assert_not_awaited()  # type: ignore[attr-defined]
+    mock_websocket_session.emit.assert_called_once_with("new_message", step_dict)
+
+
+async def test_send_step_ignores_timeout_followup_messages_for_thread_threshold(
+    emitter: ChainlitEmitter, mock_websocket_session: MagicMock
+) -> None:
+    step_dict: StepDict = {
+        "id": "assistant-timeout-step",
+        "type": "assistant_message",
+        "name": "Assistant",
+        "output": "The response timeout expired, so the system selected the default option",
+        "metadata": {"countsTowardThreadPersistenceThreshold": False},
+    }
+    mock_websocket_session.has_first_interaction = False
+    emitter.ensure_thread_persistence = AsyncMock()  # type: ignore[method-assign]
+
+    await emitter.send_step(step_dict)
+    await asyncio.sleep(0)
+
+    mock_websocket_session.register_logical_assistant_message.assert_not_called()
+    emitter.ensure_thread_persistence.assert_not_awaited()  # type: ignore[attr-defined]
+    mock_websocket_session.emit.assert_called_once_with("new_message", step_dict)
+
+
+async def test_send_step_initializes_thread_on_second_assistant_turn(
+    emitter: ChainlitEmitter, mock_websocket_session: MagicMock
+) -> None:
+    first_step: StepDict = {
+        "id": "assistant-first-step",
+        "type": "assistant_message",
+        "name": "Assistant",
+        "output": "Hello from the assistant first turn",
+    }
+    second_step: StepDict = {
+        "id": "assistant-second-step",
+        "type": "assistant_message",
+        "name": "Assistant",
+        "output": "Hello from the assistant second turn",
+    }
+    mock_websocket_session.has_first_interaction = False
+    mock_websocket_session.register_logical_assistant_message.side_effect = [1, 2]
+    emitter.ensure_thread_persistence = AsyncMock()  # type: ignore[method-assign]
+
+    await emitter.send_step(first_step)
+    await emitter.send_step(second_step)
+    await asyncio.sleep(0)
+
+    emitter.ensure_thread_persistence.assert_awaited_once_with(  # type: ignore[attr-defined]
+        "Hello from the assistant second turn"
+    )
+
+
 async def test_send_step_with_icon(
     emitter: ChainlitEmitter, mock_websocket_session: MagicMock
 ) -> None:
@@ -173,6 +243,70 @@ async def test_stream_start(
     mock_websocket_session.emit.assert_called_once_with("stream_start", step_dict)
 
 
+async def test_update_step_does_not_count_as_new_assistant_message(
+    emitter: ChainlitEmitter, mock_websocket_session: MagicMock
+) -> None:
+    step_dict: StepDict = {
+        "id": "assistant-update-step",
+        "type": "assistant_message",
+        "name": "Assistant",
+        "output": "Updated assistant content",
+    }
+
+    await emitter.update_step(step_dict)
+
+    mock_websocket_session.register_logical_assistant_message.assert_not_called()
+    mock_websocket_session.emit.assert_called_once_with("update_message", step_dict)
+
+
+async def test_stream_start_does_not_initialize_thread_on_first_assistant_turn(
+    emitter: ChainlitEmitter, mock_websocket_session: MagicMock
+) -> None:
+    step_dict: StepDict = {
+        "id": "assistant-first-stream",
+        "type": "assistant_message",
+        "name": "Assistant",
+        "output": "Streaming hello",
+    }
+    mock_websocket_session.has_first_interaction = False
+    mock_websocket_session.register_logical_assistant_message.return_value = 1
+    emitter.ensure_thread_persistence = AsyncMock()  # type: ignore[method-assign]
+
+    await emitter.stream_start(step_dict)
+    await asyncio.sleep(0)
+
+    assert mock_websocket_session.has_first_interaction is False
+    emitter.ensure_thread_persistence.assert_not_awaited()  # type: ignore[attr-defined]
+    mock_websocket_session.emit.assert_called_once_with("stream_start", step_dict)
+
+
+async def test_stream_start_initializes_thread_on_second_assistant_turn(
+    emitter: ChainlitEmitter, mock_websocket_session: MagicMock
+) -> None:
+    first_step: StepDict = {
+        "id": "assistant-first-stream",
+        "type": "assistant_message",
+        "name": "Assistant",
+        "output": "Streaming hello",
+    }
+    second_step: StepDict = {
+        "id": "assistant-second-stream",
+        "type": "assistant_message",
+        "name": "Assistant",
+        "output": "Streaming again",
+    }
+    mock_websocket_session.has_first_interaction = False
+    mock_websocket_session.register_logical_assistant_message.side_effect = [1, 2]
+    emitter.ensure_thread_persistence = AsyncMock()  # type: ignore[method-assign]
+
+    await emitter.stream_start(first_step)
+    await emitter.stream_start(second_step)
+    await asyncio.sleep(0)
+
+    emitter.ensure_thread_persistence.assert_awaited_once_with("Streaming again")  # type: ignore[attr-defined]
+    assert mock_websocket_session.emit.call_count == 2
+
+
 async def test_stream_start_with_icon(
     emitter: ChainlitEmitter, mock_websocket_session: MagicMock
 ) -> None:
@@ -185,6 +319,18 @@ async def test_stream_start_with_icon(
     }
     await emitter.stream_start(step_dict)
     mock_websocket_session.emit.assert_called_once_with("stream_start", step_dict)
+
+
+async def test_send_token_does_not_count_as_new_message(
+    emitter: ChainlitEmitter, mock_websocket_session: MagicMock
+) -> None:
+    await emitter.send_token("assistant-stream", "token-chunk", is_sequence=False, is_input=False)
+
+    mock_websocket_session.register_logical_assistant_message.assert_not_called()
+    mock_websocket_session.emit.assert_called_once_with(
+        "stream_token",
+        {"id": "assistant-stream", "token": "token-chunk", "isSequence": False, "isInput": False},
+    )
 
 
 async def test_send_toast(
@@ -224,6 +370,7 @@ async def test_flush_thread_queues_creates_thread_without_auto_title(
         identifier="user@example.com",
     )
     mock_websocket_session.flush_method_queue = AsyncMock()
+    mock_websocket_session.consume_pending_thread_metadata_patches.return_value = {}
     mock_data_layer = AsyncMock()
 
     with patch("chainlit.emitter.get_data_layer", return_value=mock_data_layer):
@@ -236,6 +383,65 @@ async def test_flush_thread_queues_creates_thread_without_auto_title(
         tags=None,
     )
     mock_websocket_session.flush_method_queue.assert_awaited_once()
+
+
+async def test_flush_thread_queues_persists_staged_metadata_before_queue_flush(
+    emitter: ChainlitEmitter, mock_websocket_session: MagicMock
+) -> None:
+    call_order = []
+    mock_websocket_session.thread_id = "thread-1"
+    mock_websocket_session.chat_profile = None
+    mock_websocket_session.user = PersistedUser(
+        id="user-1",
+        createdAt="2024-01-01T00:00:00Z",
+        identifier="user@example.com",
+    )
+    mock_websocket_session.consume_pending_thread_metadata_patches.return_value = {
+        "prompt_language": "es"
+    }
+
+    async def _flush_queue():
+        call_order.append("flush_queue")
+
+    mock_websocket_session.flush_method_queue = AsyncMock(side_effect=_flush_queue)
+    mock_data_layer = AsyncMock()
+
+    async def _update_thread(**_kwargs):
+        call_order.append("update_thread")
+
+    async def _patch_thread_metadata(*_args, **_kwargs):
+        call_order.append("patch_thread_metadata")
+
+    mock_data_layer.update_thread.side_effect = _update_thread
+    mock_data_layer.patch_thread_metadata.side_effect = _patch_thread_metadata
+
+    with patch("chainlit.emitter.get_data_layer", return_value=mock_data_layer):
+        await emitter.flush_thread_queues()
+        await asyncio.sleep(0)
+
+    assert call_order == [
+        "update_thread",
+        "patch_thread_metadata",
+        "flush_queue",
+    ]
+
+
+async def test_ensure_thread_persistence_without_data_layer_keeps_ui_interaction_only(
+    emitter: ChainlitEmitter, mock_websocket_session: MagicMock
+) -> None:
+    mock_websocket_session.thread_id = "thread-1"
+    mock_websocket_session.has_first_interaction = False
+    mock_websocket_session.thread_persistence_ready = False
+
+    with patch("chainlit.emitter.get_data_layer", return_value=None):
+        await emitter.ensure_thread_persistence("hello")
+
+    assert mock_websocket_session.has_first_interaction is True
+    assert mock_websocket_session.thread_persistence_ready is False
+    mock_websocket_session.emit.assert_called_once_with(
+        "first_interaction",
+        {"interaction": "hello", "thread_id": "thread-1"},
+    )
 
 
 async def test_set_thread_title_persists_name_and_emits_runtime_update(

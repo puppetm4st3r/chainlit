@@ -19,6 +19,7 @@
   "auth": {
     "login": {
       "title": "Melde dich an, um auf die App zuzugreifen",
+      "privateIntegrationTokenBootstrap": "Bootstrap integration token",
       "form": {
         "email": {
           "label": "E-Mail Adresse",
@@ -228,6 +229,7 @@
         "settings": "Einstellungen",
         "settingsKey": "S",
         "apiKeys": "API Schlüssel",
+        "administration": "Administration",
         "logout": "Abmelden"
       }
     }

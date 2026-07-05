@@ -28,7 +28,7 @@ const VoiceButton = ({ disabled }: Props) => {
   useHotkeys(
     'p',
     () => {
-      if (!isEnabled) return;
+      if (!isEnabled || disabled) return;
 
       // Double-check at execution time that we're not in a form field
       const getDeepActiveElement = (): Element | null => {
@@ -62,7 +62,7 @@ const VoiceButton = ({ disabled }: Props) => {
       enableOnFormTags: false,
       preventDefault: false // Don't prevent default - let letters be typed
     },
-    [isEnabled, audioConnection, startConversation, endConversation]
+    [disabled, isEnabled, audioConnection, startConversation, endConversation]
   );
 
   if (!isEnabled) return null;

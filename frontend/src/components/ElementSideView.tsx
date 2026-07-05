@@ -3,7 +3,10 @@ import { useEffect, useState } from 'react';
 import { useRecoilState } from 'recoil';
 
 import { sideViewState } from '@chainlit/react-client';
-import { dispatchCanvasShellCloseRequest } from '@/lib/canvas';
+import {
+  dispatchCanvasShellCloseRequest,
+  getCanvasShellCloseDetail
+} from '@/lib/canvas';
 
 import { Card, CardContent } from '@/components/ui/card';
 import { ResizableHandle, ResizablePanel } from '@/components/ui/resizable';
@@ -15,22 +18,22 @@ import {
 } from '@/components/ui/sheet';
 
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useDismissSideView } from '@/hooks/useDismissSideView';
 
 import { Element } from './Elements';
 
 export default function ElementSideView() {
   const [sideView, setSideView] = useRecoilState(sideViewState);
+  const dismissSideView = useDismissSideView();
   const isMobile = useIsMobile();
   const [isVisible, setIsVisible] = useState(false);
   const handleCloseSideView = () => {
+    dismissSideView(sideView?.elements);
     dispatchCanvasShellCloseRequest(sideView?.elements);
-    setSideView(undefined);
   };
 
   const isCanvas = Boolean(
-    sideView?.elements?.some(
-      (element) => element.type === 'custom' && element.name === 'Canvas Editor'
-    ) || sideView?.title?.trim().toLowerCase() === 'canvas'
+    getCanvasShellCloseDetail(sideView?.elements)
   );
 
   useEffect(() => {

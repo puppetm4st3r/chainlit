@@ -264,6 +264,10 @@ default_avatar_file_url = ""
 # Hide the Readme button, theme toggle, chat profile selector and user menu in the header.
 hide_topright_bar = false
 
+# URL opened from the Administration option in the root user profile menu.
+# Can be overridden with CHAINLIT_ADMIN_URL.
+# admin_url = ""
+
 # Specify a custom build directory for the frontend.
 # This can be used to customize the frontend code.
 # Be careful: If this is a relative path, it should not start with a slash.
@@ -414,6 +418,7 @@ class UISettings(BaseModel):
     custom_build: Optional[str] = None
     header_links: Optional[List[HeaderLink]] = None
     hide_topright_bar: bool = False
+    admin_url: Optional[str] = None
 
 
 class CodeSettings(BaseModel):
@@ -699,6 +704,9 @@ def load_settings():
         )
         if hide_topright_bar_override is not None:
             ui_settings["hide_topright_bar"] = hide_topright_bar_override
+
+        if admin_url_override := os.environ.get("CHAINLIT_ADMIN_URL"):
+            ui_settings["admin_url"] = admin_url_override
 
         project_settings = ProjectSettings(
             lc_cache_path=lc_cache_path,

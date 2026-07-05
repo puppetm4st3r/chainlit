@@ -17,6 +17,7 @@ interface Props {
   error?: string;
   providers: string[];
   callbackUrl: string;
+  privateIntegrationTokenBootstrapUrl?: string;
   onPasswordSignIn?: (
     email: string,
     password: string,
@@ -35,6 +36,7 @@ export function LoginForm({
   onPasswordSignIn,
   onOAuthSignIn,
   callbackUrl,
+  privateIntegrationTokenBootstrapUrl,
   error
 }: Props) {
   const [loading, setLoading] = useState(false);
@@ -188,6 +190,14 @@ export function LoginForm({
               />
             ))}
           </div>
+        ) : null}
+
+        {privateIntegrationTokenBootstrapUrl ? (
+          <Button asChild variant="link" className="w-full text-muted-foreground">
+            <a href={privateIntegrationTokenBootstrapUrl}>
+              <Translator path="auth.login.privateIntegrationTokenBootstrap" />
+            </a>
+          </Button>
         ) : null}
       </div>
     </form>

@@ -96,6 +96,7 @@ export default function Login() {
               error={error}
               callbackUrl="/"
               providers={config?.oauthProviders || []}
+              privateIntegrationTokenBootstrapUrl={config?.privateIntegrationTokenBootstrapUrl}
               onPasswordSignIn={
                 config?.passwordAuth ? handlePasswordLogin : undefined
               }

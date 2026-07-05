@@ -19,6 +19,7 @@
   "auth": {
     "login": {
       "title": "Accedi per utilizzare l'app",
+      "privateIntegrationTokenBootstrap": "Bootstrap integration token",
       "form": {
         "email": {
           "label": "Indirizzo email",
@@ -228,6 +229,7 @@
         "settings": "Impostazioni",
         "settingsKey": "S",
         "apiKeys": "Chiavi API",
+        "administration": "Amministrazione",
         "logout": "Disconnettiti"
       }
     }

@@ -19,6 +19,7 @@
   "auth": {
     "login": {
       "title": "Inicie sessão para aceder à aplicação",
+      "privateIntegrationTokenBootstrap": "Bootstrap integration token",
       "form": {
         "email": {
           "label": "E-mail",
@@ -228,6 +229,7 @@
         "settings": "Configurações",
         "settingsKey": "S",
         "apiKeys": "Chaves API",
+        "administration": "Administração",
         "logout": "Terminar sessão"
       }
     }

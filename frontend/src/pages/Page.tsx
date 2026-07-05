@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useRecoilValue } from 'recoil';
 
-import { sideViewState, useAuth, useConfig } from '@chainlit/react-client';
+import { sideViewState, useAuth, useChatData, useConfig } from '@chainlit/react-client';
 
 import ChatSettingsSidebar from '@/components/ChatSettings/ChatSettingsSidebar';
 import ElementSideView from '@/components/ElementSideView';
@@ -24,6 +24,7 @@ const DEFAULT_SIDE_VIEW_PANEL_SIZE = 70;
 const Page = ({ children }: Props) => {
   const { config } = useConfig();
   const { data } = useAuth();
+  const { conversationHistoryVisible } = useChatData();
   const userEnv = useRecoilValue(userEnvState);
   const sideView = useRecoilValue(sideViewState);
   const defaultSidePanelSize = sideView
@@ -72,12 +73,14 @@ const Page = ({ children }: Props) => {
 
   const historyEnabled = config?.dataPersistence && data?.requireLogin;
   const sidebarHidden = config?.ui?.default_sidebar_state === 'hidden';
+  const showConversationHistory =
+    historyEnabled && !sidebarHidden && conversationHistoryVisible !== false;
 
   return (
     <SidebarProvider
       defaultOpen={config?.ui.default_sidebar_state !== 'closed'}
     >
-      {historyEnabled && !sidebarHidden ? (
+      {showConversationHistory ? (
         <>
           <LeftSidebar />
           <SidebarInset className="max-h-svh min-w-0">

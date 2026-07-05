@@ -30,7 +30,7 @@ const AskActionButton = ({ action }: { action: IAction }) => {
 
   const button = (
     <Button
-      className="break-words h-auto min-h-10 whitespace-normal"
+      className="break-words h-auto min-h-10 whitespace-normal font-bold"
       id={action.id}
       onClick={() => {
         askUser?.callback(action);

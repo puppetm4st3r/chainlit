@@ -3,21 +3,36 @@ import type { IMessageElement } from '@chainlit/react-client';
 export const CANVAS_SHELL_CLOSE_REQUEST_EVENT =
   'chainlit:canvas-shell-close-request';
 
+export const logCanvasCloseDiag = (
+  event: string,
+  details?: Record<string, unknown>
+) => {
+  console.warn(`[CanvasCloseDiag] ${event}`, details || {});
+};
+
 type CanvasShellCloseDetail = {
   workspaceKey: string;
   widgetInstanceId: string;
 };
 
-const getCanvasShellCloseDetail = (
+export const isCanvasShellElement = (element?: IMessageElement): boolean => {
+  if (!element || element.type !== 'custom') {
+    return false;
+  }
+
+  const props =
+    element.props && typeof element.props === 'object' ? element.props : {};
+  return String(props.workspaceKey || '').trim().length > 0;
+};
+
+export const getCanvasShellCloseDetail = (
   elements?: IMessageElement[]
 ): CanvasShellCloseDetail | null => {
   if (!Array.isArray(elements)) {
     return null;
   }
 
-  const canvasElement = elements.find(
-    (element) => element.type === 'custom' && element.name === 'Canvas Editor'
-  );
+  const canvasElement = elements.find(isCanvasShellElement);
   if (!canvasElement || canvasElement.type !== 'custom') {
     return null;
   }
@@ -41,14 +56,17 @@ export const dispatchCanvasShellCloseRequest = (
   elements?: IMessageElement[]
 ): boolean => {
   if (typeof window === 'undefined') {
+    logCanvasCloseDiag('dispatch_skipped_no_window');
     return false;
   }
 
   const detail = getCanvasShellCloseDetail(elements);
   if (!detail) {
+    logCanvasCloseDiag('dispatch_skipped_no_detail');
     return false;
   }
 
+  logCanvasCloseDiag('dispatch_shell_close_request', detail);
   window.dispatchEvent(
     new CustomEvent(CANVAS_SHELL_CLOSE_REQUEST_EVENT, { detail })
   );

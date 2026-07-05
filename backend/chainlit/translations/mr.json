@@ -19,6 +19,7 @@
   "auth": {
     "login": {
       "title": "अॅप वापरण्यासाठी लॉगिन करा",
+      "privateIntegrationTokenBootstrap": "Bootstrap integration token",
       "form": {
         "email": {
           "label": "ईमेल पत्ता",
@@ -228,6 +229,7 @@
         "settings": "सेटिंग्ज",
         "settingsKey": "S",
         "apiKeys": "API कीज",
+        "administration": "प्रशासन",
         "logout": "लॉगआउट"
       }
     }

@@ -1,4 +1,4 @@
-import { debounce } from 'lodash';
+import { debounce, uniqBy } from 'lodash';
 import { useCallback, useContext, useEffect, useRef } from 'react';
 import {
   useRecoilState,
@@ -14,6 +14,7 @@ import {
   audioConnectionState,
   callFnState,
   chatProfileState,
+  composerInputRestrictionState,
   chatSettingsInputsState,
   chatSettingsValueState,
   commandsState,
@@ -25,19 +26,24 @@ import {
   isAiSpeakingState,
   loadingState,
   mcpState,
+  conversationHistoryVisibleState,
   messagesState,
   modesState,
   resumeThreadErrorState,
   sessionIdState,
   sessionState,
   sideViewState,
+  spontaneousFileUploadEnabledState,
   tasklistState,
   threadHistoryState,
   threadIdToResumeState,
   tokenCountState,
   wavRecorderState,
-  wavStreamPlayerState
+  wavStreamPlayerState,
+  workflowHelpState,
+  normalizeComposerInputRestriction
 } from 'src/state';
+import type { IComposerInputRestriction } from 'src/state';
 import {
   IAction,
   ICommand,
@@ -46,7 +52,8 @@ import {
   IMode,
   IStep,
   ITasklistElement,
-  IThread
+  IThread,
+  IWorkflowHelp
 } from 'src/types';
 import {
   addMessage,
@@ -64,10 +71,6 @@ import type { IToken } from './useChatData';
 interface BufferedStreamToken extends IToken {
   key: string;
 }
-
-const logRootFlowDiag = (event: string, details?: Record<string, unknown>) => {
-  console.warn(`[ChainlitRootFlowDiag] ${event}`, details || {});
-};
 
 const stableSidebarElementsSignature = (elements: IMessageElement[]): string => {
   try {
@@ -107,9 +110,19 @@ const useChatSession = () => {
   const setAskUser = useSetRecoilState(askUserState);
   const setCallFn = useSetRecoilState(callFnState);
   const setCommands = useSetRecoilState(commandsState);
+  const setComposerInputRestriction = useSetRecoilState(
+    composerInputRestrictionState
+  );
+  const setSpontaneousFileUploadEnabled = useSetRecoilState(
+    spontaneousFileUploadEnabledState
+  );
+  const setConversationHistoryVisible = useSetRecoilState(
+    conversationHistoryVisibleState
+  );
   const setModes = useSetRecoilState(modesState);
   const setSideView = useSetRecoilState(sideViewState);
   const setDocumentWorkspace = useSetRecoilState(documentWorkspaceState);
+  const setWorkflowHelp = useSetRecoilState(workflowHelpState);
   const setElements = useSetRecoilState(elementState);
   const setTasklists = useSetRecoilState(tasklistState);
   const setActions = useSetRecoilState(actionState);
@@ -127,6 +140,29 @@ const useChatSession = () => {
     new Map()
   );
   const streamFlushHandleRef = useRef<number | null>(null);
+  const refreshThreadHistoryPage = useCallback(async () => {
+    try {
+      const { pageInfo, data } = await client.listThreads(
+        { first: 20, cursor: undefined },
+        {}
+      );
+
+      setThreadHistory((previousHistory) => {
+        const previousThreads = previousHistory?.threads || [];
+        const mergedThreads = previousThreads.length
+          ? uniqBy([...data, ...previousThreads], 'id')
+          : data;
+
+        return {
+          ...previousHistory,
+          pageInfo,
+          threads: mergedThreads
+        };
+      });
+    } catch {
+      // Best effort only: title persistence already succeeded on the backend.
+    }
+  }, [client, setThreadHistory]);
 
   const mergeChatSettingsInputs = useCallback(
     (inputs: any[], values: Record<string, any>): any[] => {
@@ -293,14 +329,6 @@ const useChatSession = () => {
         pathname && pathname !== '/'
           ? `${pathname}/ws/socket.io`
           : '/ws/socket.io';
-      logRootFlowDiag('socket:connect_start', {
-        sessionId,
-        idToResume,
-        currentThreadId,
-        chatProfile,
-        pathname:
-          typeof window !== 'undefined' ? window.location.pathname : undefined
-      });
 
       try {
         await client.stickyCookie(sessionId);
@@ -342,16 +370,11 @@ const useChatSession = () => {
           socket
         };
       });
+      setWorkflowHelp(undefined);
+      setSpontaneousFileUploadEnabled(undefined);
+      setConversationHistoryVisible(undefined);
 
       socket.on('connect', () => {
-        const socketAuth = socket.auth as { threadId?: string } | undefined;
-        logRootFlowDiag('socket:connect', {
-          sessionId,
-          socketId: socket.id,
-          authThreadId: socketAuth?.threadId || '',
-          idToResume,
-          currentThreadId
-        });
         socket.emit('connection_successful');
         setSession((s) => ({ ...s!, error: false }));
         socket.emit('fetch_favorites');
@@ -492,11 +515,11 @@ const useChatSession = () => {
         for (const step of thread.steps) {
           messages = addMessage(messages, step);
         }
-        if (thread.metadata?.chat_profile) {
-          setChatProfile(thread.metadata?.chat_profile);
+        if ((thread.metadata as any)?.chat_profile) {
+          setChatProfile((thread.metadata as any)?.chat_profile);
         }
-        if (thread.metadata?.chat_settings) {
-          setChatSettingsValue(thread.metadata?.chat_settings);
+        if ((thread.metadata as any)?.chat_settings) {
+          setChatSettingsValue((thread.metadata as any)?.chat_settings);
         }
         setMessages(messages);
         const elements = thread.elements || [];
@@ -522,13 +545,6 @@ const useChatSession = () => {
       socket.on(
         'first_interaction',
         (event: { interaction: string; thread_id: string }) => {
-          logRootFlowDiag('socket:first_interaction', {
-            sessionId,
-            interaction: event.interaction,
-            eventThreadId: event.thread_id,
-            currentThreadId,
-            idToResume
-          });
           setFirstUserInteraction(event.interaction);
           setCurrentThreadId(event.thread_id);
         }
@@ -537,15 +553,24 @@ const useChatSession = () => {
       socket.on(
         'thread_title_updated',
         (event: { thread_id: string; name: string }) => {
+          let shouldRefreshThreadHistory = false;
+
           setThreadHistory((previousHistory) => {
             const previousThreads = previousHistory?.threads;
             if (!previousThreads?.length) {
+              shouldRefreshThreadHistory = true;
               return previousHistory;
             }
 
             let hasChanged = false;
+            let hasMatchingThread = false;
             const nextThreads = previousThreads.map((thread) => {
-              if (thread.id !== event.thread_id || thread.name === event.name) {
+              if (thread.id !== event.thread_id) {
+                return thread;
+              }
+
+              hasMatchingThread = true;
+              if (thread.name === event.name) {
                 return thread;
               }
 
@@ -557,6 +582,9 @@ const useChatSession = () => {
             });
 
             if (!hasChanged) {
+              if (!hasMatchingThread) {
+                shouldRefreshThreadHistory = true;
+              }
               return previousHistory;
             }
 
@@ -565,6 +593,10 @@ const useChatSession = () => {
               threads: nextThreads
             };
           });
+
+          if (shouldRefreshThreadHistory) {
+            void refreshThreadHistoryPage();
+          }
         }
       );
 
@@ -650,6 +682,27 @@ const useChatSession = () => {
         setCommands(commands);
       });
 
+      socket.on(
+        'set_input_restriction',
+        (inputRestriction?: Partial<IComposerInputRestriction> | null) => {
+          setComposerInputRestriction(
+            normalizeComposerInputRestriction(inputRestriction)
+          );
+        }
+      );
+
+      socket.on('set_spontaneous_file_upload', (enabled: boolean) => {
+        setSpontaneousFileUploadEnabled(Boolean(enabled));
+      });
+
+      socket.on('set_conversation_history_visibility', (visible: boolean) => {
+        setConversationHistoryVisible(Boolean(visible));
+      });
+
+      socket.on('set_new_chat_button_visibility', (visible: boolean) => {
+        setConversationHistoryVisible(Boolean(visible));
+      });
+
       socket.on('set_chat_profile', (profileName: string) => {
         setChatProfile(profileName);
       });
@@ -681,6 +734,17 @@ const useChatSession = () => {
         }
       );
 
+      socket.on(
+        'workflow_help_state',
+        (workflowHelp: IWorkflowHelp | null) => {
+          if (!workflowHelp) {
+            setWorkflowHelp(undefined);
+            return;
+          }
+          setWorkflowHelp(workflowHelp);
+        }
+      );
+
       socket.on('set_sidebar_title', (title: string) => {
         setSideView((prev) => {
           if (prev?.title === title) return prev;
@@ -703,11 +767,11 @@ const useChatSession = () => {
               }
             });
             setSideView((prev) => {
+              const previousSignature = stableSidebarElementsSignature(
+                prev?.elements ?? []
+              );
+              const nextSignature = stableSidebarElementsSignature(elements);
               if (prev?.key === key) {
-                const previousSignature = stableSidebarElementsSignature(
-                  prev?.elements ?? []
-                );
-                const nextSignature = stableSidebarElementsSignature(elements);
                 if (previousSignature === nextSignature) {
                   return prev;
                 }
@@ -809,7 +873,11 @@ const useChatSession = () => {
       enqueueBufferedStreamToken,
       flushBufferedStreamTokens,
       currentThreadId,
-      setDocumentWorkspace
+      refreshThreadHistoryPage,
+      setConversationHistoryVisible,
+      setDocumentWorkspace,
+      setSpontaneousFileUploadEnabled,
+      setWorkflowHelp
     ]
   );
 

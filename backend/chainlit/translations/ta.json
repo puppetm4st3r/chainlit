@@ -19,6 +19,7 @@
   "auth": {
     "login": {
       "title": "பயன்பாட்டை அணுக உள்நுழையவும்",
+      "privateIntegrationTokenBootstrap": "Bootstrap integration token",
       "form": {
         "email": {
           "label": "மின்னஞ்சல் முகவரி",
@@ -228,6 +229,7 @@
         "settings": "அமைப்புகள்",
         "settingsKey": "S",
         "apiKeys": "API விசைகள்",
+        "administration": "நிர்வாகம்",
         "logout": "வெளியேறு"
       }
     }

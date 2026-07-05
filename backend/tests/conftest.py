@@ -39,8 +39,46 @@ def mock_session_factory(persisted_test_user: PersistedUser) -> Callable[..., Mo
         mock.thread_id = kwargs.get("thread_id", "test_thread_id")
         mock.emit = AsyncMock()
         mock.has_first_interaction = kwargs.get("has_first_interaction", True)
+        mock.thread_persistence_ready = kwargs.get("thread_persistence_ready", False)
+        mock.thread_persistence_in_progress = kwargs.get(
+            "thread_persistence_in_progress", False
+        )
+        mock.assistant_persistence_turn_count = kwargs.get(
+            "assistant_persistence_turn_count", 0
+        )
         mock.files = kwargs.get("files", {})
         mock.files_spec = kwargs.get("files_spec", {})
+        mock.is_thread_persistence_ready = Mock(
+            side_effect=lambda: mock.thread_persistence_ready
+        )
+        mock.begin_thread_persistence = Mock(
+            side_effect=lambda: False
+            if mock.thread_persistence_ready or mock.thread_persistence_in_progress
+            else setattr(mock, "thread_persistence_in_progress", True) or True
+        )
+        mock.mark_thread_persistence_ready = Mock(
+            side_effect=lambda: setattr(mock, "thread_persistence_ready", True)
+            or setattr(mock, "thread_persistence_in_progress", False)
+            or setattr(mock, "has_first_interaction", True)
+        )
+        mock.abort_thread_persistence = Mock(
+            side_effect=lambda: setattr(mock, "thread_persistence_in_progress", False)
+        )
+        def _register_logical_assistant_message(message_id: str) -> int:
+            counted_ids = getattr(mock, "_assistant_message_ids", set())
+            if message_id and message_id not in counted_ids:
+                counted_ids.add(message_id)
+                mock.assistant_persistence_turn_count += 1
+                mock._assistant_message_ids = counted_ids
+            return mock.assistant_persistence_turn_count
+
+        mock.register_logical_assistant_message = Mock(
+            side_effect=_register_logical_assistant_message
+        )
+        mock.consume_pending_thread_metadata_patches = Mock(return_value={})
+        mock.reset_pre_persistence_state = Mock()
+        mock.should_stage_thread_metadata = Mock(return_value=False)
+        mock.stage_thread_metadata_patch = Mock()
 
         return mock
 
@@ -91,6 +129,41 @@ def user_session():
 def mock_websocket_session():
     session = Mock(spec=WebsocketSession)
     session.emit = AsyncMock()
+    session.has_first_interaction = False
+    session.thread_persistence_ready = False
+    session.thread_persistence_in_progress = False
+    session.assistant_persistence_turn_count = 0
+    session.is_thread_persistence_ready = Mock(
+        side_effect=lambda: session.thread_persistence_ready
+    )
+    session.begin_thread_persistence = Mock(
+        side_effect=lambda: False
+        if session.thread_persistence_ready or session.thread_persistence_in_progress
+        else setattr(session, "thread_persistence_in_progress", True) or True
+    )
+    session.mark_thread_persistence_ready = Mock(
+        side_effect=lambda: setattr(session, "thread_persistence_ready", True)
+        or setattr(session, "thread_persistence_in_progress", False)
+        or setattr(session, "has_first_interaction", True)
+    )
+    session.abort_thread_persistence = Mock(
+        side_effect=lambda: setattr(session, "thread_persistence_in_progress", False)
+    )
+    def _register_logical_assistant_message(message_id: str) -> int:
+        counted_ids = getattr(session, "_assistant_message_ids", set())
+        if message_id and message_id not in counted_ids:
+            counted_ids.add(message_id)
+            session.assistant_persistence_turn_count += 1
+            session._assistant_message_ids = counted_ids
+        return session.assistant_persistence_turn_count
+
+    session.register_logical_assistant_message = Mock(
+        side_effect=_register_logical_assistant_message
+    )
+    session.consume_pending_thread_metadata_patches = Mock(return_value={})
+    session.reset_pre_persistence_state = Mock()
+    session.should_stage_thread_metadata = Mock(return_value=False)
+    session.stage_thread_metadata_patch = Mock()
 
     return session
 

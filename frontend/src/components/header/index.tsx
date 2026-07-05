@@ -16,11 +16,6 @@ import AudioPresence from '@/components/AudioPresence';
 import ButtonLink from '@/components/ButtonLink';
 import { Settings } from '@/components/icons/Settings';
 import { Button } from '@/components/ui/button';
-import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger
-} from '@/components/ui/hover-card';
 import { useSidebar } from '@/components/ui/sidebar';
 import {
   Tooltip,
@@ -30,7 +25,10 @@ import {
 import { Translator } from 'components/i18n';
 
 import { dispatchCanvasShellCloseRequest } from '@/lib/canvas';
-import { chatSettingsSidebarOpenState } from '@/state/project';
+import {
+  chatSettingsSidebarOpenState
+} from '@/state/project';
+import { useDismissSideView } from '@/hooks/useDismissSideView';
 
 import ApiKeys from './ApiKeys';
 import ChatProfiles from './ChatProfiles';
@@ -40,6 +38,7 @@ import ShareButton from './Share';
 import SidebarTrigger from './SidebarTrigger';
 import { ThemeToggle } from './ThemeToggle';
 import UserNav from './UserNav';
+import WorkflowHelpButton from './WorkflowHelpButton';
 
 type HeaderProps = {
   sidePanelSize?: number;
@@ -51,14 +50,14 @@ const Header = memo(({ sidePanelSize = 30 }: HeaderProps) => {
   const { data } = useAuth();
   const { config } = useConfig();
   const { windowMessage } = useChatInteract();
-  const { chatSettingsInputs } = useChatData();
+  const { chatSettingsInputs, conversationHistoryVisible } = useChatData();
   const { open, openMobile, isMobile } = useSidebar();
   const setChatSettingsSidebarOpen = useSetRecoilState(
     chatSettingsSidebarOpenState
   );
+  const dismissSideView = useDismissSideView();
   const sideView = useRecoilValue(sideViewState);
   const documentWorkspace = useRecoilValue(documentWorkspaceState);
-  const setSideView = useSetRecoilState(sideViewState);
 
   const sidebarOpen = isMobile ? openMobile : open;
   const mainPanelSize = Math.max(0, 100 - sidePanelSize);
@@ -72,7 +71,15 @@ const Header = memo(({ sidePanelSize = 30 }: HeaderProps) => {
   const showSettingsInHeader =
     config?.ui?.chat_settings_location === 'sidebar' &&
     chatSettingsInputs.length > 0;
-  const canUseSidebar = historyEnabled && !sidebarHidden;
+  const canUseSidebar =
+    historyEnabled && !sidebarHidden && conversationHistoryVisible !== false;
+
+  const handleOpenWorkspaceEditor = () => {
+    windowMessage({ type: 'canvas:open_active_workspace' });
+  };
+
+  const canOpenWorkspaceEditor =
+    documentWorkspace?.hasActiveWorkspace === true && !documentWorkspace.enabled;
 
   const workspaceBadge = documentWorkspace?.hasActiveWorkspace ? (
     <Button
@@ -80,13 +87,14 @@ const Header = memo(({ sidePanelSize = 30 }: HeaderProps) => {
       type="button"
       variant="ghost"
       size="sm"
+      onClick={canOpenWorkspaceEditor ? handleOpenWorkspaceEditor : undefined}
       className={[
         'h-auto min-h-9 rounded-[4px] border border-border/60 bg-background/60 px-3 py-1.5',
         'text-muted-foreground shadow-sm',
         'flex items-center gap-2',
-        documentWorkspace.enabled
-          ? 'cursor-default hover:bg-background/60 hover:text-muted-foreground'
-          : 'hover:bg-accent/50 hover:text-foreground'
+        canOpenWorkspaceEditor
+          ? 'hover:bg-accent/50 hover:text-foreground'
+          : 'cursor-default hover:bg-background/60 hover:text-muted-foreground'
       ].join(' ')}
     >
       <SquarePen className="!size-4" />
@@ -101,17 +109,27 @@ const Header = memo(({ sidePanelSize = 30 }: HeaderProps) => {
     </Button>
   ) : null;
 
-  const handleOpenWorkspaceEditor = () => {
-    windowMessage({ type: 'canvas:open_active_workspace' });
-  };
+  const workspaceAction = documentWorkspace?.hasActiveWorkspace ? (
+    canOpenWorkspaceEditor ? (
+      <Tooltip>
+        <TooltipTrigger asChild>{workspaceBadge}</TooltipTrigger>
+        <TooltipContent>
+          <Translator path="chat.workspace.openEditorWord" />
+        </TooltipContent>
+      </Tooltip>
+    ) : (
+      workspaceBadge
+    )
+  ) : null;
 
   const handleCloseSideView = () => {
+    dismissSideView(desktopSideView?.elements);
     dispatchCanvasShellCloseRequest(desktopSideView?.elements);
-    setSideView(undefined);
   };
 
   const actions = (
     <div className="flex items-center gap-1 shrink-0">
+      <WorkflowHelpButton />
       <ShareButton />
       {!hideTopRightBar ? <ReadmeButton /> : null}
       <ApiKeys />
@@ -144,30 +162,7 @@ const Header = memo(({ sidePanelSize = 30 }: HeaderProps) => {
           </TooltipContent>
         </Tooltip>
       )}
-      {documentWorkspace?.hasActiveWorkspace ? (
-        documentWorkspace.enabled ? (
-          workspaceBadge
-        ) : (
-          <HoverCard openDelay={120} closeDelay={120}>
-            <HoverCardTrigger asChild>{workspaceBadge}</HoverCardTrigger>
-            <HoverCardContent
-              align="end"
-              sideOffset={8}
-              className="w-auto rounded-md border border-border/70 bg-popover px-2 py-2 shadow-md"
-            >
-              <Button
-                id="document-workspace-open-editor-button"
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleOpenWorkspaceEditor}
-              >
-                <Translator path="chat.workspace.openEditorWord" />
-              </Button>
-            </HoverCardContent>
-          </HoverCard>
-        )
-      ) : null}
+      {workspaceAction}
       {!hideTopRightBar ? <ThemeToggle /> : null}
       {!hideTopRightBar ? <UserNav /> : null}
     </div>

@@ -19,6 +19,7 @@
   "auth": {
     "login": {
       "title": "登入以存取應用程式",
+      "privateIntegrationTokenBootstrap": "Bootstrap integration token",
       "form": {
         "email": {
           "label": "電子信箱",
@@ -228,6 +229,7 @@
         "settings": "設定",
         "settingsKey": "S",
         "apiKeys": "API金鑰",
+        "administration": "管理",
         "logout": "登出"
       }
     }

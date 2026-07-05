@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils';
 import { size } from 'lodash';
-import { Share2 } from 'lucide-react';
+import { ChevronDown, Share2 } from 'lucide-react';
 import { useContext, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
@@ -56,6 +56,7 @@ import {
   TooltipProvider,
   TooltipTrigger
 } from '@/components/ui/tooltip';
+import { getSelectedChatProfile } from '@/lib/assistantAvatar';
 
 import { Translator } from '../i18n';
 import ThreadOptions from './ThreadOptions';
@@ -81,6 +82,9 @@ export function ThreadList({
   const [threadIdToDelete, setThreadIdToDelete] = useState<string>();
   const [threadIdToRename, setThreadIdToRename] = useState<string>();
   const [threadNewName, setThreadNewName] = useState<string>();
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>(
+    {}
+  );
   const setThreadHistory = useSetRecoilState(threadHistoryState);
   const apiClient = useContext(ChainlitContext);
   const { config } = useConfig();
@@ -299,6 +303,67 @@ export function ThreadList({
     return labels[group as keyof typeof labels] || group;
   };
 
+  const getThreadMetadata = (thread: {
+    metadata?: Record<string, any> | string | null;
+  }): Record<string, any> => {
+    if (!thread.metadata) {
+      return {};
+    }
+
+    if (typeof thread.metadata === 'string') {
+      try {
+        const parsedMetadata = JSON.parse(thread.metadata);
+        return parsedMetadata && typeof parsedMetadata === 'object'
+          ? parsedMetadata
+          : {};
+      } catch {
+        return {};
+      }
+    }
+
+    return thread.metadata;
+  };
+
+  const getThreadProfileName = (thread: {
+    metadata?: Record<string, any> | string | null;
+    tags?: string[] | null;
+  }) => {
+    const metadata = getThreadMetadata(thread);
+    const metadataProfileName = metadata.chat_profile;
+
+    if (typeof metadataProfileName === 'string' && metadataProfileName.trim()) {
+      return metadataProfileName;
+    }
+
+    const configuredProfileNames = new Set(
+      (config?.chatProfiles || []).map((profile) => profile.name)
+    );
+
+    return thread.tags?.find((tag) => configuredProfileNames.has(tag));
+  };
+
+  const getThreadProfileLabel = (thread: {
+    metadata?: Record<string, any> | string | null;
+    tags?: string[] | null;
+  }) => {
+    const profileName = getThreadProfileName(thread);
+    if (!profileName) {
+      return undefined;
+    }
+
+    const profile = getSelectedChatProfile(config, profileName);
+    return profile?.display_name || profile?.name || profileName;
+  };
+
+  const isGroupCollapsed = (group: string) => collapsedGroups[group] ?? false;
+
+  const toggleGroup = (group: string) => {
+    setCollapsedGroups((prev) => ({
+      ...prev,
+      [group]: !(prev[group] ?? false)
+    }));
+  };
+
   return (
     <>
       <AlertDialog
@@ -377,80 +442,116 @@ export function ThreadList({
         threadId={threadIdToShare || null}
       />
       <TooltipProvider delayDuration={300}>
-        {sortedTimeGroupKeys.map((group) => {
+        {sortedTimeGroupKeys.map((group, groupIndex) => {
           const items = threadHistory!.timeGroupedThreads![group];
+          const groupCollapsed = isGroupCollapsed(group);
           return (
-            <SidebarGroup key={group}>
-              <SidebarGroupLabel>{getTimeGroupLabel(group)}</SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {items.map((thread) => {
-                    const isResumed =
-                      idToResume === thread.id &&
-                      !threadHistory!.currentThreadId;
-                    const isSelected =
-                      isResumed || threadHistory!.currentThreadId === thread.id;
-                    return (
-                      <SidebarMenuItem
-                        key={thread.id}
-                        id={`thread-${thread.id}`}
-                      >
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Link to={isResumed ? '' : `/thread/${thread.id}`}>
-                              <SidebarMenuButton
-                                isActive={isSelected}
-                                className="relative h-9 group/thread"
-                              >
-                                <span className="flex min-w-0 items-center gap-2">
-                                  {thread.metadata?.is_shared ? (
-                                    <Share2
-                                      className="h-4 w-4 shrink-0 text-muted-foreground"
-                                      aria-hidden="true"
-                                    />
-                                  ) : null}
-                                  <span className="truncate">
-                                    {thread.name || (
-                                      <Translator path="threadHistory.thread.untitled" />
-                                    )}
+            <SidebarGroup
+              key={group}
+              className={cn(groupIndex === 0 && 'pt-1')}
+            >
+              <SidebarGroupLabel className="h-auto px-0">
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(group)}
+                  className="grid w-full grid-cols-[0.875rem_1fr_auto_1fr_0.875rem] items-center gap-2 rounded-md px-2 py-1 text-xs font-semibold text-sidebar-foreground/80 outline-none ring-sidebar-ring transition-colors hover:text-sidebar-foreground focus-visible:ring-2"
+                >
+                  <span className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span
+                    className="h-px bg-sidebar-border/70"
+                    aria-hidden="true"
+                  />
+                  <span className="min-w-0 shrink-0 text-center tracking-[0.04em]">
+                    {getTimeGroupLabel(group)}
+                  </span>
+                  <span
+                    className="h-px bg-sidebar-border/70"
+                    aria-hidden="true"
+                  />
+                  <ChevronDown
+                    className={cn(
+                      'h-3.5 w-3.5 shrink-0 text-sidebar-foreground/60 transition-transform duration-200',
+                      groupCollapsed && '-rotate-90'
+                    )}
+                    aria-hidden="true"
+                  />
+                </button>
+              </SidebarGroupLabel>
+              {!groupCollapsed ? (
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {items.map((thread) => {
+                      const isResumed =
+                        idToResume === thread.id &&
+                        !threadHistory!.currentThreadId;
+                      const isSelected =
+                        isResumed || threadHistory!.currentThreadId === thread.id;
+                      const threadMetadata = getThreadMetadata(thread);
+                      const threadProfileLabel = getThreadProfileLabel(thread);
+                      const threadProfileSubtitle = threadProfileLabel || '---';
+                      return (
+                        <SidebarMenuItem
+                          key={thread.id}
+                          id={`thread-${thread.id}`}
+                        >
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Link to={isResumed ? '' : `/thread/${thread.id}`}>
+                                <SidebarMenuButton
+                                  isActive={isSelected}
+                                  size="lg"
+                                  className="relative h-auto min-h-12 items-start group/thread"
+                                >
+                                  <span className="flex min-w-0 flex-1 items-start gap-2 pr-10">
+                                    {threadMetadata.is_shared ? (
+                                      <Share2
+                                        className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground"
+                                        aria-hidden="true"
+                                      />
+                                    ) : null}
+                                    <span className="min-w-0 flex-1">
+                                      <span className="block truncate">
+                                        {thread.name || (
+                                          <Translator path="threadHistory.thread.untitled" />
+                                        )}
+                                      </span>
+                                      <span className="block truncate text-xs font-normal text-muted-foreground">
+                                        {threadProfileSubtitle}
+                                      </span>
+                                    </span>
                                   </span>
-                                </span>
-                                <div
-                                  className={cn(
-                                    'absolute w-10 bottom-0 top-0 right-0 bg-gradient-to-l from-[hsl(var(--sidebar-background))] to-transparent'
-                                  )}
-                                />
-                                <ThreadOptions
-                                  onDelete={() =>
-                                    setThreadIdToDelete(thread.id)
-                                  }
-                                  onRename={() => {
-                                    setThreadIdToRename(thread.id);
-                                    setThreadNewName(thread.name);
-                                  }}
-                                  onShare={
-                                    dataPersistence && threadSharingReady
-                                      ? () => handleShareThread(thread.id)
-                                      : undefined
-                                  }
-                                  className={cn(
-                                    'absolute z-20 bottom-0 top-0 right-0 bg-sidebar-accent hover:bg-sidebar-accent hover:text-primary flex opacity-0 group-hover/thread:opacity-100',
-                                    isSelected &&
-                                      'bg-sidebar-accent opacity-100'
-                                  )}
-                                />
-                              </SidebarMenuButton>
-                            </Link>
-                          </TooltipTrigger>
-                          <TooltipContent side="right" align="center">
-                            <p>{thread.name}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </SidebarMenuItem>
-                    );
-                  })}
-                </SidebarMenu>
-              </SidebarGroupContent>
+                                  <ThreadOptions
+                                    onDelete={() =>
+                                      setThreadIdToDelete(thread.id)
+                                    }
+                                    onRename={() => {
+                                      setThreadIdToRename(thread.id);
+                                      setThreadNewName(thread.name);
+                                    }}
+                                    onShare={
+                                      dataPersistence && threadSharingReady
+                                        ? () => handleShareThread(thread.id)
+                                        : undefined
+                                    }
+                                    className={cn(
+                                      'absolute z-20 bottom-0 top-0 right-0 bg-sidebar-accent hover:bg-sidebar-accent hover:text-primary flex opacity-0 group-hover/thread:opacity-100',
+                                      isSelected &&
+                                        'bg-sidebar-accent opacity-100'
+                                    )}
+                                  />
+                                </SidebarMenuButton>
+                              </Link>
+                            </TooltipTrigger>
+                            <TooltipContent side="right" align="center">
+                              <p>{thread.name}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </SidebarMenuItem>
+                      );
+                    })}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              ) : null}
             </SidebarGroup>
           );
         })}

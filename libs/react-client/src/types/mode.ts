@@ -5,8 +5,9 @@ export interface IModeOption {
   id: string;
   name: string;
   description?: string;
+  tooltip?: string;
   icon?: string;
-  default?: boolean;
+  selected?: boolean;
 }
 
 /**
@@ -16,5 +17,7 @@ export interface IModeOption {
 export interface IMode {
   id: string;
   name: string;
+  description?: string;
+  multi?: boolean;
   options: IModeOption[];
 }

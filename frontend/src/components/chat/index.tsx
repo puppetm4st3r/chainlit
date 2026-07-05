@@ -29,10 +29,6 @@ import MessagesContainer from './MessagesContainer';
 import ScrollContainer from './ScrollContainer';
 import WelcomeScreen from './WelcomeScreen';
 
-const logRootFlowDiag = (event: string, details?: Record<string, unknown>) => {
-  console.warn(`[ChainlitRootFlowDiag] ${event}`, details || {});
-};
-
 const Chat = () => {
   const { user } = useAuth();
   const { config } = useConfig();
@@ -40,7 +36,12 @@ const Chat = () => {
   const setThreads = useSetRecoilState(threadHistoryState);
 
   const autoScrollRef = useRef(true);
-  const { error, disabled, callFn } = useChatData();
+  const {
+    error,
+    disabled,
+    composerInputRestriction,
+    spontaneousFileUploadEnabled
+  } = useChatData();
   const { uploadFile } = useChatInteract();
   const uploadFileRef = useRef(uploadFile);
   const navigate = useNavigate();
@@ -71,15 +72,6 @@ const Chat = () => {
 
   const { t } = useTranslation();
   const layoutMaxWidth = useLayoutMaxWidth();
-
-  useEffect(() => {
-    if (callFn) {
-      const event = new CustomEvent('chainlit-call-fn', {
-        detail: callFn
-      });
-      window.dispatchEvent(event);
-    }
-  }, [callFn]);
 
   useEffect(() => {
     uploadFileRef.current = uploadFile;
@@ -177,22 +169,12 @@ const Chat = () => {
 
   useEffect(() => {
     const currentPage = new URL(window.location.href);
-    logRootFlowDiag('chat:index_mount_effect', {
-      pathname: currentPage.pathname,
-      threadId,
-      hasUser: Boolean(user),
-      dataPersistence: config?.dataPersistence
-    });
     if (
       user &&
       config?.dataPersistence &&
       threadId &&
       currentPage.pathname === '/'
     ) {
-      logRootFlowDiag('chat:index_navigate_to_thread', {
-        pathname: currentPage.pathname,
-        threadId
-      });
       navigate(`/thread/${threadId}`);
     } else {
       setThreads((prev) => ({
@@ -202,8 +184,15 @@ const Chat = () => {
     }
   }, []);
 
+  const effectiveSpontaneousFileUploadEnabled =
+    spontaneousFileUploadEnabled ??
+    config?.features?.spontaneous_file_upload?.enabled ??
+    false;
+
   const enableAttachments =
-    !disabled && config?.features?.spontaneous_file_upload?.enabled;
+    !disabled &&
+    composerInputRestriction.mode === 'mix' &&
+    effectiveSpontaneousFileUploadEnabled;
   return (
     <div
       {...(enableAttachments

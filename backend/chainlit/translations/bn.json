@@ -19,6 +19,7 @@
   "auth": {
     "login": {
       "title": "অ্যাপ্লিকেশন ব্যবহার করতে লগইন করুন",
+      "privateIntegrationTokenBootstrap": "Bootstrap integration token",
       "form": {
         "email": {
           "label": "ইমেইল ঠিকানা",
@@ -228,6 +229,7 @@
         "settings": "সেটিংস",
         "settingsKey": "S",
         "apiKeys": "এপিআই কী",
+        "administration": "প্রশাসন",
         "logout": "লগআউট"
       }
     }

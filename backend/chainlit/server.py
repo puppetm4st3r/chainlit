@@ -1,6 +1,7 @@
 import asyncio
 import fnmatch
 import glob
+import ipaddress
 import json
 import mimetypes
 import os
@@ -59,6 +60,10 @@ from chainlit.config import (
     reload_config,
 )
 from chainlit.data import get_data_layer
+from chainlit.session import (
+    get_runtime_spontaneous_file_upload_override,
+    validate_runtime_spontaneous_file_upload_config,
+)
 from chainlit.data.acl import is_thread_author
 from chainlit.logger import logger
 from chainlit.markdown import get_markdown_str
@@ -73,7 +78,9 @@ from chainlit.types import (
     DisconnectMCPRequest,
     ElementRequest,
     GetThreadsRequest,
+    Pagination,
     ShareThreadRequest,
+    ThreadFilter,
     Theme,
     UpdateFeedbackRequest,
     UpdateThreadRequest,
@@ -500,7 +507,61 @@ def get_user_facing_url(url: URL):
 
 @router.get("/auth/config")
 async def auth(request: Request):
-    return get_configuration()
+    auth_config = get_configuration()
+    if _should_expose_private_integration_token_bootstrap_url(request):
+        auth_config["privateIntegrationTokenBootstrapUrl"] = config.ui.admin_url
+    return auth_config
+
+
+_PRIVATE_INTEGRATION_TOKEN_BOOTSTRAP_ENABLED_ENV = "PRIVATE_ADMIN_LOGIN_ENABLED"
+_PRIVATE_CLIENT_NETWORKS = tuple(
+    ipaddress.ip_network(network)
+    for network in (
+        "10.0.0.0/8",
+        "172.16.0.0/12",
+        "192.168.0.0/16",
+        "fc00::/7",
+        "fe80::/10",
+    )
+)
+
+
+def _env_flag_is_enabled(env_var_name: str) -> bool:
+    """Return whether an environment flag uses a truthy value."""
+    return os.environ.get(env_var_name, "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+def _is_private_integration_token_client_host(host: str | None) -> bool:
+    """Return whether a bootstrap client host is loopback or private-network local."""
+    if not host:
+        return False
+    if host.strip().lower() == "localhost":
+        return True
+
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+
+    if ip.version == 6 and ip.ipv4_mapped:
+        ip = ip.ipv4_mapped
+
+    return ip.is_loopback or any(ip in network for network in _PRIVATE_CLIENT_NETWORKS)
+
+
+def _should_expose_private_integration_token_bootstrap_url(request: Request) -> bool:
+    """Gate the private integration-token bootstrap URL before it reaches the public login page."""
+    client_host = request.client.host if request.client else None
+    return (
+        _env_flag_is_enabled(_PRIVATE_INTEGRATION_TOKEN_BOOTSTRAP_ENABLED_ENV)
+        and bool(config.ui.admin_url)
+        and _is_private_integration_token_client_host(client_host)
+    )
 
 
 def _get_response_dict(access_token: str) -> dict:
@@ -818,6 +879,35 @@ GenericUser = Union[User, PersistedUser, None]
 UserParam = Annotated[GenericUser, Depends(get_current_user)]
 
 
+async def _get_current_user_id(current_user: GenericUser) -> str:
+    """Resolve the persisted user id required by thread history queries."""
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if isinstance(current_user, PersistedUser):
+        return current_user.id
+
+    data_layer = get_data_layer()
+    if not data_layer:
+        raise HTTPException(status_code=400, detail="Data persistence is not enabled")
+
+    persisted_user = await data_layer.get_user(identifier=current_user.identifier)
+    if not persisted_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return persisted_user.id
+
+
+def _user_has_root_role(user: GenericUser) -> bool:
+    """Return whether the authenticated user carries the root role."""
+    if not user:
+        return False
+
+    metadata = user.metadata or {}
+    roles = metadata.get("roles", [])
+    return isinstance(roles, list) and "root" in roles
+
+
 @router.get("/user")
 async def get_user(current_user: UserParam) -> GenericUser:
     return current_user
@@ -927,9 +1017,11 @@ async def project_settings(
         if current_profile and getattr(current_profile, "config_overrides", None):
             cfg = config.with_overrides(current_profile.config_overrides)
 
+    ui_settings = cfg.ui.model_dump()
+
     return JSONResponse(
         content={
-            "ui": cfg.ui.model_dump(),
+            "ui": ui_settings,
             "features": cfg.features.model_dump(),
             "userEnv": cfg.project.user_env,
             "maskUserEnv": cfg.project.mask_user_env,
@@ -1015,16 +1107,7 @@ async def get_user_threads(
     if not data_layer:
         raise HTTPException(status_code=400, detail="Data persistence is not enabled")
 
-    if not current_user:
-        raise HTTPException(status_code=401, detail="Unauthorized")
-
-    if not isinstance(current_user, PersistedUser):
-        persisted_user = await data_layer.get_user(identifier=current_user.identifier)
-        if not persisted_user:
-            raise HTTPException(status_code=404, detail="User not found")
-        payload.filter.userId = persisted_user.id
-    else:
-        payload.filter.userId = current_user.id
+    payload.filter.userId = await _get_current_user_id(current_user)
 
     res = await data_layer.list_threads(payload.pagination, payload.filter)
     return JSONResponse(content=res.to_dict())
@@ -1314,6 +1397,42 @@ async def delete_thread(
     return JSONResponse(content={"success": True})
 
 
+@router.delete("/project/threads")
+async def delete_user_threads(
+    request: Request,
+    current_user: UserParam,
+):
+    """Delete all persisted threads owned by the current user."""
+
+    data_layer = get_data_layer()
+
+    if not data_layer:
+        raise HTTPException(status_code=400, detail="Data persistence is not enabled")
+
+    user_id = await _get_current_user_id(current_user)
+    thread_ids: List[str] = []
+    cursor: Optional[str] = None
+
+    while True:
+        res = await data_layer.list_threads(
+            Pagination(first=100, cursor=cursor),
+            ThreadFilter(userId=user_id),
+        )
+        thread_ids.extend(thread["id"] for thread in res.data if thread.get("id"))
+
+        if not res.pageInfo.hasNextPage or not res.pageInfo.endCursor:
+            break
+
+        cursor = res.pageInfo.endCursor
+
+    for thread_id in thread_ids:
+        await data_layer.delete_thread(thread_id)
+
+    return JSONResponse(
+        content={"success": True, "deletedThreadCount": len(thread_ids)}
+    )
+
+
 @router.post("/project/action")
 async def call_action(
     payload: CallActionRequest,
@@ -1343,9 +1462,8 @@ async def call_action(
 
     callback = config.code.action_callbacks.get(action.name)
     if callback:
-        if not context.session.has_first_interaction:
-            context.session.has_first_interaction = True
-            asyncio.create_task(context.emitter.init_thread(action.name))
+        if not context.session.is_thread_persistence_ready():
+            asyncio.create_task(context.emitter.ensure_thread_persistence(action.name))
 
         response = await callback(action)
     else:
@@ -1696,7 +1814,7 @@ async def upload_file(
             )
 
         try:
-            validate_file_upload(file, spec=spec)
+            validate_file_upload(file, spec=spec, session=session)
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
 
@@ -1709,21 +1827,34 @@ async def upload_file(
         await file.close()
 
 
-def validate_file_upload(file: UploadFile, spec: Optional[AskFileSpec] = None):
+
+def validate_file_upload(
+    file: UploadFile,
+    spec: Optional[AskFileSpec] = None,
+    session: Optional["WebsocketSession"] = None,
+):
     """Validate the file upload as configured in config.features.spontaneous_file_upload or by AskFileSpec
     for a specific message.
 
     Args:
         file (UploadFile): The file to validate.
         spec (AskFileSpec): The file spec to validate against if any.
+        session (WebsocketSession | None): Current websocket session for runtime overrides.
     Raises:
         ValueError: If the file is not allowed.
     """
-    if not spec and config.features.spontaneous_file_upload is None:
+    if not spec:
+        runtime_override = _get_runtime_spontaneous_file_upload_override(session)
+        if runtime_override is False:
+            raise ValueError("File upload is not enabled")
+        if runtime_override is True:
+            _validate_runtime_spontaneous_file_upload_config()
+
+    if not spec and _get_runtime_spontaneous_file_upload_override(session) is None and config.features.spontaneous_file_upload is None:
         """Default for a missing config is to allow the fileupload without any restrictions"""
         return
 
-    if not spec and not config.features.spontaneous_file_upload.enabled:
+    if not spec and _get_runtime_spontaneous_file_upload_override(session) is None and not config.features.spontaneous_file_upload.enabled:
         raise ValueError("File upload is not enabled")
 
     validate_file_mime_type(file, spec)

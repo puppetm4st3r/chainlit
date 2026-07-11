@@ -1,4 +1,3 @@
-import { MessageContext } from 'contexts/MessageContext';
 import {
   memo,
   useCallback,
@@ -18,10 +17,12 @@ import {
   IElement,
   sessionIdState,
   useAuth,
+  useChatData,
   useChatInteract
 } from '@chainlit/react-client';
 
 import Alert from '@/components/Alert';
+import { useDismissFloatingView } from '@/hooks/useDismissFloatingView';
 
 import Imports from './Imports';
 import { loadCustomElementModuleTree } from './moduleLoader';
@@ -32,7 +33,9 @@ const CustomElement = memo(function ({ element }: { element: ICustomElement }) {
   const sessionId = useRecoilValue(sessionIdState);
   const { sendMessage } = useChatInteract();
   const { user } = useAuth();
-  const { askUser } = useContext(MessageContext);
+  // Recoil ask state works for floating hosts (outside MessageContext) and inline asks.
+  const { askUser } = useChatData();
+  const dismissFloatingView = useDismissFloatingView();
 
   const [sourceCode, setSourceCode] = useState<string>();
   const [localImports, setLocalImports] = useState<Record<string, unknown>>({});
@@ -139,9 +142,14 @@ const CustomElement = memo(function ({ element }: { element: ICustomElement }) {
         askUser.spec.step_id === element.forId
       ) {
         askUser.callback({ ...props, submitted: true });
+        // Blocking floating asks (e.g. Motd) must close immediately; waiting for
+        // backend remove_element leaves the overlay open after Continuar / timeout.
+        if (element.display === 'floating') {
+          dismissFloatingView(element);
+        }
       }
     },
-    [askUser, element.forId]
+    [askUser, dismissFloatingView, element]
   );
 
   const cancelElement = useCallback(() => {
@@ -150,8 +158,11 @@ const CustomElement = memo(function ({ element }: { element: ICustomElement }) {
       askUser.spec.step_id === element.forId
     ) {
       askUser.callback({ submitted: false });
+      if (element.display === 'floating') {
+        dismissFloatingView(element);
+      }
     }
-  }, [askUser, element.forId]);
+  }, [askUser, dismissFloatingView, element]);
 
   const props = useMemo(() => {
     return JSON.parse(JSON.stringify(element.props));
@@ -170,8 +181,17 @@ const CustomElement = memo(function ({ element }: { element: ICustomElement }) {
     );
   }
 
+  // Floating hosts constrain height; fill that box so child JSX can own scroll.
+  const isFloating = element.display === 'floating';
+
   return (
-    <div className={`${element.display}-custom flex flex-col flex-grow`}>
+    <div
+      className={
+        isFloating
+          ? `${element.display}-custom flex h-full min-h-0 flex-col overflow-hidden [&>*]:flex [&>*]:h-full [&>*]:min-h-0 [&>*]:flex-col [&>*]:overflow-hidden`
+          : `${element.display}-custom flex flex-col flex-grow`
+      }
+    >
       <Runner
         code={sourceCode}
         scope={{

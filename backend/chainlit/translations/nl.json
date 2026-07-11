@@ -72,12 +72,19 @@
       "connecting": "Verbinden"
     },
     "fileUpload": {
-      "dragDrop": "Sleep bestanden hierheen",
+      "title": "Bestanden uploaden",
+      "upload": "Uploaden",
+      "uploading": "Bezig met uploaden…",
+      "dropHint": "Sleep bestanden hierheen",
       "browse": "Bestanden zoeken",
-      "sizeLimit": "Limiet:",
+      "maxSize": "Max. {{size}} MB per bestand",
+      "maxFiles": "Tot {{count}} bestanden",
+      "selectedCount": "{{count}} / {{max}} geselecteerd",
+      "removeFile": "Bestand verwijderen",
       "errors": {
         "failed": "Uploaden mislukt",
-        "cancelled": "Upload geannuleerd van"
+        "cancelled": "Upload geannuleerd van",
+        "invalidSpec": "AskFile mist max_files of max_size_mb"
       },
       "actions": {
         "cancelUpload": "Annuleer upload",
@@ -143,6 +150,11 @@
       "humanInteraction": {
         "body": "The assistant has completed the task and is waiting for your review."
       }
+    },
+    "floating": {
+      "maximize": "Maximize",
+      "restore": "Reduce size",
+      "close": "Go to chat"
     }
   },
   "threadHistory": {

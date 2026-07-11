@@ -86,12 +86,19 @@
       "availableTools": "లభ్యమైన పరికరాలు"
     },
     "fileUpload": {
-      "dragDrop": "ఫైల్స్‌ని ఇక్కడ డ్రాగ్ చేసి డ్రాప్ చేయండి",
+      "title": "ఫైల్స్ అప్‌లోడ్ చేయండి",
+      "upload": "అప్‌లోడ్",
+      "uploading": "అప్‌లోడ్ అవుతోంది…",
+      "dropHint": "ఫైల్స్‌ని ఇక్కడ డ్రాగ్ చేసి డ్రాప్ చేయండి",
       "browse": "ఫైల్స్ బ్రౌజ్ చేయండి",
-      "sizeLimit": "పరిమితి:",
+      "maxSize": "ప్రతి ఒక్కటి గరిష్టం {{size}} MB",
+      "maxFiles": "గరిష్టం {{count}} ఫైల్స్",
+      "selectedCount": "{{count}} / {{max}} ఎంచుకోబడింది",
+      "removeFile": "ఫైల్ తొలగించండి",
       "errors": {
         "failed": "అప్‌లోడ్ విఫలమైంది",
-        "cancelled": "అప్‌లోడ్ రద్దు చేయబడింది"
+        "cancelled": "అప్‌లోడ్ రద్దు చేయబడింది",
+        "invalidSpec": "AskFileలో max_files లేదా max_size_mb లేదు"
       },
       "actions": {
         "cancelUpload": "రద్దు చేయండి",
@@ -143,6 +150,11 @@
       "humanInteraction": {
         "body": "The assistant has completed the task and is waiting for your review."
       }
+    },
+    "floating": {
+      "maximize": "Maximize",
+      "restore": "Reduce size",
+      "close": "Go to chat"
     }
   },
   "threadHistory": {

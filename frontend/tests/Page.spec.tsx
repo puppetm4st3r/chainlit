@@ -57,6 +57,10 @@ vi.mock('@/components/ElementSideView', () => ({
   default: () => <div data-testid="element-side-view" />
 }));
 
+vi.mock('@/components/ElementFloatingView', () => ({
+  default: () => <div data-testid="element-floating-view" />
+}));
+
 vi.mock('@/components/ChatSettings/ChatSettingsSidebar', () => ({
   default: () => <div data-testid="chat-settings-sidebar" />
 }));

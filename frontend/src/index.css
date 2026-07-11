@@ -307,3 +307,16 @@ code {
     background-color: transparent;
   }
 }
+
+/* Floating chrome actions: hover only — keep the same border, no focus ring. */
+.floating-chrome-button:focus,
+.floating-chrome-button:focus-visible,
+.floating-chrome-button:active {
+  outline: none !important;
+  box-shadow: none !important;
+  border-color: hsl(var(--input)) !important;
+  --tw-ring-width: 0px !important;
+  --tw-ring-offset-width: 0px !important;
+  --tw-ring-shadow: 0 0 #0000 !important;
+  --tw-ring-offset-shadow: 0 0 #0000 !important;
+}

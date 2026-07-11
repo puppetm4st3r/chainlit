@@ -71,12 +71,23 @@
       "connecting": "З'єднання"
     },
     "fileUpload": {
-      "dragDrop": "Перетягніть файли сюди",
+      "title": "Завантажити файли",
+      "upload": "Завантажити",
+      "uploading": "Завантаження…",
+      "dropHint": "Перетягніть файли сюди",
       "browse": "Огляд файлів",
-      "sizeLimit": "Ліміт:",
+      "maxSize": "Макс. {{size}} МБ кожен",
+      "maxFiles": "До {{count}} файлів",
+      "selectedCount": "{{count}} / {{max}} вибрано",
+      "removeFile": "Видалити файл",
       "errors": {
         "failed": "Не вдалося завантажити",
-        "cancelled": "Завантаження скасовано для"
+        "cancelled": "Завантаження скасовано для",
+        "invalidSpec": "У AskFile відсутні max_files або max_size_mb"
+      },
+      "actions": {
+        "cancelUpload": "Скасувати завантаження",
+        "removeAttachment": "Видалити вкладення"
       }
     },
     "messages": {
@@ -122,6 +133,11 @@
       "humanInteraction": {
         "body": "Асистент завершив завдання і очікує на ваш перегляд."
       }
+    },
+    "floating": {
+      "maximize": "Розгорнути",
+      "restore": "Зменшити розмір",
+      "close": "До чату"
     }
   },
   "threadHistory": {

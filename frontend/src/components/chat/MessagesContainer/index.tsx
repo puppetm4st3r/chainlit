@@ -6,6 +6,8 @@ import { toast } from 'sonner';
 import {
   ChainlitContext,
   currentThreadIdState,
+  floatingViewState,
+  ICustomElement,
   IFeedback,
   IMessageElement,
   IStep,
@@ -25,8 +27,16 @@ import {
   isCanvasShellElement,
   logCanvasCloseDiag
 } from '@/lib/canvas';
+import {
+  decideFloatingAutoOpen,
+  isFloatingCustom
+} from '@/lib/floatingView';
+import { resolveFloatingElementTitle } from '@/lib/floatingElementTitle';
 import { buildSideViewElementsSignature } from '@/lib/sideView';
-import { dismissedSideViewSignatureState } from '@/state/project';
+import {
+  dismissedFloatingSignatureState,
+  dismissedSideViewSignatureState
+} from '@/state/project';
 import { useTranslation } from 'components/i18n/Translator';
 
 interface Props {
@@ -58,12 +68,20 @@ const MessagesContainer = ({ navigate }: Props) => {
   const setMessages = useSetRecoilState(messagesState);
   const setSideView = useSetRecoilState(sideViewState);
   const currentSideView = useRecoilValue(sideViewState);
+  const setFloatingView = useSetRecoilState(floatingViewState);
+  const currentFloatingView = useRecoilValue(floatingViewState);
   const currentThreadId = useRecoilValue(currentThreadIdState);
   const dismissedSideViewSignature = useRecoilValue(
     dismissedSideViewSignatureState
   );
   const setDismissedSideViewSignature = useSetRecoilState(
     dismissedSideViewSignatureState
+  );
+  const dismissedFloatingSignature = useRecoilValue(
+    dismissedFloatingSignatureState
+  );
+  const setDismissedFloatingSignature = useSetRecoilState(
+    dismissedFloatingSignatureState
   );
   const sessionId = useRecoilValue(sessionIdState);
 
@@ -125,6 +143,10 @@ const MessagesContainer = ({ navigate }: Props) => {
 
   const knownSideElementsRef = useRef<Map<string, IMessageElement>>(new Map());
   const knownSideOrderRef = useRef<string[]>([]);
+  const knownFloatingElementsRef = useRef<Map<string, IMessageElement>>(
+    new Map()
+  );
+  const knownFloatingOrderRef = useRef<string[]>([]);
   const previousThreadIdRef = useRef<string | undefined>(currentThreadId);
 
   useEffect(() => {
@@ -135,8 +157,17 @@ const MessagesContainer = ({ navigate }: Props) => {
     previousThreadIdRef.current = currentThreadId;
     knownSideElementsRef.current = new Map();
     knownSideOrderRef.current = [];
+    knownFloatingElementsRef.current = new Map();
+    knownFloatingOrderRef.current = [];
     setDismissedSideViewSignature(undefined);
-  }, [currentThreadId, setDismissedSideViewSignature]);
+    setDismissedFloatingSignature(undefined);
+    setFloatingView(undefined);
+  }, [
+    currentThreadId,
+    setDismissedFloatingSignature,
+    setDismissedSideViewSignature,
+    setFloatingView
+  ]);
 
   useEffect(() => {
     const sideElements = keepSingleCanvasShellElement(
@@ -233,8 +264,80 @@ const MessagesContainer = ({ navigate }: Props) => {
     setSideView
   ]);
 
+  useEffect(() => {
+    const candidates = elements.filter(isFloatingCustom);
+    const decision = decideFloatingAutoOpen({
+      candidates,
+      previousIds: knownFloatingOrderRef.current,
+      previousElementsById: knownFloatingElementsRef.current,
+      dismissedSignature: dismissedFloatingSignature,
+      currentOpenElementId: currentFloatingView?.element.id
+    });
+
+    if (decision.action === 'clear') {
+      knownFloatingElementsRef.current = new Map();
+      knownFloatingOrderRef.current = [];
+      if (dismissedFloatingSignature) {
+        setDismissedFloatingSignature(undefined);
+      }
+      setFloatingView(undefined);
+      return;
+    }
+
+    const currentIds = candidates.map((e) => e.id);
+    const newMap = new Map<string, IMessageElement>();
+    candidates.forEach((e) => newMap.set(e.id, e));
+    knownFloatingElementsRef.current = newMap;
+    knownFloatingOrderRef.current = currentIds;
+
+    if (decision.action === 'noop') {
+      return;
+    }
+
+    if (decision.action === 'sync') {
+      if (decision.element !== currentFloatingView?.element) {
+        setFloatingView({
+          title: resolveFloatingElementTitle(decision.element),
+          element: decision.element
+        });
+      }
+      return;
+    }
+
+    if (decision.action === 'suppress') {
+      return;
+    }
+
+    // action === 'open'
+    if (dismissedFloatingSignature) {
+      setDismissedFloatingSignature(undefined);
+    }
+    setFloatingView({
+      title: resolveFloatingElementTitle(decision.element),
+      element: decision.element
+    });
+  }, [
+    currentFloatingView,
+    dismissedFloatingSignature,
+    elements,
+    setDismissedFloatingSignature,
+    setFloatingView
+  ]);
+
   const onElementRefClick = useCallback(
     (element: IMessageElement) => {
+      if (element.display === 'floating') {
+        if (element.type !== 'custom') {
+          return;
+        }
+        setDismissedFloatingSignature(undefined);
+        setFloatingView({
+          title: resolveFloatingElementTitle(element),
+          element: element as ICustomElement
+        });
+        return;
+      }
+
       if (
         element.display === 'side' ||
         (element.display === 'page' && !navigate)
@@ -252,7 +355,13 @@ const MessagesContainer = ({ navigate }: Props) => {
 
       return navigate?.(element.display === 'page' ? path : '#');
     },
-    [navigate, setDismissedSideViewSignature, setSideView]
+    [
+      navigate,
+      setDismissedFloatingSignature,
+      setDismissedSideViewSignature,
+      setFloatingView,
+      setSideView
+    ]
   );
 
   const onError = useCallback((error: string) => toast.error(error), [toast]);

@@ -5,6 +5,7 @@ import { useRecoilValue } from 'recoil';
 import { sideViewState, useAuth, useChatData, useConfig } from '@chainlit/react-client';
 
 import ChatSettingsSidebar from '@/components/ChatSettings/ChatSettingsSidebar';
+import ElementFloatingView from '@/components/ElementFloatingView';
 import ElementSideView from '@/components/ElementSideView';
 import LeftSidebar from '@/components/LeftSidebar';
 import { TaskList } from '@/components/Tasklist';
@@ -68,6 +69,7 @@ const Page = ({ children }: Props) => {
         {sideView ? <ElementSideView /> : <TaskList isMobile={false} />}
         {showSettingsSidebar && <ChatSettingsSidebar />}
       </ResizablePanelGroup>
+      <ElementFloatingView />
     </div>
   );
 

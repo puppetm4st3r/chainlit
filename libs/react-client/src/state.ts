@@ -13,6 +13,7 @@ import {
   ICallFn,
   IChainlitConfig,
   IMcp,
+  ICustomElement,
   IMessageElement,
   IStep,
   ITasklistElement,
@@ -285,6 +286,13 @@ export const sideViewState = atom<
   { title: string; elements: IMessageElement[]; key?: string } | undefined
 >({
   key: 'SideView',
+  default: undefined
+});
+
+export const floatingViewState = atom<
+  { title: string; element: ICustomElement } | undefined
+>({
+  key: 'FloatingView',
   default: undefined
 });
 

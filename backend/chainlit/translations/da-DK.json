@@ -85,12 +85,19 @@
       "connecting": "Forbinder"
     },
     "fileUpload": {
-      "dragDrop": "Træk og slip filer her",
+      "title": "Upload filer",
+      "upload": "Upload",
+      "uploading": "Uploader…",
+      "dropHint": "Træk og slip filer her",
       "browse": "Gennemse filer",
-      "sizeLimit": "Grænse:",
+      "maxSize": "Maks. {{size}} MB pr. fil",
+      "maxFiles": "Op til {{count}} filer",
+      "selectedCount": "{{count}} / {{max}} valgt",
+      "removeFile": "Fjern fil",
       "errors": {
         "failed": "Upload mislykkedes",
-        "cancelled": "Annullerede upload af"
+        "cancelled": "Annullerede upload af",
+        "invalidSpec": "AskFile mangler max_files eller max_size_mb"
       },
       "actions": {
         "cancelUpload": "Annullere upload",
@@ -142,6 +149,11 @@
       "humanInteraction": {
         "body": "The assistant has completed the task and is waiting for your review."
       }
+    },
+    "floating": {
+      "maximize": "Maximize",
+      "restore": "Reduce size",
+      "close": "Go to chat"
     }
   },
   "threadHistory": {

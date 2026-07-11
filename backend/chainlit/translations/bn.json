@@ -86,12 +86,19 @@
       "availableTools": "উপলব্ধ টুলস"
     },
     "fileUpload": {
-      "dragDrop": "এখানে ফাইল টেনে আনুন",
+      "title": "ফাইল আপলোড করুন",
+      "upload": "আপলোড",
+      "uploading": "আপলোড হচ্ছে…",
+      "dropHint": "এখানে ফাইল টেনে আনুন",
       "browse": "ফাইল ব্রাউজ করুন",
-      "sizeLimit": "সীমা:",
+      "maxSize": "প্রতিটি সর্বোচ্চ {{size}} MB",
+      "maxFiles": "সর্বোচ্চ {{count}}টি ফাইল",
+      "selectedCount": "{{count}} / {{max}} নির্বাচিত",
+      "removeFile": "ফাইল সরান",
       "errors": {
         "failed": "আপলোড ব্যর্থ হয়েছে",
-        "cancelled": "আপলোড বাতিল করা হয়েছে"
+        "cancelled": "আপলোড বাতিল করা হয়েছে",
+        "invalidSpec": "AskFile-এ max_files বা max_size_mb নেই"
       },
       "actions": {
         "cancelUpload": "আপলোড বাতিল করুন",
@@ -143,6 +150,11 @@
       "humanInteraction": {
         "body": "The assistant has completed the task and is waiting for your review."
       }
+    },
+    "floating": {
+      "maximize": "Maximize",
+      "restore": "Reduce size",
+      "close": "Go to chat"
     }
   },
   "threadHistory": {

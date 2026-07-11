@@ -86,12 +86,19 @@
       "connecting": "Σύνδεση"
     },
     "fileUpload": {
-      "dragDrop": "Σύρετε αρχεία εδώ",
+      "title": "Μεταφόρτωση αρχείων",
+      "upload": "Μεταφόρτωση",
+      "uploading": "Μεταφόρτωση…",
+      "dropHint": "Σύρετε αρχεία εδώ",
       "browse": "Αναζήτηση αρχείων",
-      "sizeLimit": "Όριο:",
+      "maxSize": "Μέγ. {{size}} MB το καθένα",
+      "maxFiles": "Έως {{count}} αρχεία",
+      "selectedCount": "{{count}} / {{max}} επιλεγμένα",
+      "removeFile": "Αφαίρεση αρχείου",
       "errors": {
         "failed": "Η μεταφόρτωση απέτυχε",
-        "cancelled": "Ακυρώθηκε η μεταφόρτωση του"
+        "cancelled": "Ακυρώθηκε η μεταφόρτωση του",
+        "invalidSpec": "Το AskFile δεν έχει max_files ή max_size_mb"
       },
       "actions": {
         "cancelUpload": "Ακύρωση μεταφόρτωσης",
@@ -143,6 +150,11 @@
       "humanInteraction": {
         "body": "The assistant has completed the task and is waiting for your review."
       }
+    },
+    "floating": {
+      "maximize": "Maximize",
+      "restore": "Reduce size",
+      "close": "Go to chat"
     }
   },
   "threadHistory": {

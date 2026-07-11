@@ -130,7 +130,8 @@ class MessageBase(ABC):
         chat_context.remove(self)
         step_dict = self.to_dict()
         data_layer = get_data_layer()
-        if data_layer:
+        # Only delete from the data layer when this message was actually persisted.
+        if data_layer and self.persisted:
             try:
                 asyncio.create_task(data_layer.delete_step(step_dict["id"]))
             except Exception as e:
@@ -581,6 +582,10 @@ class AskElementMessage(AskMessageBase):
 
         super().__post_init__()
 
+    def _is_ephemeral_ask(self) -> bool:
+        """True only when the target CustomElement is floating without a reopen chip."""
+        return isinstance(self.element, CustomElement) and self.element.is_ephemeral
+
     async def send(self) -> Union[AskElementResponse, None]:
         """Send the custom element to the UI and wait for the reply."""
         if not self.created_at:
@@ -593,8 +598,16 @@ class AskElementMessage(AskMessageBase):
             self.author = await config.code.author_rename(self.author)
 
         self.wait_for_answer = True
+        ephemeral = self._is_ephemeral_ask()
 
-        step_dict = await self._create()
+        if ephemeral:
+            # Session-only ask: never create/update a durable assistant step.
+            metadata = dict(self.metadata or {})
+            metadata["countsTowardThreadPersistenceThreshold"] = False
+            self.metadata = metadata
+            step_dict = self.to_dict()
+        else:
+            step_dict = await self._create()
 
         await self.element.send(for_id=str(step_dict["id"]), persist=False)
 
@@ -603,6 +616,7 @@ class AskElementMessage(AskMessageBase):
             step_id=step_dict["id"],
             timeout=self.timeout,
             element_id=self.element.id,
+            ephemeral=ephemeral,
         )
 
         res = cast(
@@ -611,6 +625,12 @@ class AskElementMessage(AskMessageBase):
         )
 
         await self.element.remove()
+        self.wait_for_answer = False
+
+        if ephemeral:
+            # Wipe the in-session ask message so Motd leaves no chat history residue.
+            await self.remove()
+            return res
 
         if res is None:
             self.content = "Timed out"
@@ -618,8 +638,6 @@ class AskElementMessage(AskMessageBase):
             self.content = "Thanks for submitting"
         else:
             self.content = "Cancelled"
-
-        self.wait_for_answer = False
 
         await self.update()
 

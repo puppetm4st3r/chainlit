@@ -72,12 +72,19 @@
       "connecting": "連線中"
     },
     "fileUpload": {
-      "dragDrop": "拖曳檔案到這裡",
+      "title": "上傳檔案",
+      "upload": "上傳",
+      "uploading": "上傳中…",
+      "dropHint": "拖曳檔案到這裡",
       "browse": "瀏覽檔案",
-      "sizeLimit": "限制：",
+      "maxSize": "每個最大 {{size}} MB",
+      "maxFiles": "最多 {{count}} 個檔案",
+      "selectedCount": "已選擇 {{count}} / {{max}}",
+      "removeFile": "移除檔案",
       "errors": {
         "failed": "上傳失敗",
-        "cancelled": "已取消上傳"
+        "cancelled": "已取消上傳",
+        "invalidSpec": "AskFile 缺少 max_files 或 max_size_mb"
       },
       "actions": {
         "cancelUpload": "取消上傳",
@@ -143,6 +150,11 @@
       "humanInteraction": {
         "body": "The assistant has completed the task and is waiting for your review."
       }
+    },
+    "floating": {
+      "maximize": "Maximize",
+      "restore": "Reduce size",
+      "close": "Go to chat"
     }
   },
   "threadHistory": {

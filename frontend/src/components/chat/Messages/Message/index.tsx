@@ -194,7 +194,11 @@ const Message = memo(
                         renderMarkdown={true}
                       />
 
-                      <AskFileButton messageId={message.id} onError={onError} />
+                      <AskFileButton
+                        messageId={message.id}
+                        instruction={message.output}
+                        onError={onError}
+                      />
                       <AskActionButtons
                         actions={actions}
                         messageId={message.id}

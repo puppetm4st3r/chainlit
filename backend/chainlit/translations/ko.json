@@ -86,12 +86,19 @@
       "connecting": "연결 중"
     },
     "fileUpload": {
-      "dragDrop": "여기에 파일을 드래그 앤 드롭하세요",
+      "title": "파일 업로드",
+      "upload": "업로드",
+      "uploading": "업로드 중…",
+      "dropHint": "여기에 파일을 드래그 앤 드롭하세요",
       "browse": "파일 찾아보기",
-      "sizeLimit": "제한:",
+      "maxSize": "파일당 최대 {{size}} MB",
+      "maxFiles": "최대 {{count}}개 파일",
+      "selectedCount": "{{count}} / {{max}} 선택됨",
+      "removeFile": "파일 제거",
       "errors": {
         "failed": "업로드 실패",
-        "cancelled": "업로드 취소:"
+        "cancelled": "업로드 취소:",
+        "invalidSpec": "AskFile에 max_files 또는 max_size_mb가 없습니다"
       },
       "actions": {
         "cancelUpload": "업로드 취소",
@@ -143,6 +150,11 @@
       "humanInteraction": {
         "body": "The assistant has completed the task and is waiting for your review."
       }
+    },
+    "floating": {
+      "maximize": "Maximize",
+      "restore": "Reduce size",
+      "close": "Go to chat"
     }
   },
   "threadHistory": {

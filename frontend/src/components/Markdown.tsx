@@ -835,8 +835,16 @@ const Markdown = ({
         },
         a({ children, href, ...props }) {
           const name = children as string;
-          // Try match by name; if href looks like #link:KEY, try to match by chainlitKey
-          let element = referenceElementsByName.get(name);
+          // Prefer #element:NAME (floating chips with human labels), then name match,
+          // then #link:KEY for conversation reference links.
+          let element: IMessageElement | undefined;
+          if (typeof href === 'string' && href.startsWith('#element:')) {
+            const elementName = decodeURIComponent(href.slice('#element:'.length));
+            element = referenceElementsByName.get(elementName);
+          }
+          if (!element) {
+            element = referenceElementsByName.get(name);
+          }
           if (!element && typeof href === 'string' && href.startsWith('#link:')) {
             const key = href.replace('#link:', '');
             element = referenceLinkElementsByKey.get(key);

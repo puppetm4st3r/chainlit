@@ -159,7 +159,7 @@ class TestElementBase:
             )
 
     async def test_element_display_options(self, mock_chainlit_context):
-        """Test Element display options."""
+        """Test Element display options for non-custom elements."""
         async with mock_chainlit_context:
             element_inline = File(
                 name="test", url="https://example.com/file.pdf", display="inline"
@@ -174,6 +174,19 @@ class TestElementBase:
             assert element_inline.display == "inline"
             assert element_side.display == "side"
             assert element_page.display == "page"
+
+    async def test_non_custom_floating_display_raises(self, mock_chainlit_context):
+        """display='floating' is rejected for non-custom elements."""
+        async with mock_chainlit_context:
+            with pytest.raises(
+                ValueError,
+                match="display='floating' is only supported for CustomElement",
+            ):
+                File(
+                    name="test",
+                    url="https://example.com/file.pdf",
+                    display="floating",
+                )
 
     async def test_element_from_dict_file(self, mock_chainlit_context):
         """Test Element.from_dict() for File type."""
@@ -479,6 +492,147 @@ class TestCustomElement:
 
             ctx.emitter.send_element.assert_called()
 
+    async def test_custom_element_floating_display(self, mock_chainlit_context):
+        """CustomElement accepts display='floating' with an explicit chip flag."""
+        async with mock_chainlit_context:
+            custom = CustomElement(
+                name="W",
+                display="floating",
+                show_reopen_chip=True,
+                start_maximized=True,
+                props={},
+            )
+            assert custom.display == "floating"
+            assert custom.type == "custom"
+            assert custom.show_reopen_chip is True
+            assert custom.start_maximized is True
+            assert custom.to_dict()["showReopenChip"] is True
+            assert custom.to_dict()["startMaximized"] is True
+
+    async def test_custom_element_floating_requires_name(self, mock_chainlit_context):
+        """display='floating' requires a non-empty CustomElement name."""
+        async with mock_chainlit_context:
+            with pytest.raises(
+                ValueError,
+                match="display='floating' requires a non-empty name",
+            ):
+                CustomElement(
+                    name="",
+                    display="floating",
+                    show_reopen_chip=True,
+                    start_maximized=True,
+                    props={},
+                )
+
+    async def test_custom_element_floating_requires_show_reopen_chip(
+        self, mock_chainlit_context
+    ):
+        """display='floating' requires an explicit show_reopen_chip bool."""
+        async with mock_chainlit_context:
+            with pytest.raises(
+                ValueError,
+                match="show_reopen_chip=True or show_reopen_chip=False",
+            ):
+                CustomElement(
+                    name="W",
+                    display="floating",
+                    start_maximized=True,
+                    props={},
+                )
+
+    async def test_custom_element_floating_requires_start_maximized(
+        self, mock_chainlit_context
+    ):
+        """display='floating' requires an explicit start_maximized bool."""
+        async with mock_chainlit_context:
+            with pytest.raises(
+                ValueError,
+                match="start_maximized=True or start_maximized=False",
+            ):
+                CustomElement(
+                    name="W",
+                    display="floating",
+                    show_reopen_chip=True,
+                    props={},
+                )
+
+    async def test_show_reopen_chip_rejected_for_non_floating(
+        self, mock_chainlit_context
+    ):
+        """show_reopen_chip is only valid for floating CustomElements."""
+        async with mock_chainlit_context:
+            with pytest.raises(
+                ValueError,
+                match="show_reopen_chip is only valid when display='floating'",
+            ):
+                CustomElement(
+                    name="W",
+                    display="side",
+                    show_reopen_chip=True,
+                    props={},
+                )
+
+    async def test_start_maximized_rejected_for_non_floating(
+        self, mock_chainlit_context
+    ):
+        """start_maximized is only valid for floating CustomElements."""
+        async with mock_chainlit_context:
+            with pytest.raises(
+                ValueError,
+                match="start_maximized is only valid when display='floating'",
+            ):
+                CustomElement(
+                    name="W",
+                    display="side",
+                    start_maximized=True,
+                    props={},
+                )
+
+    async def test_from_dict_defaults_missing_show_reopen_chip_for_floating(
+        self, mock_chainlit_context
+    ):
+        """Historical floating payloads without the flag default to showing the chip."""
+        async with mock_chainlit_context:
+            element = CustomElement.from_dict(
+                {
+                    "id": "el-1",
+                    "type": "custom",
+                    "name": "DynamicTable",
+                    "display": "floating",
+                    "props": {},
+                }
+            )
+            assert element.show_reopen_chip is True
+            assert element.start_maximized is True
+            assert element.is_ephemeral is False
+
+    async def test_floating_without_chip_is_ephemeral(self, mock_chainlit_context):
+        """Ephemeral is derived only from floating + show_reopen_chip=False."""
+        async with mock_chainlit_context:
+            ephemeral = CustomElement(
+                name="Motd",
+                display="floating",
+                show_reopen_chip=False,
+                start_maximized=True,
+                props={},
+            )
+            durable = CustomElement(
+                name="DynamicTable",
+                display="floating",
+                show_reopen_chip=True,
+                start_maximized=False,
+                props={},
+            )
+            inline = CustomElement(name="Form", display="inline", props={})
+
+            assert ephemeral.is_ephemeral is True
+            assert durable.is_ephemeral is False
+            assert durable.start_maximized is False
+            assert inline.is_ephemeral is False
+            # Ephemeral must not appear as a constructor / to_dict authoring field.
+            assert "isEphemeral" not in durable.to_dict()
+            assert "isEphemeral" not in ephemeral.to_dict()
+            assert durable.to_dict()["startMaximized"] is False
 
 @pytest.mark.asyncio
 class TestElementEdgeCases:
@@ -576,7 +730,7 @@ class TestDataframeElement:
 
     async def test_dataframe_with_polars(self, mock_chainlit_context):
         """Test Dataframe element with a polars DataFrame."""
-        import polars as pl
+        pl = pytest.importorskip("polars")
 
         async with mock_chainlit_context:
             df = pl.DataFrame({"a": [4, 2, 0], "b": ["foo", "bar", "baz"]})
@@ -604,7 +758,8 @@ class TestDataframeElement:
     ):
         """Test that pandas and polars DataFrames produce the same JSON."""
         import pandas as pd
-        import polars as pl
+
+        pl = pytest.importorskip("polars")
 
         async with mock_chainlit_context:
             pd_df = pd.DataFrame({"a": [4, 2, 0], "b": ["foo", "bar", "baz"]})
@@ -624,7 +779,7 @@ class TestDataframeElement:
         """Test Dataframe element with polars date columns serializes correctly."""
         from datetime import date
 
-        import polars as pl
+        pl = pytest.importorskip("polars")
 
         async with mock_chainlit_context:
             df = pl.DataFrame(

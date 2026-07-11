@@ -72,12 +72,19 @@
       "connecting": "कनेक्ट हो रहा है"
     },
     "fileUpload": {
-      "dragDrop": "फ़ाइलों को यहां खींचें और छोड़ें",
+      "title": "फ़ाइलें अपलोड करें",
+      "upload": "अपलोड",
+      "uploading": "अपलोड हो रहा है…",
+      "dropHint": "फ़ाइलों को यहां खींचें और छोड़ें",
       "browse": "फ़ाइलें ब्राउज़ करें",
-      "sizeLimit": "सीमा:",
+      "maxSize": "प्रत्येक अधिकतम {{size}} MB",
+      "maxFiles": "अधिकतम {{count}} फ़ाइलें",
+      "selectedCount": "{{count}} / {{max}} चयनित",
+      "removeFile": "फ़ाइल हटाएं",
       "errors": {
         "failed": "अपलोड करने में विफल",
-        "cancelled": "का अपलोड रद्द किया गया"
+        "cancelled": "का अपलोड रद्द किया गया",
+        "invalidSpec": "AskFile में max_files या max_size_mb नहीं है"
       },
       "actions": {
         "cancelUpload": "अपलोड रद्द करें",
@@ -143,6 +150,11 @@
       "humanInteraction": {
         "body": "The assistant has completed the task and is waiting for your review."
       }
+    },
+    "floating": {
+      "maximize": "Maximize",
+      "restore": "Reduce size",
+      "close": "Go to chat"
     }
   },
   "threadHistory": {

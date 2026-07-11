@@ -86,12 +86,19 @@
       "connecting": "Connexion en cours"
     },
     "fileUpload": {
-      "dragDrop": "Glissez et déposez des fichiers ici",
+      "title": "Téléverser des fichiers",
+      "upload": "Téléverser",
+      "uploading": "Téléversement…",
+      "dropHint": "Glissez et déposez des fichiers ici",
       "browse": "Parcourir les fichiers",
-      "sizeLimit": "Limite :",
+      "maxSize": "Max. {{size}} Mo chacun",
+      "maxFiles": "Jusqu’à {{count}} fichiers",
+      "selectedCount": "{{count}} / {{max}} sélectionnés",
+      "removeFile": "Retirer le fichier",
       "errors": {
         "failed": "Échec du téléversement",
-        "cancelled": "Téléversement annulé de"
+        "cancelled": "Téléversement annulé de",
+        "invalidSpec": "AskFile : max_files ou max_size_mb manquant"
       },
       "actions": {
         "cancelUpload": "Annuler le téléversement",
@@ -143,6 +150,11 @@
       "humanInteraction": {
         "body": "The assistant has completed the task and is waiting for your review."
       }
+    },
+    "floating": {
+      "maximize": "Agrandir",
+      "restore": "Réduire la taille",
+      "close": "Aller au chat"
     }
   },
   "threadHistory": {

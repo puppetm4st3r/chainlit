@@ -19,7 +19,7 @@
   "auth": {
     "login": {
       "title": "Login to access the app",
-        "privateIntegrationTokenBootstrap": "Bootstrap integration token",
+      "privateIntegrationTokenBootstrap": "Bootstrap integration token",
       "form": {
         "email": {
           "label": "Email address",
@@ -86,12 +86,19 @@
       "connecting": "Connecting"
     },
     "fileUpload": {
-      "dragDrop": "Drag and drop files here",
-      "browse": "Browse Files",
-      "sizeLimit": "Limit:",
+      "title": "Upload files",
+      "upload": "Upload",
+      "uploading": "Uploading…",
+      "dropHint": "Drag and drop files here",
+      "browse": "Browse files",
+      "maxSize": "Max {{size}} MB each",
+      "maxFiles": "Up to {{count}} files",
+      "selectedCount": "{{count}} / {{max}} selected",
+      "removeFile": "Remove file",
       "errors": {
         "failed": "Failed to upload",
-        "cancelled": "Cancelled upload of"
+        "cancelled": "Cancelled upload of",
+        "invalidSpec": "AskFile is missing max_files or max_size_mb"
       },
       "actions": {
         "cancelUpload": "Cancel upload",
@@ -148,6 +155,11 @@
       "humanInteraction": {
         "body": "The assistant has completed the task and is waiting for your review."
       }
+    },
+    "floating": {
+      "maximize": "Maximize",
+      "restore": "Reduce size",
+      "close": "Go to chat"
     }
   },
   "threadHistory": {

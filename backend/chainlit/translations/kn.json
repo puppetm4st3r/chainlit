@@ -86,12 +86,19 @@
       "connecting": "ಸಂಪರ್ಕಿಸಲಾಗುತ್ತಿದೆ"
     },
     "fileUpload": {
-      "dragDrop": "ಫೈಲ್‌ಗಳನ್ನು ಇಲ್ಲಿ ಎಳೆದು ಬಿಡಿ",
+      "title": "ಫೈಲ್‌ಗಳನ್ನು ಅಪ್‌ಲೋಡ್ ಮಾಡಿ",
+      "upload": "ಅಪ್‌ಲೋಡ್",
+      "uploading": "ಅಪ್‌ಲೋಡ್ ಆಗುತ್ತಿದೆ…",
+      "dropHint": "ಫೈಲ್‌ಗಳನ್ನು ಇಲ್ಲಿ ಎಳೆದು ಬಿಡಿ",
       "browse": "ಫೈಲ್‌ಗಳನ್ನು ಬ್ರೌಸ್ ಮಾಡಿ",
-      "sizeLimit": "ಮಿತಿ:",
+      "maxSize": "ಪ್ರತಿ ಗರಿಷ್ಠ {{size}} MB",
+      "maxFiles": "ಗರಿಷ್ಠ {{count}} ಫೈಲ್‌ಗಳು",
+      "selectedCount": "{{count}} / {{max}} ಆಯ್ಕೆಯಾಗಿದೆ",
+      "removeFile": "ಫೈಲ್ ತೆಗೆದುಹಾಕಿ",
       "errors": {
         "failed": "ಅಪ್‌ಲೋಡ್ ವಿಫಲವಾಗಿದೆ",
-        "cancelled": "ಅಪ್‌ಲೋಡ್ ರದ್ದುಗೊಳಿಸಲಾಗಿದೆ"
+        "cancelled": "ಅಪ್‌ಲೋಡ್ ರದ್ದುಗೊಳಿಸಲಾಗಿದೆ",
+        "invalidSpec": "AskFile ನಲ್ಲಿ max_files ಅಥವಾ max_size_mb ಇಲ್ಲ"
       },
       "actions": {
         "cancelUpload": "ಅಪ್‌ಲೋಡ್ ರದ್ದುಗೊಳಿಸಿ",
@@ -143,6 +150,11 @@
       "humanInteraction": {
         "body": "The assistant has completed the task and is waiting for your review."
       }
+    },
+    "floating": {
+      "maximize": "Maximize",
+      "restore": "Reduce size",
+      "close": "Go to chat"
     }
   },
   "threadHistory": {

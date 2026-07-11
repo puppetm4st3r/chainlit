@@ -1,7 +1,12 @@
 {
   "extends": "../tsconfig.json",
   "compilerOptions": {
-    "types": ["jest", "testing-library__jest-dom"]
+    "types": ["node", "react", "react-dom"]
   },
-  "include": ["**/*.spec.tsx"]
+  "include": [
+    "**/*.spec.ts",
+    "**/*.spec.tsx",
+    "setup-tests.ts",
+    "vitest-env.d.ts"
+  ]
 }

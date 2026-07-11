@@ -85,12 +85,19 @@
       "connecting": "جاري الاتصال"
     },
     "fileUpload": {
-      "dragDrop": "اسحب وأفلت الملفات هنا",
+      "title": "رفع الملفات",
+      "upload": "رفع",
+      "uploading": "جارٍ الرفع…",
+      "dropHint": "اسحب وأفلت الملفات هنا",
       "browse": "تصفح الملفات",
-      "sizeLimit": "الحد الأقصى:",
+      "maxSize": "الحد الأقصى {{size}} ميجابايت لكل ملف",
+      "maxFiles": "حتى {{count}} ملفات",
+      "selectedCount": "{{count}} / {{max}} محددة",
+      "removeFile": "إزالة الملف",
       "errors": {
         "failed": "فشل التحميل",
-        "cancelled": "تم إلغاء تحميل"
+        "cancelled": "تم إلغاء تحميل",
+        "invalidSpec": "AskFile يفتقد max_files أو max_size_mb"
       },
       "actions": {
         "cancelUpload": "إلغاء التحميل",
@@ -142,6 +149,11 @@
       "humanInteraction": {
         "body": "The assistant has completed the task and is waiting for your review."
       }
+    },
+    "floating": {
+      "maximize": "Maximize",
+      "restore": "Reduce size",
+      "close": "Go to chat"
     }
   },
   "threadHistory": {

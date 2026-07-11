@@ -86,12 +86,19 @@
       "availableTools": "ઉપલબ્ધ ટૂલ્સ"
     },
     "fileUpload": {
-      "dragDrop": "અહીં ફાઇલ્સ ખેંચો અને છોડો",
+      "title": "ફાઇલ્સ અપલોડ કરો",
+      "upload": "અપલોડ",
+      "uploading": "અપલોડ થઈ રહ્યું છે…",
+      "dropHint": "અહીં ફાઇલ્સ ખેંચો અને છોડો",
       "browse": "ફાઇલ્સ બ્રાઉઝ કરો",
-      "sizeLimit": "મર્યાદા:",
+      "maxSize": "દરેક માટે મહત્તમ {{size}} MB",
+      "maxFiles": "વધુમાં વધુ {{count}} ફાઇલ્સ",
+      "selectedCount": "{{count}} / {{max}} પસંદ કરેલ",
+      "removeFile": "ફાઇલ દૂર કરો",
       "errors": {
         "failed": "અપલોડ કરવામાં નિષ્ફળ",
-        "cancelled": "અપલોડ રદ કર્યું"
+        "cancelled": "અપલોડ રદ કર્યું",
+        "invalidSpec": "AskFileમાં max_files અથવા max_size_mb નથી"
       },
       "actions": {
         "cancelUpload": "અપલોડ રદ કરો",
@@ -143,6 +150,11 @@
       "humanInteraction": {
         "body": "The assistant has completed the task and is waiting for your review."
       }
+    },
+    "floating": {
+      "maximize": "Maximize",
+      "restore": "Reduce size",
+      "close": "Go to chat"
     }
   },
   "threadHistory": {

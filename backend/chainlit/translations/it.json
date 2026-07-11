@@ -86,12 +86,19 @@
       "connecting": "Connettendo"
     },
     "fileUpload": {
-      "dragDrop": "Trascina e rilascia i file qui",
+      "title": "Carica file",
+      "upload": "Carica",
+      "uploading": "Caricamento…",
+      "dropHint": "Trascina e rilascia i file qui",
       "browse": "Sfoglia file",
-      "sizeLimit": "Limite:",
+      "maxSize": "Max {{size}} MB ciascuno",
+      "maxFiles": "Fino a {{count}} file",
+      "selectedCount": "{{count}} / {{max}} selezionati",
+      "removeFile": "Rimuovi file",
       "errors": {
         "failed": "Caricamento file non riuscito",
-        "cancelled": "Caricamento annullato di"
+        "cancelled": "Caricamento annullato di",
+        "invalidSpec": "AskFile: mancano max_files o max_size_mb"
       },
       "actions": {
         "cancelUpload": "Annulla caricamento",
@@ -143,6 +150,11 @@
       "humanInteraction": {
         "body": "The assistant has completed the task and is waiting for your review."
       }
+    },
+    "floating": {
+      "maximize": "Ingrandisci",
+      "restore": "Riduci dimensioni",
+      "close": "Vai alla chat"
     }
   },
   "threadHistory": {

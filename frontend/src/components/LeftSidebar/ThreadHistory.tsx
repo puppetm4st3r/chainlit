@@ -15,7 +15,6 @@ import {
   SidebarMenu
 } from '@/components/ui/sidebar';
 
-import ProjectSelector from './ProjectSelector';
 import { ThreadList } from './ThreadList';
 
 const BATCH_SIZE = 35;
@@ -161,12 +160,8 @@ export function ThreadHistory() {
     <SidebarContent
       onScroll={handleScroll}
       ref={scrollRef}
-      className="gap-1"
     >
-      <SidebarGroup className="p-2 pb-0">
-        <ProjectSelector />
-      </SidebarGroup>
-      <SidebarGroup className="p-2 pt-0">
+      <SidebarGroup>
         <SidebarMenu>
           {threadHistory ? (
             <div id="thread-history" className="flex-grow">

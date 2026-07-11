@@ -86,15 +86,22 @@
       "connecting": "ബന്ധിപ്പിക്കുന്നു"
     },
     "fileUpload": {
-      "dragDrop": "ഫയലുകൾ ഇവിടെ വലിച്ചിടുക",
+      "title": "ഫയലുകൾ അപ്‌ലോഡ് ചെയ്യുക",
+      "upload": "അപ്‌ലോഡ്",
+      "uploading": "അപ്‌ലോഡ് ചെയ്യുന്നു…",
+      "dropHint": "ഫയലുകൾ ഇവിടെ വലിച്ചിടുക",
       "browse": "ഫയലുകൾ തിരയുക",
-      "sizeLimit": "പരിധി:",
+      "maxSize": "ഓരോന്നിനും പരമാവധി {{size}} MB",
+      "maxFiles": "പരമാവധി {{count}} ഫയലുകൾ",
+      "selectedCount": "{{count}} / {{max}} തിരഞ്ഞെടുത്തു",
+      "removeFile": "ഫയൽ നീക്കം ചെയ്യുക",
       "errors": {
         "failed": "അപ്‌ലോഡ് പരാജയപ്പെട്ടു",
-        "cancelled": "അപ്‌ലോഡ് റദ്ദാക്കി"
+        "cancelled": "അപ്‌ലോഡ് റദ്ദാക്കി",
+        "invalidSpec": "AskFile-ൽ max_files അല്ലെങ്കിൽ max_size_mb ഇല്ല"
       },
       "actions": {
-        "cancelUpload": "അപ്‌ಲോഡ് റദ്ദുചെയ്യുക",
+        "cancelUpload": "അപ്‌ലോഡ് റദ്ദുചെയ്യുക",
         "removeAttachment": "അറ്റാച്ച്‌മെന്റ് നീക്കം ചെയ്യുക"
       }
     },
@@ -143,6 +150,11 @@
       "humanInteraction": {
         "body": "The assistant has completed the task and is waiting for your review."
       }
+    },
+    "floating": {
+      "maximize": "Maximize",
+      "restore": "Reduce size",
+      "close": "Go to chat"
     }
   },
   "threadHistory": {

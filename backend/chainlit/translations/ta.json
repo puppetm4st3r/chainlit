@@ -86,12 +86,19 @@
       "connecting": "இணைக்கிறது"
     },
     "fileUpload": {
-      "dragDrop": "கோப்புகளை இங்கே இழுத்து விடவும்",
+      "title": "கோப்புகளை பதிவேற்று",
+      "upload": "பதிவேற்று",
+      "uploading": "பதிவேற்றுகிறது…",
+      "dropHint": "கோப்புகளை இங்கே இழுத்து விடவும்",
       "browse": "கோப்புகளை உலாவு",
-      "sizeLimit": "வரம்பு:",
+      "maxSize": "ஒவ்வொன்றும் அதிகபட்சம் {{size}} MB",
+      "maxFiles": "அதிகபட்சம் {{count}} கோப்புகள்",
+      "selectedCount": "{{count}} / {{max}} தேர்ந்தெடுக்கப்பட்டது",
+      "removeFile": "கோப்பை அகற்று",
       "errors": {
         "failed": "பதிவேற்றம் தோல்வியடைந்தது",
-        "cancelled": "பதிவேற்றம் ரத்து செய்யப்பட்டது"
+        "cancelled": "பதிவேற்றம் ரத்து செய்யப்பட்டது",
+        "invalidSpec": "AskFile-இல் max_files அல்லது max_size_mb இல்லை"
       },
       "actions": {
         "cancelUpload": "ரத்து செய்",
@@ -143,6 +150,11 @@
       "humanInteraction": {
         "body": "The assistant has completed the task and is waiting for your review."
       }
+    },
+    "floating": {
+      "maximize": "Maximize",
+      "restore": "Reduce size",
+      "close": "Go to chat"
     }
   },
   "threadHistory": {

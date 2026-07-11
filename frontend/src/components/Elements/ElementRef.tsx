@@ -3,6 +3,16 @@ import { useContext } from 'react';
 
 import type { IMessageElement } from '@chainlit/react-client';
 
+import { resolveFloatingElementTitle } from '@/lib/floatingElementTitle';
+import { shouldShowFloatingReopenChip } from '@/lib/floatingReopenChip';
+import { cn } from '@/lib/utils';
+
+const FLOATING_CHIP_STYLE = {
+  backgroundColor: '#045f3f',
+  color: '#ffffff',
+  borderColor: '#045f3f'
+} as const;
+
 interface ElementRefProps {
   element: IMessageElement;
 }
@@ -15,7 +25,30 @@ const ElementRef = ({ element }: ElementRefProps) => {
     return <span className="font-bold">{element.name}</span>;
   }
 
-  // For other elements, return a clickable link
+  // Floating CustomElements use the FileCommand chip geometry in brand green.
+  // Motd and other one-shot notices set showReopenChip=false and must not render.
+  if (element.display === 'floating') {
+    if (!shouldShowFloatingReopenChip(element)) {
+      return null;
+    }
+    return (
+      <a
+        href="#"
+        className={cn(
+          'inline-flex max-w-full items-center rounded-[4px] border border-solid px-2.5 py-1 text-sm font-medium cursor-pointer element-link element-link-floating'
+        )}
+        style={FLOATING_CHIP_STYLE}
+        onClick={(event) => {
+          event.preventDefault();
+          onElementRefClick?.(element);
+        }}
+      >
+        {resolveFloatingElementTitle(element)}
+      </a>
+    );
+  }
+
+  // For side/page elements, return a clickable muted pill
   return (
     <a
       href="#"

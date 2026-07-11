@@ -23,6 +23,7 @@ from chainlit.step import StepDict
 from chainlit.types import (
     AskActionResponse,
     AskElementResponse,
+    AskElementSpec,
     AskFileSpec,
     AskSpec,
     CommandDict,
@@ -413,7 +414,7 @@ class ChainlitEmitter(BaseChainlitEmitter):
         *,
         files: List[FileDict],
         for_id: str,
-        display: Literal["inline", "side", "page"] = "inline",
+        display: Literal["inline", "side", "page", "floating"] = "inline",
     ) -> List[Element]:
         """Persist upload-backed file elements before exposing them to application code."""
         elements = [
@@ -511,7 +512,11 @@ class ChainlitEmitter(BaseChainlitEmitter):
                     interaction = action_res["name"]
                 elif spec.type == "element":
                     final_res = cast(AskElementResponse, user_res)
-                    interaction = "custom_element"
+                    element_spec = cast(AskElementSpec, spec)
+                    # Ephemeral floating asks (show_reopen_chip=False) must not
+                    # create or flush a durable thread.
+                    if not element_spec.ephemeral:
+                        interaction = "custom_element"
 
                 if not self.session.is_thread_persistence_ready() and interaction:
                     await self.ensure_thread_persistence(interaction=interaction)

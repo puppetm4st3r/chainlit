@@ -7,6 +7,7 @@ import pytest
 
 from chainlit.action import Action
 from chainlit.context import ChainlitContext, context_var
+from chainlit.element import CustomElement
 from chainlit.message import (
     AskActionMessage,
     AskElementMessage,
@@ -690,6 +691,46 @@ class TestAskElementMessage:
 
                         assert result is None
                         assert msg.content == "Timed out"
+
+    @pytest.mark.asyncio
+    async def test_ask_element_ephemeral_skips_persist_and_removes_message(self):
+        """Floating + show_reopen_chip=False must not leave a durable ask step."""
+        with mock_chainlit_context() as ctx:
+            element = CustomElement(
+                name="Motd",
+                display="floating",
+                show_reopen_chip=False,
+                start_maximized=True,
+                props={"title": "Welcome"},
+            )
+            element.send = AsyncMock()
+            element.remove = AsyncMock()
+            msg = AskElementMessage(content="Motd", element=element)
+            ctx.emitter.send_ask_user = AsyncMock(
+                return_value={"submitted": True, "dismissed": "continue"}
+            )
+            ctx.emitter.delete_step = AsyncMock()
+            data_layer = AsyncMock()
+
+            with patch("chainlit.message.get_data_layer", return_value=data_layer):
+                with patch("chainlit.message.config") as mock_config:
+                    mock_config.code.author_rename = None
+                    with patch("chainlit.message.chat_context"):
+                        result = await msg.send()
+
+            assert result == {"submitted": True, "dismissed": "continue"}
+            assert msg.persisted is False
+            data_layer.create_step.assert_not_called()
+            data_layer.update_step.assert_not_called()
+            data_layer.delete_step.assert_not_called()
+            element.send.assert_called_once()
+            element.remove.assert_called_once()
+            ctx.emitter.delete_step.assert_called_once()
+            ask_spec = ctx.emitter.send_ask_user.await_args.args[1]
+            assert ask_spec.ephemeral is True
+            assert (
+                msg.metadata.get("countsTowardThreadPersistenceThreshold") is False
+            )
 
 
 class TestMessageEdgeCases:

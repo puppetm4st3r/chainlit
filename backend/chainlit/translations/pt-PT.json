@@ -86,12 +86,19 @@
       "connecting": "A ligar"
     },
     "fileUpload": {
-      "dragDrop": "Arraste e largue ficheiros aqui",
+      "title": "Carregar ficheiros",
+      "upload": "Carregar",
+      "uploading": "A carregar…",
+      "dropHint": "Arraste e largue ficheiros aqui",
       "browse": "Procurar ficheiros",
-      "sizeLimit": "Limite:",
+      "maxSize": "Máx. {{size}} MB cada",
+      "maxFiles": "Até {{count}} ficheiros",
+      "selectedCount": "{{count}} / {{max}} selecionados",
+      "removeFile": "Remover ficheiro",
       "errors": {
         "failed": "Erro ao carregar",
-        "cancelled": "Carregamento cancelado de"
+        "cancelled": "Carregamento cancelado de",
+        "invalidSpec": "AskFile sem max_files ou max_size_mb"
       },
       "actions": {
         "cancelUpload": "Cancelar carregamento",
@@ -143,6 +150,11 @@
       "humanInteraction": {
         "body": "The assistant has completed the task and is waiting for your review."
       }
+    },
+    "floating": {
+      "maximize": "Maximizar",
+      "restore": "Reduzir tamanho",
+      "close": "Ir para o chat"
     }
   },
   "threadHistory": {

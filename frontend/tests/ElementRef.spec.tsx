@@ -1,0 +1,101 @@
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+
+import type { IMessageElement } from '@chainlit/react-client';
+
+import { ElementRef } from '@/components/Elements/ElementRef';
+import { MessageContext } from '@/contexts/MessageContext';
+
+const renderWithContext = (
+  element: IMessageElement,
+  onElementRefClick = vi.fn()
+) => {
+  return {
+    onElementRefClick,
+    ...render(
+      <MessageContext.Provider
+        value={
+          {
+            onElementRefClick
+          } as any
+        }
+      >
+        <ElementRef element={element} />
+      </MessageContext.Provider>
+    )
+  };
+};
+
+describe('ElementRef', () => {
+  it('renders a light-green floating chip and forwards clicks', () => {
+    const element = {
+      id: 'c1',
+      type: 'custom',
+      name: 'MyWidget',
+      display: 'floating',
+      forId: 'm1',
+      showReopenChip: true,
+      props: {}
+    } as IMessageElement;
+
+    const { onElementRefClick } = renderWithContext(element);
+    const chip = screen.getByText('MyWidget');
+
+    expect(chip).toHaveClass('element-link-floating');
+    expect(chip).toHaveStyle({
+      backgroundColor: '#045f3f',
+      color: '#ffffff',
+      borderColor: '#045f3f'
+    });
+    expect(chip.className).not.toContain('uppercase');
+
+    fireEvent.click(chip);
+    expect(onElementRefClick).toHaveBeenCalledWith(element);
+  });
+
+  it('prefers props.title for floating chip label when present', () => {
+    const element = {
+      id: 'c2',
+      type: 'custom',
+      name: 'DynamicTable',
+      display: 'floating',
+      forId: 'm1',
+      showReopenChip: true,
+      props: { title: 'Sample people' }
+    } as IMessageElement;
+
+    renderWithContext(element);
+    expect(screen.getByText('Sample people')).toBeInTheDocument();
+    expect(screen.queryByText('DynamicTable')).not.toBeInTheDocument();
+  });
+
+  it('does not render a floating chip when showReopenChip is false', () => {
+    const element = {
+      id: 'c3',
+      type: 'custom',
+      name: 'Motd',
+      display: 'floating',
+      forId: 'm1',
+      showReopenChip: false,
+      props: { title: 'Welcome message' }
+    } as IMessageElement;
+
+    const { container } = renderWithContext(element);
+    expect(container).toBeEmptyDOMElement();
+  });
+  it('keeps the muted pill for side elements', () => {
+    const element = {
+      id: 's1',
+      type: 'text',
+      name: 'SideDoc',
+      display: 'side',
+      forId: 'm1'
+    } as IMessageElement;
+
+    renderWithContext(element);
+    const chip = screen.getByText('SideDoc');
+    expect(chip).toHaveClass('element-link');
+    expect(chip).toHaveClass('uppercase');
+    expect(chip.className).not.toContain('element-link-floating');
+  });
+});

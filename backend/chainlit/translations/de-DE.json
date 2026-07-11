@@ -86,12 +86,19 @@
       "connecting": "Verbinde"
     },
     "fileUpload": {
-      "dragDrop": "Ziehe deine Dateien hierher",
+      "title": "Dateien hochladen",
+      "upload": "Hochladen",
+      "uploading": "Wird hochgeladen…",
+      "dropHint": "Ziehe deine Dateien hierher",
       "browse": "Dateien durchsuchen",
-      "sizeLimit": "Limit:",
+      "maxSize": "Max. {{size}} MB pro Datei",
+      "maxFiles": "Bis zu {{count}} Dateien",
+      "selectedCount": "{{count}} / {{max}} ausgewählt",
+      "removeFile": "Datei entfernen",
       "errors": {
         "failed": "Hochladen fehlgeschlagen",
-        "cancelled": "Abbruch des hochladens von"
+        "cancelled": "Abbruch des hochladens von",
+        "invalidSpec": "AskFile: max_files oder max_size_mb fehlt"
       },
       "actions": {
         "cancelUpload": "Upload abbrechen",
@@ -143,6 +150,11 @@
       "humanInteraction": {
         "body": "The assistant has completed the task and is waiting for your review."
       }
+    },
+    "floating": {
+      "maximize": "Maximieren",
+      "restore": "Größe reduzieren",
+      "close": "Zum Chat"
     }
   },
   "threadHistory": {

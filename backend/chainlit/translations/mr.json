@@ -86,12 +86,19 @@
       "availableTools": "उपलब्ध साधने"
     },
     "fileUpload": {
-      "dragDrop": "फाइल्स येथे ड्रॅग आणि ड्रॉप करा",
+      "title": "फाइल्स अपलोड करा",
+      "upload": "अपलोड",
+      "uploading": "अपलोड होत आहे…",
+      "dropHint": "फाइल्स येथे ड्रॅग आणि ड्रॉप करा",
       "browse": "फाइल्स ब्राउझ करा",
-      "sizeLimit": "मर्यादा:",
+      "maxSize": "प्रत्येकी कमाल {{size}} MB",
+      "maxFiles": "कमाल {{count}} फाइल्स",
+      "selectedCount": "{{count}} / {{max}} निवडले",
+      "removeFile": "फाइल काढा",
       "errors": {
         "failed": "अपलोड अयशस्वी",
-        "cancelled": "यांचे अपलोड रद्द केले"
+        "cancelled": "यांचे अपलोड रद्द केले",
+        "invalidSpec": "AskFile मध्ये max_files किंवा max_size_mb नाही"
       },
       "actions": {
         "cancelUpload": "अपलोड रद्द करा",
@@ -143,6 +150,11 @@
       "humanInteraction": {
         "body": "The assistant has completed the task and is waiting for your review."
       }
+    },
+    "floating": {
+      "maximize": "Maximize",
+      "restore": "Reduce size",
+      "close": "Go to chat"
     }
   },
   "threadHistory": {

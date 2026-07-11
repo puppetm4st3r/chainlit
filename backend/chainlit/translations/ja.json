@@ -86,11 +86,19 @@
       "availableTools": "利用可能なツール"
     },
     "fileUpload": {
-      "dragDrop": "ここにファイルをドラッグ＆ドロップ",
-      "sizeLimit": "制限：",
+      "title": "ファイルをアップロード",
+      "upload": "アップロード",
+      "uploading": "アップロード中…",
+      "dropHint": "ここにファイルをドラッグ＆ドロップ",
+      "browse": "ファイルを参照",
+      "maxSize": "各ファイル最大 {{size}} MB",
+      "maxFiles": "最大 {{count}} ファイル",
+      "selectedCount": "{{count}} / {{max}} 選択中",
+      "removeFile": "ファイルを削除",
       "errors": {
         "failed": "アップロードに失敗しました",
-        "cancelled": "アップロードをキャンセルしました："
+        "cancelled": "アップロードをキャンセルしました：",
+        "invalidSpec": "AskFile に max_files または max_size_mb がありません"
       },
       "actions": {
         "cancelUpload": "アップロードをキャンセル",
@@ -142,6 +150,11 @@
       "humanInteraction": {
         "body": "The assistant has completed the task and is waiting for your review."
       }
+    },
+    "floating": {
+      "maximize": "Maximize",
+      "restore": "Reduce size",
+      "close": "Go to chat"
     }
   },
   "threadHistory": {

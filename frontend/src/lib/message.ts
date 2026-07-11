@@ -1,9 +1,18 @@
-import type { IMessageElement } from 'client-types/';
+import type { ICustomElement, IMessageElement } from 'client-types/';
+
+import { shouldShowFloatingReopenChip } from '@/lib/floatingReopenChip';
 
 const toSafeLinkTarget = (name: string) =>
   encodeURIComponent(name.replace(/\s+/g, '_'))
     .replace(/\(/g, '%28')
     .replace(/\)/g, '%29'); // Encode parentheses to avoid issues in URLs
+
+/**
+ * Build a stable markdown href that preserves the CustomElement match name
+ * even when the visible link label is a human title (props.title).
+ */
+const toElementRefHref = (name: string) =>
+  `#element:${encodeURIComponent(name)}`;
 
 const isForIdMatch = (id: string | number | undefined, forId: string) => {
   if (!forId || !id) {
@@ -16,6 +25,27 @@ const isForIdMatch = (id: string | number | undefined, forId: string) => {
 const escapeRegExp = (string: string) => {
   // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_Expressions#escaping
   return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+};
+
+const escapeMarkdownLinkLabel = (label: string) =>
+  String(label || '')
+    .replace(/\\/g, '\\\\')
+    .replace(/\[/g, '\\[')
+    .replace(/\]/g, '\\]');
+
+/**
+ * Prefer CustomElement props.title for the visible chip label.
+ * Element.name remains the match token in message content / href.
+ */
+const resolveElementRefLabel = (element: IMessageElement, fallback: string) => {
+  if (element.type === 'custom') {
+    const props = (element as ICustomElement).props || {};
+    const title = props.title;
+    if (typeof title === 'string' && title.trim()) {
+      return title.trim();
+    }
+  }
+  return fallback;
 };
 
 export const prepareContent = ({
@@ -76,12 +106,24 @@ export const prepareContent = ({
           inlinedElements.push(element);
         }
         return match;
+      } else if (
+        element.display === 'floating' &&
+        element.type === 'custom' &&
+        !shouldShowFloatingReopenChip(element)
+      ) {
+        // One-shot floating notices (e.g. Motd): strip the match token, no chip.
+        return '';
       } else {
-        // Element is a reference, add it to the list and return link
+        // Element is a reference, add it to the list and return link.
+        // Visible label may be props.title; href keeps the element name for lookup.
         refElements.push(element);
-        // Build a Markdown-safe link: escape text, and encode () in the slug
-        // The address in the link is not used anyway
-        return `[${match}](${toSafeLinkTarget(match)})`;
+        const label = escapeMarkdownLinkLabel(
+          resolveElementRefLabel(element, match)
+        );
+        if (element.display === 'floating' && element.type === 'custom') {
+          return `[${label}](${toElementRefHref(element.name)})`;
+        }
+        return `[${label}](${toSafeLinkTarget(match)})`;
       }
     });
   }

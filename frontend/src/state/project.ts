@@ -15,6 +15,11 @@ export const dismissedSideViewSignatureState = atom<string | undefined>({
   default: undefined
 });
 
+export const dismissedFloatingSignatureState = atom<string | undefined>({
+  key: 'dismissedFloatingSignature',
+  default: undefined
+});
+
 export const workflowHelpDialogOpenState = atom<boolean>({
   key: 'workflowHelpDialogOpen',
   default: false

@@ -19,7 +19,7 @@
   "auth": {
     "login": {
       "title": "Inicia sesión para acceder a la aplicación",
-        "privateIntegrationTokenBootstrap": "Generar token de integración",
+      "privateIntegrationTokenBootstrap": "Generar token de integración",
       "form": {
         "email": {
           "label": "Correo electrónico",
@@ -86,12 +86,19 @@
       "connecting": "Conectando"
     },
     "fileUpload": {
-      "dragDrop": "Arrastra y suelta archivos aquí",
+      "title": "Subir archivos",
+      "upload": "Subir",
+      "uploading": "Subiendo…",
+      "dropHint": "Arrastra y suelta archivos aquí",
       "browse": "Buscar archivos",
-      "sizeLimit": "Límite:",
+      "maxSize": "Máx. {{size}} MB cada uno",
+      "maxFiles": "Hasta {{count}} archivos",
+      "selectedCount": "{{count}} / {{max}} seleccionados",
+      "removeFile": "Quitar archivo",
       "errors": {
         "failed": "Error al subir",
-        "cancelled": "Carga cancelada de"
+        "cancelled": "Carga cancelada de",
+        "invalidSpec": "AskFile no tiene max_files o max_size_mb"
       },
       "actions": {
         "cancelUpload": "Cancelar subida",
@@ -143,6 +150,11 @@
       "humanInteraction": {
         "body": "El asistente ha completado la tarea y está esperando tu revisión."
       }
+    },
+    "floating": {
+      "maximize": "Maximizar",
+      "restore": "Reducir tamaño",
+      "close": "Ir al chat"
     }
   },
   "threadHistory": {
@@ -157,10 +169,6 @@
         "yesterday": "Ayer",
         "previous7days": "Últimos 7 días",
         "previous30days": "Últimos 30 días"
-      },
-      "project": {
-        "label": "Proyecto",
-        "menuTitle": "Seleccionar proyecto"
       },
       "empty": "No se encontraron conversaciones",
       "actions": {

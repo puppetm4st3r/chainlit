@@ -7,7 +7,9 @@ import { toast } from 'sonner';
 
 import {
   ChainlitContext,
+  floatingViewState,
   IAction,
+  ICustomElement,
   IFeedback,
   IMessageElement,
   IStep,
@@ -21,9 +23,11 @@ import {
 
 import { useLayoutMaxWidth } from 'hooks/useLayoutMaxWidth';
 
+import { resolveFloatingElementTitle } from '@/lib/floatingElementTitle';
 import { ErrorBoundary } from './ErrorBoundary';
 import { Loader } from './Loader';
 import { Messages } from './chat/Messages';
+import { dismissedFloatingSignatureState } from '@/state/project';
 
 type Props = {
   id: string;
@@ -49,6 +53,10 @@ const ReadOnlyThread = ({ id }: Props) => {
   );
   const navigate = useNavigate();
   const setSideView = useSetRecoilState(sideViewState);
+  const setFloatingView = useSetRecoilState(floatingViewState);
+  const setDismissedFloatingSignature = useSetRecoilState(
+    dismissedFloatingSignatureState
+  );
   const [steps, setSteps] = useState<IStep[]>([]);
   const apiClient = useContext(ChainlitContext);
   const { t } = useTranslation();
@@ -131,6 +139,18 @@ const ReadOnlyThread = ({ id }: Props) => {
 
   const onElementRefClick = useCallback(
     (element: IMessageElement) => {
+      if (element.display === 'floating') {
+        if (element.type !== 'custom') {
+          return;
+        }
+        setDismissedFloatingSignature(undefined);
+        setFloatingView({
+          title: resolveFloatingElementTitle(element),
+          element: element as ICustomElement
+        });
+        return;
+      }
+
       if (element.display === 'side') {
         setSideView({ title: element.name, elements: [element] });
         return;
@@ -144,7 +164,12 @@ const ReadOnlyThread = ({ id }: Props) => {
 
       return navigate(element.display === 'page' ? path : '#');
     },
-    [setSideView, navigate]
+    [
+      navigate,
+      setDismissedFloatingSignature,
+      setFloatingView,
+      setSideView
+    ]
   );
 
   const onError = useCallback((error: string) => toast.error(error), [toast]);

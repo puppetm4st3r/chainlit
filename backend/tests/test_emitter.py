@@ -484,3 +484,76 @@ async def test_set_thread_title_skips_runtime_update_without_data_layer(
 
     assert result is False
     mock_websocket_session.emit.assert_not_called()
+
+
+async def test_send_ask_user_ephemeral_element_skips_thread_persistence(
+    emitter: ChainlitEmitter, mock_websocket_session: MagicMock
+) -> None:
+    """Ephemeral AskElement replies must not flush thread persistence."""
+    from chainlit.types import AskElementSpec
+
+    step_dict: StepDict = {
+        "id": "ask-ephemeral",
+        "parentId": "parent-1",
+        "type": "assistant_message",
+        "name": "Assistant",
+        "output": "Motd",
+        "metadata": {"countsTowardThreadPersistenceThreshold": False},
+    }
+    spec = AskElementSpec(
+        type="element",
+        step_id="ask-ephemeral",
+        timeout=60,
+        element_id="el-1",
+        ephemeral=True,
+    )
+    mock_websocket_session.files_spec = {}
+    mock_websocket_session.emit_call = AsyncMock(
+        return_value={"submitted": True, "dismissed": "continue"}
+    )
+    emitter.ensure_thread_persistence = AsyncMock()  # type: ignore[method-assign]
+    emitter.task_end = AsyncMock()  # type: ignore[method-assign]
+    emitter.task_start = AsyncMock()  # type: ignore[method-assign]
+    emitter.clear = AsyncMock()  # type: ignore[method-assign]
+
+    result = await emitter.send_ask_user(step_dict, spec)
+
+    assert result == {"submitted": True, "dismissed": "continue"}
+    emitter.ensure_thread_persistence.assert_not_awaited()  # type: ignore[attr-defined]
+
+
+async def test_send_ask_user_durable_element_ensures_thread_persistence(
+    emitter: ChainlitEmitter, mock_websocket_session: MagicMock
+) -> None:
+    """Non-ephemeral AskElement replies still cross the persistence threshold."""
+    from chainlit.types import AskElementSpec
+
+    step_dict: StepDict = {
+        "id": "ask-durable",
+        "parentId": "parent-1",
+        "type": "assistant_message",
+        "name": "Assistant",
+        "output": "Form",
+    }
+    spec = AskElementSpec(
+        type="element",
+        step_id="ask-durable",
+        timeout=60,
+        element_id="el-2",
+        ephemeral=False,
+    )
+    mock_websocket_session.files_spec = {}
+    mock_websocket_session.emit_call = AsyncMock(
+        return_value={"submitted": True}
+    )
+    emitter.ensure_thread_persistence = AsyncMock()  # type: ignore[method-assign]
+    emitter.task_end = AsyncMock()  # type: ignore[method-assign]
+    emitter.task_start = AsyncMock()  # type: ignore[method-assign]
+    emitter.clear = AsyncMock()  # type: ignore[method-assign]
+
+    result = await emitter.send_ask_user(step_dict, spec)
+
+    assert result == {"submitted": True}
+    emitter.ensure_thread_persistence.assert_awaited_once_with(  # type: ignore[attr-defined]
+        interaction="custom_element"
+    )

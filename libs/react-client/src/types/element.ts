@@ -38,7 +38,7 @@ interface TElement<T> {
 
 interface TMessageElement<T> extends TElement<T> {
   name: string;
-  display: 'inline' | 'side' | 'page';
+  display: 'inline' | 'side' | 'page' | 'floating';
 }
 
 export interface IImageElement extends TMessageElement<'image'> {
@@ -82,4 +82,14 @@ export type IDataframeElement = TMessageElement<'dataframe'>;
 
 export interface ICustomElement extends TMessageElement<'custom'> {
   props: Record<string, unknown>;
+  /**
+   * Required for display="floating": whether the green reopen chip appears in chat history.
+   * Backend CustomElement raises if floating and this is not an explicit boolean.
+   */
+  showReopenChip?: boolean;
+  /**
+   * Required for display="floating": whether the floating window opens maximized.
+   * Backend CustomElement raises if floating and this is not an explicit boolean.
+   */
+  startMaximized?: boolean;
 }

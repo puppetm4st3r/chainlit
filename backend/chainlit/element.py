@@ -44,7 +44,7 @@ ElementType = Literal[
     "link",
     "custom",
 ]
-ElementDisplay = Literal["inline", "side", "page"]
+ElementDisplay = Literal["inline", "side", "page", "floating"]
 ElementSize = Literal["small", "medium", "large"]
 
 
@@ -66,6 +66,10 @@ class ElementDict(TypedDict, total=False):
     playerConfig: Optional[dict]
     forId: Optional[str]
     mime: Optional[str]
+    # Required for display="floating": True shows the reopen chip, False hides it.
+    showReopenChip: Optional[bool]
+    # Required for display="floating": whether the window opens maximized.
+    startMaximized: Optional[bool]
 
 
 @dataclass
@@ -88,7 +92,9 @@ class Element:
     path: Optional[str] = None
     # The byte content of the element.
     content: Optional[Union[bytes, str]] = None
-    # Controls how the image element should be displayed in the UI. Choices are “side” (default), “inline”, or “page”.
+    # Controls how the element should be displayed in the UI.
+    # Choices are "inline" (default), "side", "page", or "floating".
+    # "floating" is only valid for CustomElement.
     display: ElementDisplay = Field(default="inline")
     # Controls element size
     size: Optional[ElementSize] = None
@@ -98,6 +104,11 @@ class Element:
     language: Optional[str] = None
     # Mime type, inferred based on content if not provided
     mime: Optional[str] = None
+    # Floating reopen chip in chat history. Required bool when display="floating".
+    # True: show green reopen chip (e.g. DynamicTable). False: no chip (e.g. Motd).
+    show_reopen_chip: Optional[bool] = None
+    # Whether the floating window opens maximized. Required bool when display="floating".
+    start_maximized: Optional[bool] = None
 
     def __post_init__(self) -> None:
         self.persisted = False
@@ -105,6 +116,43 @@ class Element:
 
         if not self.url and not self.path and not self.content:
             raise ValueError("Must provide url, path or content to instantiate element")
+
+        if self.display == "floating":
+            if self.type != "custom":
+                raise ValueError(
+                    "display='floating' is only supported for CustomElement."
+                )
+            if not (self.name or "").strip():
+                raise ValueError("display='floating' requires a non-empty name.")
+            if not isinstance(self.show_reopen_chip, bool):
+                raise ValueError(
+                    "display='floating' requires show_reopen_chip=True or "
+                    "show_reopen_chip=False (explicit bool)."
+                )
+            if not isinstance(self.start_maximized, bool):
+                raise ValueError(
+                    "display='floating' requires start_maximized=True or "
+                    "start_maximized=False (explicit bool)."
+                )
+        else:
+            if self.show_reopen_chip is not None:
+                raise ValueError(
+                    "show_reopen_chip is only valid when display='floating'."
+                )
+            if self.start_maximized is not None:
+                raise ValueError(
+                    "start_maximized is only valid when display='floating'."
+                )
+
+    @property
+    def is_ephemeral(self) -> bool:
+        """
+        Whether this element must leave no durable chat/thread footprint.
+
+        True only for ``display='floating'`` with ``show_reopen_chip=False``
+        (e.g. Motd). Not a constructor argument; derived from that combination.
+        """
+        return self.display == "floating" and self.show_reopen_chip is False
 
     def to_dict(self) -> ElementDict:
         _dict = ElementDict(
@@ -125,6 +173,8 @@ class Element:
                 "language": getattr(self, "language", None),
                 "forId": getattr(self, "for_id", None),
                 "mime": getattr(self, "mime", None),
+                "showReopenChip": getattr(self, "show_reopen_chip", None),
+                "startMaximized": getattr(self, "start_maximized", None),
             }
         )
         return _dict
@@ -151,6 +201,14 @@ class Element:
         chainlit_key = e_dict.get("chainlitKey")
         display = e_dict.get("display", "inline")
         mime_type = e_dict.get("mime", "")
+        show_reopen_chip = e_dict.get("showReopenChip")
+        start_maximized = e_dict.get("startMaximized")
+        # Historical floating elements predate the required flags; they showed a chip
+        # and opened maximized.
+        if display == "floating" and show_reopen_chip is None:
+            show_reopen_chip = True
+        if display == "floating" and start_maximized is None:
+            start_maximized = True
 
         # Common parameters for all element types
         common_params = {
@@ -164,6 +222,8 @@ class Element:
             "chainlit_key": chainlit_key,
             "display": display,
             "mime": mime_type,
+            "show_reopen_chip": show_reopen_chip,
+            "start_maximized": start_maximized,
         }
 
         if type == "image":
@@ -564,7 +624,18 @@ class Dataframe(Element):
 
 @dataclass
 class CustomElement(Element):
-    """Useful to send a custom element to the UI."""
+    """Useful to send a custom JSX element to the UI.
+
+    Supported display modes: "inline", "side", "page", and "floating".
+    "floating" opens a modal resizable window. Pass ``show_reopen_chip=True`` to
+    keep a reopen chip in chat history, or ``False`` for one-shot notices (Motd).
+    Pass ``start_maximized=True/False`` to control the initial window size
+    (required for floating).
+
+    Floating + ``show_reopen_chip=False`` is treated as ephemeral internally
+    (``is_ephemeral``): no durable step/thread side effects when used with
+    ``AskElementMessage``.
+    """
 
     type: ClassVar[ElementType] = "custom"
     mime: str = "application/json"

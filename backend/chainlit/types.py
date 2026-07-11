@@ -156,6 +156,9 @@ class AskElementSpec(AskSpec, DataClassJsonMixin):
     """Specification for asking the user a custom element"""
 
     element_id: str
+    # Set by AskElementMessage when the target CustomElement is ephemeral
+    # (floating + show_reopen_chip=False). Not authored by application code.
+    ephemeral: bool = False
 
 
 class FileReference(TypedDict):

@@ -86,12 +86,19 @@
       "availableTools": "כלים זמינים"
     },
     "fileUpload": {
-      "dragDrop": "גרור ושחרר קבצים כאן",
+      "title": "העלאת קבצים",
+      "upload": "העלה",
+      "uploading": "מעלה…",
+      "dropHint": "גרור ושחרר קבצים כאן",
       "browse": "עיין בקבצים",
-      "sizeLimit": "מגבלה:",
+      "maxSize": "עד {{size}} MB לכל קובץ",
+      "maxFiles": "עד {{count}} קבצים",
+      "selectedCount": "{{count}} / {{max}} נבחרו",
+      "removeFile": "הסרת קובץ",
       "errors": {
         "failed": "העלאה נכשלה",
-        "cancelled": "העלאה בוטלה של"
+        "cancelled": "העלאה בוטלה של",
+        "invalidSpec": "ל-AskFile חסרים max_files או max_size_mb"
       },
       "actions": {
         "cancelUpload": "ביטול העלאה",
@@ -143,6 +150,11 @@
       "humanInteraction": {
         "body": "The assistant has completed the task and is waiting for your review."
       }
+    },
+    "floating": {
+      "maximize": "Maximize",
+      "restore": "Reduce size",
+      "close": "Go to chat"
     }
   },
   "threadHistory": {

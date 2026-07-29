@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils';
-import { Ellipsis, Share2, Trash2 } from 'lucide-react';
+import { Ellipsis, FolderInput, Share2, Trash2 } from 'lucide-react';
 
 import { Pencil } from '@/components/icons/Pencil';
 import { buttonVariants } from '@/components/ui/button';
@@ -15,6 +15,8 @@ import { Translator } from '../i18n';
 interface Props {
   onDelete: () => void;
   onRename: () => void;
+  onMove?: () => void;
+  moveDisabled?: boolean;
   onShare?: () => void;
   className?: string;
 }
@@ -22,6 +24,8 @@ interface Props {
 export default function ThreadOptions({
   onDelete,
   onRename,
+  onMove,
+  moveDisabled = false,
   onShare,
   className
 }: Props) {
@@ -43,7 +47,7 @@ export default function ThreadOptions({
           <Ellipsis />
         </div>
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-20" align="start" forceMount>
+      <DropdownMenuContent className="w-48" align="start" forceMount>
         <DropdownMenuItem
           id="rename-thread"
           onClick={(e) => {
@@ -54,6 +58,22 @@ export default function ThreadOptions({
           <Translator path="threadHistory.thread.menu.rename" />
           <Pencil className="ml-auto" />
         </DropdownMenuItem>
+        {onMove ? (
+          <DropdownMenuItem
+            id="move-thread-project"
+            disabled={moveDisabled}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (moveDisabled) {
+                return;
+              }
+              onMove();
+            }}
+          >
+            <Translator path="threadHistory.thread.menu.moveProject" />
+            <FolderInput className="ml-auto" />
+          </DropdownMenuItem>
+        ) : null}
         {onShare && (
           <DropdownMenuItem
             id="share-thread"

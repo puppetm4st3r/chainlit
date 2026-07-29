@@ -38,11 +38,36 @@ describe('canvas editor runtime bridge', () => {
     expect(runtimeModule.bridgeLinesToBackendCanonical(line)).toBe(line);
   });
 
-  it('still rejects real HTML tags in canonical content', () => {
+  it('unwraps presentation HTML tags while keeping visible text', () => {
     const runtimeModule = loadCanvasEditorRuntimeModule();
 
-    expect(() => runtimeModule.bridgeCanonicalToEditorView('Texto con <a href="https://www.dolfs.io/">link</a>')).toThrow(
-      /Unsupported HTML artifact/
+    expect(runtimeModule.bridgeCanonicalToEditorView('<center>ARRENDADOR</center>')).toBe(
+      'ARRENDADOR'
+    );
+    expect(
+      runtimeModule.bridgeLinesToBackendCanonical('Texto con <a href="https://www.dolfs.io/">link</a>')
+    ).toBe('Texto con link');
+  });
+
+  it('ignores document-pipeline media markers until canvas image support exists', () => {
+    const runtimeModule = loadCanvasEditorRuntimeModule();
+    const line = '<m uri="img_1" />';
+
+    expect(runtimeModule.bridgeCanonicalToEditorView(line)).toBe('');
+    expect(runtimeModule.bridgeLinesToBackendCanonical(line)).toBe('');
+    expect(
+      runtimeModule.bridgeCanonicalToEditorView('Before\n\n<m uri="tenant/x/img_1" />\n\nAfter')
+    ).toBe('Before\n\n<br>\nAfter');
+    expect(
+      runtimeModule.bridgeCanonicalToEditorView('Caption <m uri="img_1" /> continues')
+    ).toBe('Caption  continues');
+  });
+
+  it('unwraps non-media HTML after ignoring media markers on the same line', () => {
+    const runtimeModule = loadCanvasEditorRuntimeModule();
+
+    expect(runtimeModule.bridgeLinesToBackendCanonical('<m uri="img_1" /><div>bad</div>')).toBe(
+      'bad'
     );
   });
 });

@@ -10,6 +10,7 @@ import ElementSideView from '@/components/ElementSideView';
 import LeftSidebar from '@/components/LeftSidebar';
 import { TaskList } from '@/components/Tasklist';
 import { Header } from '@/components/header';
+import ChatSidebarOpenControl from '@/components/header/ChatSidebarOpenControl';
 import { ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 
@@ -21,6 +22,13 @@ type Props = {
 
 const DEFAULT_TASKLIST_PANEL_SIZE = 30;
 const DEFAULT_SIDE_VIEW_PANEL_SIZE = 70;
+
+/**
+ * Temporary: keep the chat Header mounted but hidden so the chat column
+ * (and full-height side panels) reclaim its vertical space. Flip to true to
+ * restore the top bar without putting the component back by hand.
+ */
+const CHAT_HEADER_VISIBLE = false;
 
 const Page = ({ children }: Props) => {
   const { config } = useConfig();
@@ -47,36 +55,81 @@ const Page = ({ children }: Props) => {
   }
 
   const showSettingsSidebar = config?.ui?.chat_settings_location === 'sidebar';
-
-  const mainContent = (
-    <div className="flex flex-col h-full w-full">
-      <Header sidePanelSize={desktopPanelSizes[1] ?? defaultSidePanelSize} />
-      <ResizablePanelGroup
-        key={sideView ? 'side-view-layout' : 'tasklist-layout'}
-        direction="horizontal"
-        className="flex flex-row flex-grow"
-        onLayout={setDesktopPanelSizes}
-      >
-        <ResizablePanel
-          className="flex flex-col h-full w-full"
-          minSize={20}
-          defaultSize={100 - defaultSidePanelSize}
-        >
-          <div className="flex flex-row flex-grow overflow-auto">
-            {children}
-          </div>
-        </ResizablePanel>
-        {sideView ? <ElementSideView /> : <TaskList isMobile={false} />}
-        {showSettingsSidebar && <ChatSettingsSidebar />}
-      </ResizablePanelGroup>
-      <ElementFloatingView />
-    </div>
-  );
-
+  const sidePanelSize = desktopPanelSizes[1] ?? defaultSidePanelSize;
   const historyEnabled = config?.dataPersistence && data?.requireLogin;
   const sidebarHidden = config?.ui?.default_sidebar_state === 'hidden';
   const showConversationHistory =
     historyEnabled && !sidebarHidden && conversationHistoryVisible !== false;
+
+  // Side view keeps a full-width header grid (title/actions over the right pane).
+  // TaskList docks like the threads sidebar: full viewport height and pushes the
+  // chat header so icons are not drawn above the task panel.
+  const header = (
+    <div
+      className={CHAT_HEADER_VISIBLE ? undefined : 'hidden'}
+      aria-hidden={CHAT_HEADER_VISIBLE ? undefined : true}
+    >
+      <Header sidePanelSize={sideView ? sidePanelSize : 0} />
+    </div>
+  );
+
+  const chatColumn = (
+    <div className="relative flex min-h-0 flex-grow flex-col">
+      {!CHAT_HEADER_VISIBLE && showConversationHistory ? (
+        <ChatSidebarOpenControl />
+      ) : null}
+      <div className="flex min-h-0 flex-grow flex-row overflow-auto">
+        {children}
+      </div>
+    </div>
+  );
+
+  const mainContent = (
+    <div className="flex h-full w-full flex-col">
+      {sideView ? (
+        <>
+          {header}
+          <ResizablePanelGroup
+            key="side-view-layout"
+            direction="horizontal"
+            className="flex min-h-0 flex-grow flex-row"
+            onLayout={setDesktopPanelSizes}
+          >
+            <ResizablePanel
+              className="flex h-full w-full flex-col"
+              minSize={20}
+              defaultSize={100 - defaultSidePanelSize}
+            >
+              {chatColumn}
+            </ResizablePanel>
+            <ElementSideView />
+            {showSettingsSidebar && <ChatSettingsSidebar />}
+          </ResizablePanelGroup>
+        </>
+      ) : (
+        <ResizablePanelGroup
+          key="tasklist-layout"
+          direction="horizontal"
+          className="flex h-full min-h-0 flex-grow flex-row"
+          onLayout={setDesktopPanelSizes}
+        >
+          <ResizablePanel
+            className="flex h-full min-h-0 w-full flex-col"
+            minSize={20}
+            defaultSize={100 - defaultSidePanelSize}
+          >
+            <div className="flex h-full min-h-0 flex-col">
+              {header}
+              {chatColumn}
+            </div>
+          </ResizablePanel>
+          <TaskList isMobile={false} />
+          {showSettingsSidebar && <ChatSettingsSidebar />}
+        </ResizablePanelGroup>
+      )}
+      <ElementFloatingView />
+    </div>
+  );
 
   return (
     <SidebarProvider

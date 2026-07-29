@@ -7,7 +7,7 @@ from urllib.parse import unquote
 import jwt as pyjwt
 from fastapi import HTTPException
 from starlette.requests import cookie_parser
-from typing_extensions import TypeAlias
+from typing_extensions import NotRequired, TypeAlias
 
 from chainlit.auth import (
     get_current_user,
@@ -36,10 +36,12 @@ WSGIEnvironment: TypeAlias = dict[str, Any]
 
 class WebSocketSessionAuth(TypedDict):
     sessionId: str
-    userEnv: str | None
     clientType: ClientType
-    chatProfile: str | None
-    threadId: str | None
+    userEnv: NotRequired[str | None]
+    chatProfile: NotRequired[str | None]
+    threadId: NotRequired[str | None]
+    # Page URL ``project_id`` (URL-encoded); preferred over Referer for project scope.
+    projectId: NotRequired[str | None]
 
 
 def _normalize_identifier(value: Any) -> str:
@@ -74,6 +76,7 @@ def restore_existing_session(
     emit_call_fn,
     environ,
     user: User | PersistedUser | None = None,
+    client_project_id: Optional[str] = None,
 ):
     """Restore a session from the sessionId provided by the client."""
     if session := WebsocketSession.get_by_id(session_id):
@@ -85,6 +88,8 @@ def restore_existing_session(
         session.emit = emit_fn
         session.emit_call = emit_call_fn
         session.environ = environ
+        # Keep page URL project scope in sync across reconnects / soft reloads.
+        session.client_project_id = client_project_id
         return True
     return False
 
@@ -418,8 +423,20 @@ async def connect(sid: str, environ: WSGIEnvironment, auth: WebSocketSessionAuth
         return sio.call(event, data, timeout=timeout, to=sid)
 
     session_id = auth["sessionId"]
+    url_encoded_project_id = auth.get("projectId", None)
+    client_project_id = (
+        unquote(url_encoded_project_id).strip()
+        if url_encoded_project_id and str(url_encoded_project_id).strip()
+        else None
+    )
     if restore_existing_session(
-        sid, session_id, emit_fn, emit_call_fn, environ, user=user
+        sid,
+        session_id,
+        emit_fn,
+        emit_call_fn,
+        environ,
+        user=user,
+        client_project_id=client_project_id,
     ):
         return True
 
@@ -444,6 +461,7 @@ async def connect(sid: str, environ: WSGIEnvironment, auth: WebSocketSessionAuth
         chat_profile=chat_profile,
         thread_id=thread_id,
         environ=environ,
+        client_project_id=client_project_id,
     )
 
     return True
@@ -727,9 +745,6 @@ async def audio_end(sid):
     try:
         context = init_ws_context(session)
         await context.emitter.task_start()
-
-        if not session.is_thread_persistence_ready():
-            asyncio.create_task(context.emitter.ensure_thread_persistence("audio"))
 
         config: ChainlitConfig = session.get_config()  # type: ignore
 

@@ -205,26 +205,9 @@ async def test_delete_user_threads_deletes_only_current_user_history(
     mock_get_current_user: Mock,
     monkeypatch: pytest.MonkeyPatch,
 ):
-    """Delete all threads returned by the current user's history query."""
+    """Bulk-delete delegates to the data layer with project scope and exclude id."""
     data_layer = AsyncMock()
-    data_layer.list_threads.side_effect = [
-        PaginatedResponse(
-            pageInfo=PageInfo(
-                hasNextPage=True,
-                startCursor="thread-1",
-                endCursor="thread-2",
-            ),
-            data=[{"id": "thread-1"}, {"id": "thread-2"}],
-        ),
-        PaginatedResponse(
-            pageInfo=PageInfo(
-                hasNextPage=False,
-                startCursor="thread-3",
-                endCursor="thread-3",
-            ),
-            data=[{"id": "thread-3"}],
-        ),
-    ]
+    data_layer.delete_user_threads = AsyncMock(return_value=2)
     monkeypatch.setattr("chainlit.server.get_data_layer", lambda: data_layer)
     mock_get_current_user.return_value = PersistedUser(
         identifier="user@example.com",
@@ -233,18 +216,24 @@ async def test_delete_user_threads_deletes_only_current_user_history(
         metadata={"roles": ["web"]},
     )
 
-    response = test_client.request("DELETE", "/project/threads", json={})
+    response = test_client.request(
+        "DELETE",
+        "/project/threads",
+        json={
+            "filter": {"projectId": None},
+            "excludeThreadId": "current-thread",
+        },
+    )
 
     assert response.status_code == 200, response.json()
-    assert response.json() == {"success": True, "deletedThreadCount": 3}
-    assert data_layer.list_threads.await_count == 2
-    data_layer.delete_thread.assert_has_awaits(
-        [
-            call("thread-1"),
-            call("thread-2"),
-            call("thread-3"),
-        ]
+    assert response.json() == {"success": True, "deletedThreadCount": 2}
+    data_layer.delete_user_threads.assert_awaited_once_with(
+        user_id="user-id",
+        project_id=None,
+        exclude_thread_id="current-thread",
     )
+    data_layer.delete_thread.assert_not_called()
+    data_layer.list_threads.assert_not_called()
 
 
 def test_project_settings_path_traversal(

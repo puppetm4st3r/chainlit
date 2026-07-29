@@ -256,6 +256,7 @@ alert_style = "classic"
 logo_file_url = ""
 
 # Load assistant avatar image directly from URL.
+# Can be overridden with CHAINLIT_DEFAULT_AVATAR_FILE_URL (env wins over this value).
 default_avatar_file_url = ""
 
 # Avatar size in pixels (default: 20).
@@ -707,6 +708,12 @@ def load_settings():
 
         if admin_url_override := os.environ.get("CHAINLIT_ADMIN_URL"):
             ui_settings["admin_url"] = admin_url_override
+
+        # Non-empty env wins over UI.default_avatar_file_url from config.toml.
+        if default_avatar_override := os.environ.get(
+            "CHAINLIT_DEFAULT_AVATAR_FILE_URL", ""
+        ).strip():
+            ui_settings["default_avatar_file_url"] = default_avatar_override
 
         project_settings = ProjectSettings(
             lc_cache_path=lc_cache_path,

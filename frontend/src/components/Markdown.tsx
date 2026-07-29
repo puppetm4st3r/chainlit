@@ -42,6 +42,14 @@ import {
   normalizeAlertType
 } from './MarkdownAlert';
 
+/**
+ * Stable react-markdown component identity so the streaming caret is not
+ * unmounted/remounted on every token (inline () => ... caused visible flicker).
+ */
+function MarkdownBlinkingCursor() {
+  return <BlinkingCursor whitespace />;
+}
+
 interface Props {
   allowHtml?: boolean;
   latex?: boolean;
@@ -301,11 +309,12 @@ function ReferenceTooltipBody({
           ref={scrollRef}
           className="flex flex-col gap-2 overflow-y-auto pr-1"
           style={{
+            // Do not set scrollbarWidth here: on Chrome 121+ it overrides
+            // ::-webkit-scrollbar-* and re-enables native arrow buttons.
             maxHeight:
               references.length > REFERENCE_TOOLTIP_MAX_VISIBLE_ITEMS
                 ? REFERENCE_TOOLTIP_SCROLL_MAX_HEIGHT
-                : undefined,
-            scrollbarWidth: 'thin'
+                : undefined
           }}
         >
           {references.map((reference, index) => (
@@ -484,10 +493,9 @@ function ConversationReferenceTooltipLayer() {
     }, REFERENCE_TOOLTIP_CLOSE_DELAY_MS);
   };
 
-  const updateTooltipPosition = () => {
-    const anchorElement = activeTooltip?.anchorElement || null;
-    if (!anchorElement || !anchorElement.isConnected) {
-      return;
+  const syncTooltipPosition = (anchorElement: HTMLElement) => {
+    if (!anchorElement.isConnected) {
+      return false;
     }
     const anchorRect = anchorElement.getBoundingClientRect();
     const tooltipRect = tooltipRef.current?.getBoundingClientRect();
@@ -501,13 +509,14 @@ function ConversationReferenceTooltipLayer() {
         ? currentPosition
         : nextPosition
     );
+    return true;
   };
 
   useLayoutEffect(() => {
     if (!activeTooltip) {
       return;
     }
-    updateTooltipPosition();
+    syncTooltipPosition(activeTooltip.anchorElement);
   }, [activeTooltip]);
 
   useEffect(() => {
@@ -570,12 +579,24 @@ function ConversationReferenceTooltipLayer() {
     if (!activeTooltip) {
       return;
     }
-    const handleViewportMutation = () => {
-      if (!activeTooltip.anchorElement.isConnected) {
-        setActiveTooltip(null);
+    const anchorElement = activeTooltip.anchorElement;
+    const dismissImmediately = () => {
+      clearCloseTimer();
+      setActiveTooltip(null);
+    };
+    /**
+     * Any scroll outside the tooltip portal closes it immediately.
+     * Internal tooltip list scroll is allowed and must not dismiss.
+     */
+    const handleScroll = (event: Event) => {
+      const scrollTarget = event.target;
+      if (scrollTarget instanceof Node && tooltipRef.current?.contains(scrollTarget)) {
         return;
       }
-      updateTooltipPosition();
+      dismissImmediately();
+    };
+    const handleResize = () => {
+      dismissImmediately();
     };
     const handlePointerDownOutside = (event: MouseEvent) => {
       const eventTarget = event.target;
@@ -585,26 +606,25 @@ function ConversationReferenceTooltipLayer() {
       if (tooltipRef.current?.contains(eventTarget)) {
         return;
       }
-      if (activeTooltip.anchorElement.contains(eventTarget)) {
+      if (anchorElement.contains(eventTarget)) {
         return;
       }
-      clearCloseTimer();
-      setActiveTooltip(null);
+      dismissImmediately();
     };
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') {
         return;
       }
-      clearCloseTimer();
-      setActiveTooltip(null);
+      dismissImmediately();
     };
-    window.addEventListener('resize', handleViewportMutation);
-    window.addEventListener('scroll', handleViewportMutation, true);
+
+    window.addEventListener('scroll', handleScroll, { capture: true, passive: true });
+    window.addEventListener('resize', handleResize, { passive: true });
     document.addEventListener('mousedown', handlePointerDownOutside, true);
     document.addEventListener('keydown', handleEscape);
     return () => {
-      window.removeEventListener('resize', handleViewportMutation);
-      window.removeEventListener('scroll', handleViewportMutation, true);
+      window.removeEventListener('scroll', handleScroll, true);
+      window.removeEventListener('resize', handleResize);
       document.removeEventListener('mousedown', handlePointerDownOutside, true);
       document.removeEventListener('keydown', handleEscape);
     };
@@ -1052,7 +1072,7 @@ const Markdown = ({
           return <TableBody {...(props as any)}>{children}</TableBody>;
         },
         // @ts-expect-error custom plugin
-        blinkingCursor: () => <BlinkingCursor whitespace />,
+        blinkingCursor: MarkdownBlinkingCursor,
         alert: ({
           type,
           children,

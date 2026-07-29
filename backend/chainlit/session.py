@@ -1,6 +1,7 @@
 import asyncio
 import json
 import mimetypes
+import os
 import re
 import shutil
 import uuid
@@ -98,6 +99,26 @@ def get_runtime_conversation_history_visibility_override(
     return bool(override)
 
 
+def get_runtime_conversation_history_show_new_thread_override(
+    session: Optional["BaseSession"] = None,
+) -> Optional[bool]:
+    """Return the session-scoped new-thread action override, if any."""
+    override = getattr(session, "conversation_history_show_new_thread_override", None)
+    if override is None:
+        return None
+    return bool(override)
+
+
+def get_runtime_conversation_history_show_delete_threads_override(
+    session: Optional["BaseSession"] = None,
+) -> Optional[bool]:
+    """Return the session-scoped bulk-delete action override, if any."""
+    override = getattr(session, "conversation_history_show_delete_threads_override", None)
+    if override is None:
+        return None
+    return bool(override)
+
+
 def get_runtime_new_chat_button_visibility_override(
     session: Optional["BaseSession"] = None,
 ) -> Optional[bool]:
@@ -150,6 +171,43 @@ def resolve_effective_conversation_history_visible(
     if override is None:
         return True
     return override
+
+
+def resolve_effective_conversation_history_show_new_thread(
+    session: Optional["BaseSession"] = None,
+) -> bool:
+    """Resolve whether the new-thread action should be shown."""
+    if not resolve_effective_conversation_history_visible(session):
+        return False
+    override = get_runtime_conversation_history_show_new_thread_override(session)
+    if override is None:
+        return True
+    return override
+
+
+def resolve_effective_conversation_history_show_delete_threads(
+    session: Optional["BaseSession"] = None,
+) -> bool:
+    """Resolve whether the bulk-delete action should be shown."""
+    if not resolve_effective_conversation_history_visible(session):
+        return False
+    override = get_runtime_conversation_history_show_delete_threads_override(session)
+    if override is None:
+        return True
+    return override
+
+
+def resolve_effective_conversation_history_controls(
+    session: Optional["BaseSession"] = None,
+) -> Dict[str, bool]:
+    """Resolve the full conversation-history control payload for the UI."""
+    return {
+        "visible": resolve_effective_conversation_history_visible(session),
+        "show_new_thread": resolve_effective_conversation_history_show_new_thread(session),
+        "show_delete_threads": resolve_effective_conversation_history_show_delete_threads(
+            session
+        ),
+    }
 
 
 def resolve_effective_new_chat_button_visible(
@@ -209,6 +267,8 @@ class BaseSession:
         environ: Optional[dict[str, Any]] = None,
         # Chat profile selected before the session was created
         chat_profile: Optional[str] = None,
+        # Raw project_id from the page URL (socket auth); normalized later on chat start/resume.
+        client_project_id: Optional[str] = None,
     ):
         if thread_id:
             self.thread_id_to_resume = thread_id
@@ -219,20 +279,26 @@ class BaseSession:
         self.has_first_interaction = False
         self.thread_persistence_ready = False
         self.thread_persistence_in_progress = False
-        self.assistant_persistence_turn_count = 0
-        self._assistant_persistence_message_ids: set[str] = set()
         self.pending_thread_metadata_patches: Dict[str, Any] = {}
         self.chat_started = False
         self.chat_resumed = False
         self.user_env = user_env or {}
         self.environ = environ or {}
         self.chat_profile = chat_profile
+        # Raw value from the browser page URL (`?project_id=`), before NFC normalization.
+        self.client_project_id: Optional[str] = client_project_id
+        # Optional conversation project scope (query param project_id); None = global bag.
+        self.project_id: Optional[str] = None
 
         self.files: Dict[str, FileDict] = {}
         self.files_spec: Dict[str, AskFileSpec] = {}
         self.spontaneous_file_upload_enabled_override: Optional[bool] = None
         self.conversation_history_visible_override: Optional[bool] = None
         self.new_chat_button_visible_override: Optional[bool] = None
+        self.conversation_history_show_new_thread_override: Optional[bool] = None
+        self.conversation_history_show_delete_threads_override: Optional[bool] = None
+        # In-memory cache of metadata.ui_session_surface for multi-facet merges.
+        self.ui_session_surface: Optional[Dict[str, Any]] = None
 
         self.id = id
 
@@ -269,17 +335,6 @@ class BaseSession:
             and not self.is_thread_persistence_ready()
         )
 
-    def register_logical_assistant_message(self, message_id: str) -> int:
-        """Count one assistant logical message exactly once per message id."""
-        normalized_message_id = str(message_id or "").strip()
-        if not normalized_message_id:
-            return self.assistant_persistence_turn_count
-        if normalized_message_id in self._assistant_persistence_message_ids:
-            return self.assistant_persistence_turn_count
-        self._assistant_persistence_message_ids.add(normalized_message_id)
-        self.assistant_persistence_turn_count += 1
-        return self.assistant_persistence_turn_count
-
     def stage_thread_metadata_patch(self, metadata_patch: Dict[str, Any]) -> None:
         """Merge a top-level metadata patch into the in-memory pre-persistence buffer."""
         if not isinstance(metadata_patch, dict):
@@ -298,12 +353,10 @@ class BaseSession:
         return pending_patch
 
     def reset_pre_persistence_state(self) -> None:
-        """Drop any staged thread state that has not crossed the persistence threshold."""
+        """Drop any staged thread state that has not been flushed to a durable thread row."""
         self.has_first_interaction = False
         self.thread_persistence_ready = False
         self.thread_persistence_in_progress = False
-        self.assistant_persistence_turn_count = 0
-        self._assistant_persistence_message_ids.clear()
         self.pending_thread_metadata_patches = {}
         if hasattr(self, "thread_queues") and isinstance(self.thread_queues, dict):
             self.thread_queues.clear()
@@ -339,18 +392,31 @@ class BaseSession:
             file_path = file_path.with_suffix(file_extension)
 
         if path:
-            # Copy the file from the given path
-            async with (
-                aiofiles.open(path, "rb") as src,
-                aiofiles.open(file_path, "wb") as dst,
-            ):
-                await dst.write(await src.read())
+            # Copy via a temp file then replace so concurrent /project/file
+            # readers never observe a truncated body mid-write.
+            tmp_path = file_path.with_name(f"{file_path.name}.{uuid.uuid4().hex}.tmp")
+            try:
+                async with (
+                    aiofiles.open(path, "rb") as src,
+                    aiofiles.open(tmp_path, "wb") as dst,
+                ):
+                    await dst.write(await src.read())
+                os.replace(tmp_path, file_path)
+            finally:
+                if tmp_path.exists():
+                    tmp_path.unlink(missing_ok=True)
         elif content:
-            # Write the provided content to the file
-            async with aiofiles.open(file_path, "wb") as buffer:
-                if isinstance(content, str):
-                    content = content.encode("utf-8")
-                await buffer.write(content)
+            # Write atomically: truncate-on-open races with FileResponse and yields
+            # "Response content shorter than Content-Length" for updatable TaskList.
+            payload = content.encode("utf-8") if isinstance(content, str) else content
+            tmp_path = file_path.with_name(f"{file_path.name}.{uuid.uuid4().hex}.tmp")
+            try:
+                async with aiofiles.open(tmp_path, "wb") as buffer:
+                    await buffer.write(payload)
+                os.replace(tmp_path, file_path)
+            finally:
+                if tmp_path.exists():
+                    tmp_path.unlink(missing_ok=True)
 
         # Get the file size
         file_size = file_path.stat().st_size
@@ -460,6 +526,8 @@ class WebsocketSession(BaseSession):
         token: Optional[str] = None,
         # Chat profile selected before the session was created
         chat_profile: Optional[str] = None,
+        # Raw project_id from the page URL (socket auth)
+        client_project_id: Optional[str] = None,
     ):
         super().__init__(
             id=id,
@@ -470,6 +538,7 @@ class WebsocketSession(BaseSession):
             client_type=client_type,
             chat_profile=chat_profile,
             environ=environ,
+            client_project_id=client_project_id,
         )
 
         self.socket_id = socket_id

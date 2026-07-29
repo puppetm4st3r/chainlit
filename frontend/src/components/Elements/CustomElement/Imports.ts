@@ -1,4 +1,5 @@
 import * as LucideIcons from 'lucide-react';
+import * as PhosphorIcons from '@phosphor-icons/react';
 import React from 'react';
 import * as ReactHookForm from 'react-hook-form';
 import * as Recoil from 'recoil';
@@ -48,6 +49,7 @@ const Imports = {
   '@/components/markdown': Markdown,
   'react-hook-form': ReactHookForm,
   'lucide-react': LucideIcons,
+  '@phosphor-icons/react': PhosphorIcons,
   '@/components/ui/tabs': TabsComponents,
   '@/components/ui/accordion': AccordionComponents,
   '@/components/ui/aspect-ratio': AspectRatioComponents,

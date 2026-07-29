@@ -39,6 +39,17 @@ describe('NewChatButton', () => {
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
+  it('returns null when runtime hides only the new-thread action', () => {
+    mockUseChatData.mockReturnValue({
+      conversationHistoryVisible: true,
+      conversationHistoryShowNewThread: false
+    });
+
+    render(<NewChatButton />);
+
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
+
   it('opens dialog by default when config is undefined', () => {
     mockUseConfig.mockReturnValue({ config: undefined });
 

@@ -114,11 +114,13 @@ This hook provides access to various chat-related data and states.
 - `composerInputRestriction`: The active composer mode (`mix`, `only_modes`, or `selection_only`) and optional runtime placeholder override.
 - `connected`: A boolean indicating if the WebSocket connection is established.
 - `conversationHistoryVisible`: Whether the runtime currently allows the past-conversation history UI to be shown.
+- `conversationHistoryShowNewThread`: Whether the new-thread button should be shown while history is visible. Defaults to shown when unset.
+- `conversationHistoryShowDeleteThreads`: Whether the bulk-delete control should be shown while history is visible. Defaults to shown when unset.
 - `disabled`: A boolean indicating if the chat is disabled.
 - `elements`: An array of chat elements.
 - `error`: A boolean indicating if there is an error in the session.
 - `loading`: A boolean indicating if the chat is in a loading state.
-- `newChatButtonVisible`: Alias of `conversationHistoryVisible` for consumers that only need to gate the new chat entry point.
+- `newChatButtonVisible`: Alias of `conversationHistoryVisible` for consumers that only need to gate the history surface.
 - `spontaneousFileUploadEnabled`: Whether uploads are currently enabled for the active session.
 - `tasklists`: An array of tasklist elements.
 

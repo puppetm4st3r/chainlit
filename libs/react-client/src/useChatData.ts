@@ -9,11 +9,13 @@ import {
   chatSettingsValueState,
   composerInputRestrictionState,
   elementState,
+  conversationHistoryShowDeleteThreadsState,
+  conversationHistoryShowNewThreadState,
   conversationHistoryVisibleState,
   loadingState,
+  projectState,
   spontaneousFileUploadEnabledState,
-  sessionState,
-  tasklistState
+  sessionState
 } from './state';
 
 export interface IToken {
@@ -26,7 +28,6 @@ export interface IToken {
 const useChatData = () => {
   const loading = useRecoilValue(loadingState);
   const elements = useRecoilValue(elementState);
-  const tasklists = useRecoilValue(tasklistState);
   const actions = useRecoilValue(actionState);
   const session = useRecoilValue(sessionState);
   const askUser = useRecoilValue(askUserState);
@@ -38,6 +39,13 @@ const useChatData = () => {
   const conversationHistoryVisible = useRecoilValue(
     conversationHistoryVisibleState
   );
+  const conversationHistoryShowNewThread = useRecoilValue(
+    conversationHistoryShowNewThreadState
+  );
+  const conversationHistoryShowDeleteThreads = useRecoilValue(
+    conversationHistoryShowDeleteThreadsState
+  );
+  const projectId = useRecoilValue(projectState);
   const chatSettingsInputs = useRecoilValue(chatSettingsInputsState);
   const chatSettingsValue = useRecoilValue(chatSettingsValueState);
   const chatSettingsDefaultValue = useRecoilValue(
@@ -62,13 +70,15 @@ const useChatData = () => {
     composerInputRestriction,
     connected,
     conversationHistoryVisible,
+    conversationHistoryShowNewThread,
+    conversationHistoryShowDeleteThreads,
     newChatButtonVisible: conversationHistoryVisible,
+    projectId,
     spontaneousFileUploadEnabled,
     disabled,
     elements,
     error: session?.error,
-    loading,
-    tasklists
+    loading
   };
 };
 

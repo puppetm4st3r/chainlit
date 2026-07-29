@@ -226,3 +226,26 @@ def test_load_settings_overrides_admin_url_from_env(monkeypatch, tmp_path: Path)
     settings = chainlit_config.load_settings()
 
     assert settings["ui"].admin_url == "https://admin.example.com"
+
+
+def test_load_settings_overrides_default_avatar_from_env(monkeypatch, tmp_path: Path):
+    config_dir = tmp_path / ".chainlit"
+    config_dir.mkdir()
+    config_path = config_dir / "config.toml"
+    config_path.write_text(
+        chainlit_config.DEFAULT_CONFIG_STR.replace(
+            'default_avatar_file_url = ""',
+            'default_avatar_file_url = "/public/avatars/from_toml.png"',
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(chainlit_config, "config_dir", str(config_dir))
+    monkeypatch.setattr(chainlit_config, "config_file", str(config_path))
+    monkeypatch.setenv(
+        "CHAINLIT_DEFAULT_AVATAR_FILE_URL", "/public/avatars/from_env.png"
+    )
+
+    settings = chainlit_config.load_settings()
+
+    assert settings["ui"].default_avatar_file_url == "/public/avatars/from_env.png"

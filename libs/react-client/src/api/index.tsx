@@ -10,6 +10,8 @@ export * from './hooks/api';
 export interface IThreadFilters {
   search?: string;
   feedback?: number;
+  /** Required: null = global bag; non-empty string = that project. */
+  projectId: string | null;
 }
 
 export interface IPageInfo {
@@ -269,14 +271,50 @@ export class ChainlitAPI extends APIBase {
     return res.json();
   }
 
+  async moveThreadToProject(threadId: string, projectId: string) {
+    const res = await this.put(`/project/thread/project`, {
+      threadId,
+      projectId
+    });
+
+    return res.json();
+  }
+
+  async searchProjects(params: {
+    search?: string;
+    first?: number;
+    excludeProjectId?: string | null;
+  }): Promise<{
+    data: Array<{
+      id: string;
+      name: string;
+      createdAt?: string;
+      updatedAt?: string;
+    }>;
+  }> {
+    const res = await this.post(`/project/projects/search`, {
+      search: params.search,
+      first: params.first ?? 20,
+      excludeProjectId: params.excludeProjectId ?? undefined
+    });
+
+    return res.json();
+  }
+
   async deleteThread(threadId: string) {
     const res = await this.delete(`/project/thread`, { threadId });
 
     return res.json();
   }
 
-  async deleteThreads() {
-    const res = await this.delete(`/project/threads`, {});
+  async deleteThreads(
+    projectId: string | null,
+    excludeThreadId?: string | null
+  ) {
+    const res = await this.delete(`/project/threads`, {
+      filter: { projectId },
+      excludeThreadId: excludeThreadId || null
+    });
 
     return res.json();
   }

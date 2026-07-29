@@ -1,13 +1,11 @@
 import {
-  documentWorkspaceState,
   sideViewState,
   useAudio,
   useAuth,
   useChatData,
-  useChatInteract,
   useConfig
 } from '@chainlit/react-client';
-import { ArrowLeft, SquarePen } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { memo } from 'react';
 import { useRecoilValue, useSetRecoilState } from 'recoil';
 import { useNavigate } from 'react-router-dom';
@@ -24,7 +22,10 @@ import {
 } from '@/components/ui/tooltip';
 import { Translator } from 'components/i18n';
 
-import { dispatchCanvasShellCloseRequest } from '@/lib/canvas';
+import {
+  dispatchCanvasShellCloseRequest,
+  isCanvasShellElement
+} from '@/lib/canvas';
 import {
   chatSettingsSidebarOpenState
 } from '@/state/project';
@@ -39,6 +40,7 @@ import SidebarTrigger from './SidebarTrigger';
 import { ThemeToggle } from './ThemeToggle';
 import UserNav from './UserNav';
 import WorkflowHelpButton from './WorkflowHelpButton';
+import WorkspaceEditorButton from './WorkspaceEditorButton';
 
 type HeaderProps = {
   sidePanelSize?: number;
@@ -49,7 +51,6 @@ const Header = memo(({ sidePanelSize = 30 }: HeaderProps) => {
   const navigate = useNavigate();
   const { data } = useAuth();
   const { config } = useConfig();
-  const { windowMessage } = useChatInteract();
   const { chatSettingsInputs, conversationHistoryVisible } = useChatData();
   const { open, openMobile, isMobile } = useSidebar();
   const setChatSettingsSidebarOpen = useSetRecoilState(
@@ -57,11 +58,15 @@ const Header = memo(({ sidePanelSize = 30 }: HeaderProps) => {
   );
   const dismissSideView = useDismissSideView();
   const sideView = useRecoilValue(sideViewState);
-  const documentWorkspace = useRecoilValue(documentWorkspaceState);
 
   const sidebarOpen = isMobile ? openMobile : open;
   const mainPanelSize = Math.max(0, 100 - sidePanelSize);
   const desktopSideView = !isMobile ? sideView : undefined;
+  // Canvas owns its document title inside CanvasDocumentHeader; the chrome label
+  // next to the close control is redundant and stays out of sync with renames.
+  const desktopSideViewIsCanvas = Boolean(
+    desktopSideView?.elements?.some((element) => isCanvasShellElement(element))
+  );
 
   const historyEnabled = data?.requireLogin && config?.dataPersistence;
   const sidebarHidden = config?.ui?.default_sidebar_state === 'hidden';
@@ -73,59 +78,20 @@ const Header = memo(({ sidePanelSize = 30 }: HeaderProps) => {
     chatSettingsInputs.length > 0;
   const canUseSidebar =
     historyEnabled && !sidebarHidden && conversationHistoryVisible !== false;
-
-  const handleOpenWorkspaceEditor = () => {
-    windowMessage({ type: 'canvas:open_active_workspace' });
-  };
-
-  const canOpenWorkspaceEditor =
-    documentWorkspace?.hasActiveWorkspace === true && !documentWorkspace.enabled;
-
-  const workspaceBadge = documentWorkspace?.hasActiveWorkspace ? (
-    <Button
-      id="document-workspace-header-button"
-      type="button"
-      variant="ghost"
-      size="sm"
-      onClick={canOpenWorkspaceEditor ? handleOpenWorkspaceEditor : undefined}
-      className={[
-        'h-auto min-h-9 rounded-[4px] border border-border/60 bg-background/60 px-3 py-1.5',
-        'text-muted-foreground shadow-sm',
-        'flex items-center gap-2',
-        canOpenWorkspaceEditor
-          ? 'hover:bg-accent/50 hover:text-foreground'
-          : 'cursor-default hover:bg-background/60 hover:text-muted-foreground'
-      ].join(' ')}
-    >
-      <SquarePen className="!size-4" />
-      <span className="flex flex-col items-start text-left leading-[1.05]">
-        <span className="text-[12px] font-medium">
-          <Translator path="chat.workspace.activePrimary" />
-        </span>
-        <span className="text-[11px] font-medium opacity-85">
-          <Translator path="chat.workspace.activeSecondary" />
-        </span>
-      </span>
-    </Button>
-  ) : null;
-
-  const workspaceAction = documentWorkspace?.hasActiveWorkspace ? (
-    canOpenWorkspaceEditor ? (
-      <Tooltip>
-        <TooltipTrigger asChild>{workspaceBadge}</TooltipTrigger>
-        <TooltipContent>
-          <Translator path="chat.workspace.openEditorWord" />
-        </TooltipContent>
-      </Tooltip>
-    ) : (
-      workspaceBadge
-    )
-  ) : null;
+  // Workspace control sits immediately left of new-thread when that cluster is in the header.
+  const showHeaderThreadActions = !canUseSidebar || !sidebarOpen;
 
   const handleCloseSideView = () => {
     dismissSideView(desktopSideView?.elements);
     dispatchCanvasShellCloseRequest(desktopSideView?.elements);
   };
+
+  const threadActions = showHeaderThreadActions ? (
+    <>
+      <WorkspaceEditorButton />
+      <NewChatButton navigate={navigate} />
+    </>
+  ) : null;
 
   const actions = (
     <div className="flex items-center gap-1 shrink-0">
@@ -162,7 +128,6 @@ const Header = memo(({ sidePanelSize = 30 }: HeaderProps) => {
           </TooltipContent>
         </Tooltip>
       )}
-      {workspaceAction}
       {!hideTopRightBar ? <ThemeToggle /> : null}
       {!hideTopRightBar ? <UserNav /> : null}
     </div>
@@ -179,13 +144,7 @@ const Header = memo(({ sidePanelSize = 30 }: HeaderProps) => {
       >
         <div className="flex min-w-0 items-center">
           {canUseSidebar ? !sidebarOpen ? <SidebarTrigger /> : null : null}
-          {canUseSidebar ? (
-            !sidebarOpen ? (
-              <NewChatButton navigate={navigate} />
-            ) : null
-          ) : (
-            <NewChatButton navigate={navigate} />
-          )}
+          {threadActions}
 
           {!hideTopRightBar ? <ChatProfiles navigate={navigate} /> : null}
         </div>
@@ -203,7 +162,9 @@ const Header = memo(({ sidePanelSize = 30 }: HeaderProps) => {
             >
               <ArrowLeft />
             </Button>
-            <span className="truncate">{desktopSideView.title}</span>
+            {desktopSideViewIsCanvas ? null : (
+              <span className="truncate">{desktopSideView.title}</span>
+            )}
           </div>
           {actions}
         </div>
@@ -230,13 +191,7 @@ const Header = memo(({ sidePanelSize = 30 }: HeaderProps) => {
     >
       <div className="flex items-center">
         {canUseSidebar ? !sidebarOpen ? <SidebarTrigger /> : null : null}
-        {canUseSidebar ? (
-          !sidebarOpen ? (
-            <NewChatButton navigate={navigate} />
-          ) : null
-        ) : (
-          <NewChatButton navigate={navigate} />
-        )}
+        {threadActions}
 
         {!hideTopRightBar ? <ChatProfiles navigate={navigate} /> : null}
       </div>

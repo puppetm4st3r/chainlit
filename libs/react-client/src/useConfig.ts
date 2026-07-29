@@ -11,32 +11,32 @@ const useConfig = () => {
   const { isAuthenticated } = useAuth();
   const chatProfile = useRecoilValue(chatProfileState);
   const { language } = useLanguage();
-  const prevChatProfileRef = useRef(chatProfile);
+  // Profile the currently loaded config belongs to. Used to soft-refetch without
+  // clearing config (clearing unmounts App and reconnects the socket mid-ask).
+  const loadedForProfileRef = useRef<string | undefined>(undefined);
+
+  const normalizedProfile = chatProfile || '';
 
   // Build the API URL with optional chat profile parameter
   const apiUrl = isAuthenticated
     ? `/project/settings?language=${language}${chatProfile ? `&chat_profile=${encodeURIComponent(chatProfile)}` : ''}`
     : null;
 
-  // Always fetch if we don't have config and we're authenticated
-  const shouldFetch = isAuthenticated && !config;
+  // Fetch when missing config, or when the active chat profile changed.
+  // Keep the previous config mounted so socket asks (Motd, forms) stay alive.
+  const needsFetch =
+    isAuthenticated &&
+    (!config || loadedForProfileRef.current !== normalizedProfile);
 
   const { data, error, isLoading } = useApi<IChainlitConfig>(
-    shouldFetch ? apiUrl : null
+    needsFetch ? apiUrl : null
   );
 
   useEffect(() => {
     if (!data) return;
     setConfig(data);
-  }, [data, setConfig]);
-
-  // Clear config when chat profile changes to force re-fetch
-  useEffect(() => {
-    if (prevChatProfileRef.current !== chatProfile) {
-      setConfig(undefined);
-      prevChatProfileRef.current = chatProfile;
-    }
-  }, [chatProfile, setConfig]);
+    loadedForProfileRef.current = normalizedProfile;
+  }, [data, setConfig, normalizedProfile]);
 
   return { config, error, isLoading, language };
 };

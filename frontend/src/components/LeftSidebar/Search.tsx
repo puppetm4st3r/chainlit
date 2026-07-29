@@ -36,7 +36,7 @@ export default function SearchChats() {
   const [threads, setThreads] = useState<IThread[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const { conversationHistoryVisible } = useChatData();
+  const { conversationHistoryVisible, projectId } = useChatData();
   const apiClient = useContext(ChainlitContext);
 
   // Debounced search function
@@ -47,7 +47,7 @@ export default function SearchChats() {
         try {
           const { data } = await apiClient.listThreads(
             { first: 20, cursor: undefined },
-            { search: query || undefined }
+            { search: query || undefined, projectId }
           );
           setThreads(data || []);
         } catch (_error) {
@@ -56,7 +56,7 @@ export default function SearchChats() {
           setLoading(false);
         }
       }, 300),
-    [apiClient, t]
+    [apiClient, projectId, t]
   );
 
   // Group threads by month and year
@@ -146,7 +146,10 @@ export default function SearchChats() {
                     value={`${searchQuery}-${thread.id}`}
                     onSelect={() => {
                       setOpen(false);
-                      navigate(`/thread/${thread.id}`);
+                      navigate({
+                        pathname: `/thread/${thread.id}`,
+                        search: window.location.search
+                      });
                     }}
                   >
                     <div className="line-clamp-2">

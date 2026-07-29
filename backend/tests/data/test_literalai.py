@@ -124,7 +124,7 @@ def literal_test_user(test_user: User):
 
 @pytest.fixture
 def test_filters() -> ThreadFilter:
-    return ThreadFilter(feedback=1, userId="user1", search="test")
+    return ThreadFilter(feedback=1, userId="user1", search="test", projectId=None)
 
 
 @pytest.fixture

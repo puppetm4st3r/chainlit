@@ -70,6 +70,7 @@ function loadAnchorModule() {
     return {
       buildTextAnchor,
       createCommentThread,
+      createTextQuoteResolver,
       getLatestCommentEntry,
       mapRangeAcrossTextChange,
       normalizeCommentThreads,
@@ -87,6 +88,7 @@ function loadAnchorModule() {
 
 function loadUseCanvasComments() {
   const anchorModule = loadAnchorModule();
+  const { markdownToTrackedChangesText } = loadDiffModuleForComments();
   const getEditorView = (editorInstanceRef: React.MutableRefObject<unknown>) =>
     (editorInstanceRef.current as { wwEditor?: { view?: unknown } } | null)?.wwEditor?.view || null;
   const getEditorDocumentText = (editorInstanceRef: React.MutableRefObject<unknown>) => {
@@ -94,7 +96,7 @@ function loadUseCanvasComments() {
     if (!doc || typeof doc.textBetween !== 'function') {
       return '';
     }
-    return String(doc.textBetween(0, doc.content?.size ?? doc.nodeSize ?? 0, '', '\n'));
+    return String(doc.textBetween(0, doc.content?.size ?? doc.nodeSize ?? 0, '\n', '\n'));
   };
   const findEditorPositionForTextOffset = (
     doc: { textBetween?: (...args: unknown[]) => string; content?: { size?: number }; nodeSize?: number },
@@ -110,7 +112,7 @@ function loadUseCanvasComments() {
     let resolvedPosition = maxPosition;
     while (left <= right) {
       const midpoint = Math.floor((left + right) / 2);
-      const textLength = String(doc.textBetween(0, midpoint, '', '\n')).length;
+      const textLength = String(doc.textBetween(0, midpoint, '\n', '\n')).length;
       if (textLength >= normalizedTarget) {
         resolvedPosition = midpoint;
         right = midpoint - 1;
@@ -141,6 +143,7 @@ function loadUseCanvasComments() {
     .replace(/import \{[\s\S]*?\} from "\.\/anchor\.js";/, '')
     .replace(/import \{[\s\S]*?\} from "\.\.\/prosemirrorText\.js";/, '')
     .replace(/import \{[\s\S]*?\} from "\.\.\/ask\/message\.js";/, '')
+    .replace(/import \{[\s\S]*?\} from "\.\.\/tracked-changes\/diff\.js";/, '')
     .replace('export function useCanvasComments', 'function useCanvasComments');
   const executeModule = Function(
     'useCallback',
@@ -153,6 +156,7 @@ function loadUseCanvasComments() {
     'getEditorPositionRangeForTextOffsets',
     'getEditorView',
     'buildCanvasResolveAiUserMessage',
+    'markdownToTrackedChangesText',
     ...Object.keys(anchorModule),
     `${transformedSource}\nreturn { useCanvasComments };`
   );
@@ -168,9 +172,33 @@ function loadUseCanvasComments() {
       getEditorPositionRangeForTextOffsets,
       getEditorView,
       vi.fn(() => 'FileCommand:CanvasResolveAI\n{}'),
+      markdownToTrackedChangesText,
       ...Object.values(anchorModule)
     ) as { useCanvasComments: (...args: unknown[]) => unknown }
   ).useCanvasComments;
+}
+
+function loadDiffModuleForComments() {
+  const diffSource = readFileSync(
+    resolve(
+      __dirname,
+      '../../../../backend/public/elements/canvas-editor/tracked-changes/diff.js'
+    ),
+    'utf8'
+  );
+  const transformedSource = diffSource
+    .replace('import { decodeVisibleSpaceRuns } from "../whitespace.js";', '')
+    .replace(/export function /g, 'function ');
+  const executeModule = Function(
+    'decodeVisibleSpaceRuns',
+    `${transformedSource}
+    return {
+      markdownToTrackedChangesText,
+    };`
+  );
+  return executeModule((value: unknown) => String(value ?? '').replace(/\u00a0/g, ' ')) as {
+    markdownToTrackedChangesText: (value: string) => string;
+  };
 }
 
 function loadProsemirrorDecorationsModule() {
@@ -274,6 +302,7 @@ type HarnessProps = {
   onState: (state: Record<string, unknown>) => void;
   sendCanvasSave: ReturnType<typeof vi.fn>;
   editorChildren?: React.ReactNode;
+  content?: string;
 };
 
 function Harness({
@@ -283,12 +312,13 @@ function Harness({
   onState,
   sendCanvasSave,
   editorChildren,
+  content = '# Draft',
 }: HarnessProps) {
   const editorRef = React.useRef<HTMLDivElement>(null);
   const editorInstanceRef = React.useMemo(() => createFakeEditorInstanceRef(editorRef), []);
   const canvasViewportRef = React.useRef<HTMLDivElement>(null);
   const [widgetConfig, setWidgetConfig] = React.useState({
-    content: '# Draft',
+    content,
     commentThreads: initialThreads,
   });
   const captureSelectionSnapshot = React.useCallback(() => {
@@ -346,7 +376,7 @@ function Harness({
     widgetConfig,
     setWidgetConfig,
     sendCanvasSave,
-    getSafeCurrentContent: () => '# Draft',
+    getSafeCurrentContent: () => content,
     isReadonly: false,
   }) as Record<string, unknown>;
 
@@ -393,6 +423,53 @@ describe('useCanvasComments', () => {
         suffix: ' baz',
       })
     ).toEqual({ start: 0, end: 8 });
+  });
+
+  it('mirrors backend apply-time matching for whitespace, curly quotes, and unique affixes', () => {
+    const { resolveTextQuoteAnchor } = loadAnchorModule() as {
+      resolveTextQuoteAnchor: (text: string, anchor: Record<string, string>) => unknown;
+    };
+
+    expect(
+      resolveTextQuoteAnchor('facultará a EL ARRENDADOR a poner término inmediato', {
+        quote: 'facultará\n\na EL ARRENDADOR a poner término inmediato',
+        prefix: '',
+        suffix: '',
+      })
+    ).toEqual({ start: 0, end: 51 });
+
+    expect(
+      resolveTextQuoteAnchor('Said \u201chello\u201d world', {
+        quote: 'Said "hello" world',
+        prefix: '',
+        suffix: '',
+      })
+    ).toEqual({ start: 0, end: 18 });
+
+    // Unique quote: wrong prefix must not detach the anchor.
+    expect(
+      resolveTextQuoteAnchor('alpha Hello world', {
+        quote: 'Hello',
+        prefix: 'WRONG ',
+        suffix: '',
+      })
+    ).toEqual({ start: 6, end: 11 });
+
+    // Ambiguous quote: affixes must select exactly one occurrence.
+    expect(
+      resolveTextQuoteAnchor('Hello world and Hello again', {
+        quote: 'Hello',
+        prefix: '',
+        suffix: ' again',
+      })
+    ).toEqual({ start: 16, end: 21 });
+    expect(
+      resolveTextQuoteAnchor('Hello world and Hello again', {
+        quote: 'Hello',
+        prefix: 'WRONG ',
+        suffix: ' again',
+      })
+    ).toBeNull();
   });
 
   it('filters and sorts visible threads using derived positions and activity', async () => {
@@ -755,6 +832,80 @@ describe('useCanvasComments', () => {
         }),
       })
     );
+  });
+
+  it('keeps workflow markdown anchors linked when editor text is WYSIWYG-shaped', async () => {
+    const useCanvasComments = loadUseCanvasComments();
+    const selectionRangeRef = { current: null } as React.MutableRefObject<Range | null>;
+    const sendCanvasSave = vi.fn();
+    const states: Record<string, unknown>[] = [];
+    const markdownContent =
+      'Antes del ancla.\n\n- EL ARRENDADOR se obliga a pagar las contribuciones.\n\n' +
+      'EL ARRENDADOR queda facultado para descontar deterioros en el\n\ninmueble arrendado.';
+    const editorText =
+      'Antes del ancla.\nEL ARRENDADOR se obliga a pagar las contribuciones.\n' +
+      'EL ARRENDADOR queda facultado para descontar deterioros en el\ninmueble arrendado.';
+
+    render(
+      <Harness
+        useCanvasComments={useCanvasComments}
+        content={markdownContent}
+        editorChildren={editorText}
+        initialThreads={[
+          {
+            commentThreadId: 'comment-thread-list',
+            status: 'open',
+            anchor: {
+              quote: '- EL ARRENDADOR se obliga a pagar las contribuciones.',
+              prefix: 'Antes del ancla.\n\n',
+              suffix: '\n\nEL ARRENDADOR queda',
+            },
+            comments: [
+              {
+                commentId: 'comment-list',
+                body: 'Cláusulas abusivas\n\nLista markdown',
+                author: 'Agente',
+                createdAt: '2026-07-11T21:56:36.000Z',
+                updatedAt: '2026-07-11T21:56:36.000Z',
+                source: 'workflow',
+              },
+            ],
+            docxCommentId: '',
+          },
+          {
+            commentThreadId: 'comment-thread-paragraph',
+            status: 'open',
+            anchor: {
+              quote:
+                'EL ARRENDADOR queda facultado para descontar deterioros en el\n\ninmueble arrendado.',
+              prefix: 'contribuciones.\n\n',
+              suffix: '',
+            },
+            comments: [
+              {
+                commentId: 'comment-paragraph',
+                body: 'Cláusulas abusivas\n\nSalto de párrafo',
+                author: 'Agente',
+                createdAt: '2026-07-11T21:56:36.000Z',
+                updatedAt: '2026-07-11T21:56:36.000Z',
+                source: 'workflow',
+              },
+            ],
+            docxCommentId: '',
+          },
+        ]}
+        selectionRangeRef={selectionRangeRef}
+        onState={(state) => states.push(state)}
+        sendCanvasSave={sendCanvasSave}
+      />
+    );
+
+    await act(async () => {
+      await flushAnimationFrames();
+    });
+
+    const latestState = states.at(-1) as Record<string, unknown>;
+    expect(latestState.detachedCommentThreadIds).toEqual([]);
   });
 
   it('keeps edited preserved-space comment ranges linked after anchor rebase', async () => {
@@ -1130,10 +1281,12 @@ describe('useCanvasComments', () => {
     );
 
     await act(async () => {
-      await flushEffects();
+      await flushAnimationFrames();
     });
 
-    const scrollContainer = view.container.querySelector('.toastui-editor-main') as HTMLElement;
+    const scrollContainer = view.container.querySelector(
+      '.toastui-editor-contents'
+    ) as HTMLElement;
     const scrollTo = vi.fn();
     Object.defineProperty(scrollContainer, 'clientHeight', {
       configurable: true,
@@ -1158,11 +1311,19 @@ describe('useCanvasComments', () => {
       bottom: 200,
       height: 200,
     } as DOMRect);
+    vi.spyOn(window, 'getComputedStyle').mockImplementation((element) => {
+      if (element === scrollContainer) {
+        return { overflowY: 'auto' } as CSSStyleDeclaration;
+      }
+      return { overflowY: 'visible' } as CSSStyleDeclaration;
+    });
 
     const latestState = states.at(-1) as Record<string, unknown>;
+    expect(latestState.detachedCommentThreadIds).toEqual([]);
 
     await act(async () => {
       (latestState.jumpToThread as (commentThreadId: string) => void)('comment-thread-scroll');
+      await flushAnimationFrames();
     });
 
     expect(scrollTo).toHaveBeenCalledWith(
@@ -1171,7 +1332,9 @@ describe('useCanvasComments', () => {
         behavior: 'smooth',
       })
     );
-    expect((states.at(-1) as Record<string, unknown>).selectedCommentThreadId).toBe('comment-thread-scroll');
+    expect((states.at(-1) as Record<string, unknown>).selectedCommentThreadId).toBe(
+      'comment-thread-scroll'
+    );
   });
 
   it('keeps draft decorations stable without dispatching editor updates on scroll', async () => {

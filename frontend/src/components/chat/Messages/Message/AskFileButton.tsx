@@ -100,8 +100,10 @@ interface _AskFileButtonProps {
 
 /**
  * AskFile overlay: auto-opens a staging dialog. There is no inline CTA in the
- * message thread. Cancel / dismiss resolves the ask with an empty payload so
- * the backend treats it like a timeout (workflow node gets an error).
+ * message thread. Accepted browse/drop selections start upload immediately so
+ * the OS file picker does not require a second confirm in Chainlit. Cancel /
+ * dismiss resolves the ask with an empty payload so the backend treats it like
+ * a timeout (workflow node gets an error).
  */
 const _AskFileButton = ({
   askUser,
@@ -121,6 +123,8 @@ const _AskFileButton = ({
   const [stagedFiles, setStagedFiles] = useState<File[]>([]);
   const [uploads, setUploads] = useState<StagedUpload[] | null>(null);
   const resolvedRef = useRef(false);
+  /** Guards against double-start from browse + rapid re-entry. */
+  const uploadStartedRef = useRef(false);
 
   useEffect(() => {
     if (!specValid) {
@@ -134,59 +138,21 @@ const _AskFileButton = ({
   const canSubmit = specValid && !uploading && stagedFiles.length > 0;
   const acceptExtensions = formatAcceptExtensions(askUser.spec.accept);
 
-  const { getRootProps, getInputProps, isDragActive } = useUpload({
-    spec: askUser.spec,
-    options: {
-      disabled: !canAddFiles,
-      maxFiles: remainingSlots > 0 ? remainingSlots : 0
-    },
-    onResolved: (files) => {
-      setStagedFiles((prev) => [...prev, ...files]);
-    },
-    onError: (error: string) => onError(error)
-  });
-
-  if (!specValid) {
-    return null;
-  }
-
   /**
-   * Resolve the ask without files. Chainlit maps an empty/falsy ask reply to
-   * ``None``, which ``ui_ask_file`` surfaces as a timeout-style workflow error.
+   * Start durable upload for the given file list and resolve the ask on success.
+   * Manual submit remains available as a retry path after a failed transfer.
    */
-  const cancelAsk = () => {
-    if (resolvedRef.current || uploading) {
-      return;
-    }
-    resolvedRef.current = true;
-    setOpen(false);
-    askUser.callback([]);
-  };
-
-  /**
-   * Controlled dialog: only dismiss is allowed, and dismiss always cancels the ask.
-   * Re-open is intentionally unsupported (no inline CTA).
-   */
-  const handleOpenChange = (next: boolean) => {
-    if (uploading || next) {
-      return;
-    }
-    cancelAsk();
-  };
-
-  const removeStagedFile = (index: number) => {
-    if (uploading) {
-      return;
-    }
-    setStagedFiles((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const startUpload = () => {
-    if (!canSubmit || resolvedRef.current) {
+  const startUpload = (files: File[]) => {
+    if (
+      !specValid ||
+      resolvedRef.current ||
+      uploadStartedRef.current ||
+      files.length === 0
+    ) {
       return;
     }
 
-    const files = stagedFiles;
+    uploadStartedRef.current = true;
     const promises: Promise<IFileRef>[] = [];
     const nextUploads: StagedUpload[] = files.map((file, index) => {
       const { xhr, promise } = uploadFile(
@@ -232,10 +198,63 @@ const _AskFileButton = ({
       })
       .catch((error: unknown) => {
         nextUploads.forEach((upload) => upload.cancel());
+        uploadStartedRef.current = false;
         setUploads(null);
         const detail = error instanceof Error ? error.message : String(error);
         onError(`${t('chat.fileUpload.errors.failed')}: ${detail}`);
       });
+  };
+
+  const { getRootProps, getInputProps, isDragActive } = useUpload({
+    spec: askUser.spec,
+    options: {
+      disabled: !canAddFiles,
+      maxFiles: remainingSlots > 0 ? remainingSlots : 0
+    },
+    onResolved: (files) => {
+      setStagedFiles((prev) => {
+        const next = [...prev, ...files];
+        // Start transfer as soon as the OS picker / drop accepts files.
+        queueMicrotask(() => startUpload(next));
+        return next;
+      });
+    },
+    onError: (error: string) => onError(error)
+  });
+
+  if (!specValid) {
+    return null;
+  }
+
+  /**
+   * Resolve the ask without files. Chainlit maps an empty/falsy ask reply to
+   * ``None``, which ``ui_ask_file`` surfaces as a timeout-style workflow error.
+   */
+  const cancelAsk = () => {
+    if (resolvedRef.current || uploading) {
+      return;
+    }
+    resolvedRef.current = true;
+    setOpen(false);
+    askUser.callback([]);
+  };
+
+  /**
+   * Controlled dialog: only dismiss is allowed, and dismiss always cancels the ask.
+   * Re-open is intentionally unsupported (no inline CTA).
+   */
+  const handleOpenChange = (next: boolean) => {
+    if (uploading || next) {
+      return;
+    }
+    cancelAsk();
+  };
+
+  const removeStagedFile = (index: number) => {
+    if (uploading) {
+      return;
+    }
+    setStagedFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
   return (
@@ -354,7 +373,7 @@ const _AskFileButton = ({
             id="ask-upload-submit"
             type="button"
             disabled={!canSubmit}
-            onClick={startUpload}
+            onClick={() => startUpload(stagedFiles)}
           >
             {uploading ? (
               <Translator path="chat.fileUpload.uploading" />

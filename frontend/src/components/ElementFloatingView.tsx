@@ -138,6 +138,32 @@ export default function ElementFloatingView() {
             width: appliedBox.width,
             height: appliedBox.height
           }}
+          onFocusOutside={(event) => {
+            // Document workspace / ElementSidebar (canvas + comments) steals focus when
+            // it mounts. That must never auto-dismiss an open floating DynamicTable.
+            event.preventDefault();
+          }}
+          onPointerDownOutside={(event) => {
+            const originalTarget =
+              event.detail?.originalEvent?.target ?? event.target;
+            // Keep intentional backdrop dismiss; block dismiss from side/canvas UI.
+            if (
+              !(originalTarget instanceof Element) ||
+              !originalTarget.closest('[data-radix-dialog-overlay]')
+            ) {
+              event.preventDefault();
+            }
+          }}
+          onInteractOutside={(event) => {
+            const originalTarget =
+              event.detail?.originalEvent?.target ?? event.target;
+            if (
+              !(originalTarget instanceof Element) ||
+              !originalTarget.closest('[data-radix-dialog-overlay]')
+            ) {
+              event.preventDefault();
+            }
+          }}
         >
           <div
             className="flex items-center gap-2 border-b px-4 py-3"

@@ -283,6 +283,17 @@ class Element:
                 raise ValueError(
                     "Blob-backed elements require matching id and chainlit_key values"
                 )
+            # Updatable elements keep a stable chainlit_key/id across send() calls, but
+            # the session file behind /project/file must be rewritten so live fetches
+            # (TaskList, CustomElement, …) observe the latest serialized content.
+            if self.updatable and (self.content is not None or self.path is not None):
+                await context.session.persist_file(
+                    name=self.name,
+                    path=self.path,
+                    content=self.content,
+                    mime=self.mime or "",
+                    file_id=self.id,
+                )
             return
 
         file_dict = await context.session.persist_file(
@@ -452,6 +463,8 @@ class TaskList(Element):
     type: ClassVar[ElementType] = "tasklist"
     tasks: List[Task] = Field(default_factory=list, exclude=True)
     status: str = "Ready"
+    # Empty title lets the frontend apply locale i18n (components.TaskList.defaultTitle).
+    title: str = ""
     name: str = "tasklist"
     content: str = "dummy content to pass validation"
 
@@ -477,8 +490,10 @@ class TaskList(Element):
         ]
 
         # store stringified json in content so that it's correctly stored in the database
+        panel_title = str(self.title or "").strip()
         self.content = json.dumps(
             {
+                "title": panel_title,
                 "status": self.status,
                 "tasks": tasks,
             },

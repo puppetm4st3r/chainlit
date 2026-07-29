@@ -728,9 +728,7 @@ class TestAskElementMessage:
             ctx.emitter.delete_step.assert_called_once()
             ask_spec = ctx.emitter.send_ask_user.await_args.args[1]
             assert ask_spec.ephemeral is True
-            assert (
-                msg.metadata.get("countsTowardThreadPersistenceThreshold") is False
-            )
+            assert msg.metadata in (None, {})
 
 
 class TestMessageEdgeCases:

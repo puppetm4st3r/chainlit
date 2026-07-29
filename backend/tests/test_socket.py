@@ -614,10 +614,10 @@ class TestConnectionSuccessfulIdempotency:
         assert session.reset_pre_persistence_state.call_count == 2
 
     @pytest.mark.asyncio
-    async def test_reconnect_without_persisted_thread_clears_prethreshold_state(
+    async def test_reconnect_without_persisted_thread_clears_pre_flush_state(
         self, mock_session_factory
     ):
-        """Reconnects before persistence should drop staged pre-threshold session state."""
+        """Reconnects before the first thread flush should drop staged session state."""
         on_chat_start = AsyncMock()
 
         session = mock_session_factory(has_first_interaction=False)

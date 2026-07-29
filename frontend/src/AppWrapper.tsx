@@ -1,5 +1,5 @@
-import getRouterBasename from '@/lib/router';
 import App from 'App';
+import getRouterBasename from '@/lib/router';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -38,6 +38,9 @@ export default function AppWrapper() {
 
   useEffect(() => {
     const handleWindowMessage = (event: MessageEvent) => {
+      // Canvas host download now emits via backend send_window_message
+      // (same path as workflow system events). Forward all frame messages
+      // to the Chainlit socket bridge.
       windowMessage(event.data);
     };
     window.addEventListener('message', handleWindowMessage);
@@ -56,5 +59,6 @@ export default function AppWrapper() {
     const currentUrl = encodeURIComponent(window.location.pathname + window.location.search);
     window.location.href = getRouterBasename() + `/login?redirect_to=${currentUrl}`;
   }
+
   return <App />;
 }

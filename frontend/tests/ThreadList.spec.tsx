@@ -11,10 +11,12 @@ const mocks = vi.hoisted(() => ({
   clear: vi.fn(),
   navigate: vi.fn(),
   setThreadHistory: vi.fn(),
+  chatProfile: 'root-profile' as string | undefined,
   config: {
     dataPersistence: true,
     chatProfiles: [
-      { name: 'root-profile', display_name: 'Perfil Administracion' }
+      { name: 'root-profile', display_name: 'Perfil Administracion' },
+      { name: 'ops-profile', display_name: 'Perfil Operaciones' }
     ]
   }
 }));
@@ -25,9 +27,13 @@ vi.mock('@chainlit/react-client', async () => {
     ChainlitContext: React.createContext(mocks.apiClient),
     ClientError: class ClientError extends Error {},
     threadHistoryState: { key: 'ThreadHistory' },
+    useChatData: () => ({ loading: false }),
     useChatInteract: () => ({ clear: mocks.clear }),
     useChatMessages: () => ({ threadId: undefined }),
-    useChatSession: () => ({ idToResume: undefined }),
+    useChatSession: () => ({
+      idToResume: undefined,
+      chatProfile: mocks.chatProfile
+    }),
     useConfig: () => ({ config: mocks.config })
   };
 });
@@ -117,15 +123,21 @@ vi.mock('@/components/LeftSidebar/ThreadOptions', () => ({
   default: () => <div />
 }));
 
+vi.mock('@/components/LeftSidebar/MoveThreadProjectDialog', () => ({
+  default: () => null
+}));
+
 describe('ThreadList', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.chatProfile = 'root-profile';
     mocks.config.chatProfiles = [
-      { name: 'root-profile', display_name: 'Perfil Administracion' }
+      { name: 'root-profile', display_name: 'Perfil Administracion' },
+      { name: 'ops-profile', display_name: 'Perfil Operaciones' }
     ];
   });
 
-  it('shows the thread profile label below the thread name', () => {
+  it('shows only threads for the selected agent profile and hides the agent name', () => {
     render(
       <ThreadList
         threadHistory={{
@@ -134,9 +146,16 @@ describe('ThreadList', () => {
             {
               id: 'thread-1',
               createdAt: 0,
-              name: 'Conversacion importante',
+              name: 'Conversacion del perfil actual',
               steps: [],
               metadata: { chat_profile: 'root-profile' }
+            },
+            {
+              id: 'thread-2',
+              createdAt: 0,
+              name: 'Conversacion de otro perfil',
+              steps: [],
+              metadata: { chat_profile: 'ops-profile' }
             }
           ],
           timeGroupedThreads: {
@@ -144,9 +163,16 @@ describe('ThreadList', () => {
               {
                 id: 'thread-1',
                 createdAt: 0,
-                name: 'Conversacion importante',
+                name: 'Conversacion del perfil actual',
                 steps: [],
                 metadata: { chat_profile: 'root-profile' }
+              },
+              {
+                id: 'thread-2',
+                createdAt: 0,
+                name: 'Conversacion de otro perfil',
+                steps: [],
+                metadata: { chat_profile: 'ops-profile' }
               }
             ]
           }
@@ -156,12 +182,20 @@ describe('ThreadList', () => {
       />
     );
 
-    expect(screen.getByText('Conversacion importante')).toBeInTheDocument();
-    expect(screen.getByText('Perfil Administracion')).toBeInTheDocument();
+    expect(
+      screen.getByText('Conversacion del perfil actual')
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('Conversacion de otro perfil')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Perfil Administracion')
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('---')).not.toBeInTheDocument();
   });
 
-  it('reads the thread profile from serialized metadata', () => {
-    mocks.config.chatProfiles = [{ name: 'ops-profile' }];
+  it('reads the thread profile from serialized metadata when filtering', () => {
+    mocks.chatProfile = 'ops-profile';
 
     render(
       <ThreadList
@@ -174,6 +208,13 @@ describe('ThreadList', () => {
               name: 'Conversacion tecnica',
               steps: [],
               metadata: JSON.stringify({ chat_profile: 'ops-profile' })
+            },
+            {
+              id: 'thread-1',
+              createdAt: 0,
+              name: 'Conversacion de otro perfil',
+              steps: [],
+              metadata: JSON.stringify({ chat_profile: 'root-profile' })
             }
           ],
           timeGroupedThreads: {
@@ -184,6 +225,13 @@ describe('ThreadList', () => {
                 name: 'Conversacion tecnica',
                 steps: [],
                 metadata: JSON.stringify({ chat_profile: 'ops-profile' })
+              },
+              {
+                id: 'thread-1',
+                createdAt: 0,
+                name: 'Conversacion de otro perfil',
+                steps: [],
+                metadata: JSON.stringify({ chat_profile: 'root-profile' })
               }
             ]
           }
@@ -193,11 +241,14 @@ describe('ThreadList', () => {
       />
     );
 
-    expect(screen.getByText('ops-profile')).toBeInTheDocument();
+    expect(screen.getByText('Conversacion tecnica')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Conversacion de otro perfil')
+    ).not.toBeInTheDocument();
   });
 
   it('falls back to tags when metadata does not include the profile', () => {
-    mocks.config.chatProfiles = [{ name: 'ops-profile' }];
+    mocks.chatProfile = 'ops-profile';
 
     render(
       <ThreadList
@@ -210,6 +261,13 @@ describe('ThreadList', () => {
               name: 'Conversacion con tags',
               steps: [],
               tags: ['ops-profile']
+            },
+            {
+              id: 'thread-1',
+              createdAt: 0,
+              name: 'Conversacion de otro perfil',
+              steps: [],
+              tags: ['root-profile']
             }
           ],
           timeGroupedThreads: {
@@ -220,6 +278,13 @@ describe('ThreadList', () => {
                 name: 'Conversacion con tags',
                 steps: [],
                 tags: ['ops-profile']
+              },
+              {
+                id: 'thread-1',
+                createdAt: 0,
+                name: 'Conversacion de otro perfil',
+                steps: [],
+                tags: ['root-profile']
               }
             ]
           }
@@ -229,12 +294,68 @@ describe('ThreadList', () => {
       />
     );
 
-    expect(screen.getByText('ops-profile')).toBeInTheDocument();
+    expect(screen.getByText('Conversacion con tags')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Conversacion de otro perfil')
+    ).not.toBeInTheDocument();
   });
 
-  it('shows placeholder when the thread has no profile data', () => {
-    mocks.config.chatProfiles = [{ name: 'ops-profile' }];
+  it('filters by selected profile even when chatProfiles failed to load', () => {
+    mocks.config.chatProfiles = [];
 
+    render(
+      <ThreadList
+        threadHistory={{
+          currentThreadId: 'thread-1',
+          threads: [
+            {
+              id: 'thread-1',
+              createdAt: 0,
+              name: 'Conversacion del perfil actual',
+              steps: [],
+              metadata: { chat_profile: 'root-profile' }
+            },
+            {
+              id: 'thread-2',
+              createdAt: 0,
+              name: 'Conversacion de otro perfil',
+              steps: [],
+              metadata: { chat_profile: 'ops-profile' }
+            }
+          ],
+          timeGroupedThreads: {
+            Today: [
+              {
+                id: 'thread-1',
+                createdAt: 0,
+                name: 'Conversacion del perfil actual',
+                steps: [],
+                metadata: { chat_profile: 'root-profile' }
+              },
+              {
+                id: 'thread-2',
+                createdAt: 0,
+                name: 'Conversacion de otro perfil',
+                steps: [],
+                metadata: { chat_profile: 'ops-profile' }
+              }
+            ]
+          }
+        }}
+        isFetching={false}
+        isLoadingMore={false}
+      />
+    );
+
+    expect(
+      screen.getByText('Conversacion del perfil actual')
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('Conversacion de otro perfil')
+    ).not.toBeInTheDocument();
+  });
+
+  it('hides threads without profile data when a profile is selected', () => {
     render(
       <ThreadList
         threadHistory={{
@@ -263,7 +384,12 @@ describe('ThreadList', () => {
       />
     );
 
-    expect(screen.getByText('---')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Conversacion sin perfil')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText('threadHistory.sidebar.empty')
+    ).toBeInTheDocument();
   });
 
   it('collapses and expands thread groups from the date header', () => {

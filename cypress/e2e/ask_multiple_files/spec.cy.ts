@@ -9,7 +9,6 @@ describe('Upload multiple files', () => {
     cy.get('#ask-button-input').selectFile(['@txtFile', '@pyFile'], {
       force: true
     });
-    cy.get('#ask-upload-submit').click();
 
     cy.get('.step')
       .eq(1)

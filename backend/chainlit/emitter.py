@@ -14,8 +14,7 @@ from chainlit.mode import Mode
 from chainlit.session import (
     BaseSession,
     WebsocketSession,
-    resolve_effective_conversation_history_visible,
-    resolve_effective_new_chat_button_visible,
+    resolve_effective_conversation_history_controls,
     resolve_effective_spontaneous_file_upload_enabled,
     validate_runtime_spontaneous_file_upload_config,
 )
@@ -23,7 +22,6 @@ from chainlit.step import StepDict
 from chainlit.types import (
     AskActionResponse,
     AskElementResponse,
-    AskElementSpec,
     AskFileSpec,
     AskSpec,
     CommandDict,
@@ -136,7 +134,13 @@ class BaseChainlitEmitter:
         """Stub method to synchronize spontaneous file upload state in the UI."""
         pass
 
-    def set_conversation_history_visibility(self, visible: Optional[bool] = None):
+    def set_conversation_history_visibility(
+        self,
+        visible: Optional[bool] = None,
+        *,
+        show_new_thread: Optional[bool] = None,
+        show_delete_threads: Optional[bool] = None,
+    ):
         """Stub method to synchronize conversation-history visibility in the UI."""
         pass
 
@@ -194,6 +198,10 @@ class BaseChainlitEmitter:
 
     async def set_chat_profile(self, profile_name: str):
         """Stub method to send a chat profile selection to the UI."""
+        pass
+
+    async def set_project(self, project_id: Optional[str]):
+        """Stub method to send the active conversation project to the UI."""
         pass
 
     async def set_favorites(self, steps: List[StepDict]):
@@ -258,7 +266,6 @@ class ChainlitEmitter(BaseChainlitEmitter):
 
     def send_step(self, step_dict: StepDict):
         """Send a message to the UI."""
-        self._track_assistant_persistence_threshold(step_dict)
         return self.emit("new_message", step_dict)
 
     def update_step(self, step_dict: StepDict):
@@ -288,81 +295,61 @@ class ChainlitEmitter(BaseChainlitEmitter):
         )
         return [self.session.chat_profile] if should_tag_thread else None
 
-    def _get_interaction_label(self, step_dict: StepDict) -> str:
-        """Return the best-effort visible label for a logical interaction."""
-        return str(
-            step_dict.get("output") or step_dict.get("name") or step_dict.get("type") or ""
-        ).strip()
-
     async def ensure_thread_persistence(self, interaction: str) -> None:
-        """Cross the persistence threshold once and flush the staged thread state."""
-        if not self.session.begin_thread_persistence():
+        """
+        Persist the thread row once and flush staged steps/elements.
+
+        Idempotent when already ready. Raises when another flush is in flight or
+        when the flush does not leave the session in a ready state.
+        """
+        if self.session.is_thread_persistence_ready():
             return
+        if not self.session.begin_thread_persistence():
+            raise RuntimeError("Thread persistence already in progress")
         try:
             persisted = await self.init_thread(interaction)
         except Exception:
             self.session.abort_thread_persistence()
             raise
-        if not persisted:
+        if not persisted or not self.session.is_thread_persistence_ready():
             self.session.abort_thread_persistence()
-            return
-        if not self.session.is_thread_persistence_ready():
-            self.session.abort_thread_persistence()
-            self.session.has_first_interaction = True
-
-    def _track_assistant_persistence_threshold(self, step_dict: StepDict) -> None:
-        """Persist only after the second logical assistant message for the session."""
-        if self.session.is_thread_persistence_ready():
-            return
-        if str(step_dict.get("type") or "").strip() != "assistant_message":
-            return
-        metadata = step_dict.get("metadata") or {}
-        if isinstance(metadata, dict) and metadata.get(
-            "countsTowardThreadPersistenceThreshold"
-        ) is False:
-            return
-        interaction = self._get_interaction_label(step_dict)
-        if not interaction:
-            return
-        logical_turn_count = self.session.register_logical_assistant_message(
-            str(step_dict.get("id") or "").strip()
-        )
-        if logical_turn_count < 2:
-            return
-        asyncio.create_task(self.ensure_thread_persistence(interaction))
+            raise RuntimeError("Thread persistence flush failed")
 
     async def flush_thread_queues(self) -> bool:
-        if data_layer := get_data_layer():
+        """Flush the thread row and staged metadata; return False without a data layer."""
+        data_layer = get_data_layer()
+        if not data_layer:
+            return False
+        try:
+            await data_layer.update_thread(
+                thread_id=self.session.thread_id,
+                user_id=self._get_thread_user_id(),
+                tags=self._get_thread_tags(),
+                project_id=self.session.project_id,
+            )
+        except Exception as e:
+            logger.error(f"Error updating thread: {e}")
+            return False
+
+        pending_metadata_patch = self.session.consume_pending_thread_metadata_patches()
+        if pending_metadata_patch:
+            patcher = getattr(data_layer, "patch_thread_metadata", None)
             try:
-                await data_layer.update_thread(
-                    thread_id=self.session.thread_id,
-                    user_id=self._get_thread_user_id(),
-                    tags=self._get_thread_tags(),
-                )
+                if callable(patcher):
+                    await patcher(self.session.thread_id, pending_metadata_patch)
+                else:
+                    await data_layer.update_thread(
+                        thread_id=self.session.thread_id,
+                        user_id=self._get_thread_user_id(),
+                        metadata=pending_metadata_patch,
+                        tags=self._get_thread_tags(),
+                    )
             except Exception as e:
-                logger.error(f"Error updating thread: {e}")
+                logger.error(f"Error updating thread metadata: {e}")
                 return False
 
-            pending_metadata_patch = self.session.consume_pending_thread_metadata_patches()
-            if pending_metadata_patch:
-                patcher = getattr(data_layer, "patch_thread_metadata", None)
-                try:
-                    if callable(patcher):
-                        await patcher(self.session.thread_id, pending_metadata_patch)
-                    else:
-                        await data_layer.update_thread(
-                            thread_id=self.session.thread_id,
-                            user_id=self._get_thread_user_id(),
-                            metadata=pending_metadata_patch,
-                            tags=self._get_thread_tags(),
-                        )
-                except Exception as e:
-                    logger.error(f"Error updating thread metadata: {e}")
-                    return False
-
-            asyncio.create_task(self.session.flush_method_queue())
-            self.session.mark_thread_persistence_ready()
-            return True
+        asyncio.create_task(self.session.flush_method_queue())
+        self.session.mark_thread_persistence_ready()
         return True
 
     async def init_thread(self, interaction: str) -> bool:
@@ -379,26 +366,31 @@ class ChainlitEmitter(BaseChainlitEmitter):
         return True
 
     async def set_thread_title(self, title: str) -> bool:
-        """Persist the thread title and notify the UI when it changes."""
+        """
+        Flush thread persistence when needed, then persist the visible thread title.
+
+        This is the manual persistence entry point used by the thread-title workflow
+        node. Empty titles and missing data layers raise instead of soft-failing.
+        """
         normalized_title = str(title or "").strip()
         if not normalized_title:
-            return False
+            raise ValueError("Thread title cannot be empty")
 
         data_layer = get_data_layer()
         if not data_layer:
-            logger.warning("Skipping thread title update because no data layer is configured.")
-            return False
+            raise RuntimeError("No data layer is configured for thread title updates")
 
-        try:
-            await data_layer.update_thread(
-                thread_id=self.session.thread_id,
-                name=normalized_title,
-                user_id=self._get_thread_user_id(),
-                tags=self._get_thread_tags(),
-            )
-        except Exception as e:
-            logger.error(f"Error updating thread title: {e}")
-            return False
+        if not self.session.is_thread_persistence_ready():
+            await self.ensure_thread_persistence(normalized_title)
+        if not self.session.is_thread_persistence_ready():
+            raise RuntimeError("Thread persistence flush failed")
+
+        await data_layer.update_thread(
+            thread_id=self.session.thread_id,
+            name=normalized_title,
+            user_id=self._get_thread_user_id(),
+            tags=self._get_thread_tags(),
+        )
 
         await self.emit(
             "thread_title_updated",
@@ -416,7 +408,18 @@ class ChainlitEmitter(BaseChainlitEmitter):
         for_id: str,
         display: Literal["inline", "side", "page", "floating"] = "inline",
     ) -> List[Element]:
-        """Persist upload-backed file elements before exposing them to application code."""
+        """
+        Persist upload-backed file elements before exposing them to application code.
+
+        Durable element persistence requires a flushed thread row: ``create_element``
+        is staged by ``@queue_until_user_message`` until the session is ready. AskFile
+        replies and composer uploads therefore flush here when needed (idempotent when
+        ``process_message`` / ``set_thread_title`` already flushed).
+        """
+        if files and not self.session.is_thread_persistence_ready():
+            interaction = str(files[0].get("name") or "").strip() or "file_upload"
+            await self.ensure_thread_persistence(interaction)
+
         elements = [
             Element.from_dict(
                 {
@@ -473,26 +476,26 @@ class ChainlitEmitter(BaseChainlitEmitter):
             if spec.type == "file":
                 self.session.files_spec[parent_id] = cast(AskFileSpec, spec)
 
-            # Send the prompt to the UI
+            # End the task temporarily so that the User can answer the prompt
+            # (Stop/loading off while AskFile / actions / forms are open).
+            await self.task_end()
+
+            # Send the prompt to the UI and wait for the user response.
             user_res = await self.emit_call(
                 "ask", {"msg": step_dict, "spec": spec.to_dict()}, spec.timeout
             )  # type: Optional[Union["StepDict", "AskActionResponse", "AskElementResponse", List["FileReference"]]]
-
-            # End the task temporarily so that the User can answer the prompt
-            await self.task_end()
 
             final_res: Optional[
                 Union[StepDict, AskActionResponse, AskElementResponse, List[FileDict]]
             ] = None
 
             if user_res:
-                interaction: Union[str, None] = None
                 if spec.type == "text":
                     message_dict_res = cast(StepDict, user_res)
+                    # Text asks persist through process_message (user-message rule).
                     await self.process_message(
                         {"message": message_dict_res, "fileReferences": None}
                     )
-                    interaction = message_dict_res["output"]
                     final_res = message_dict_res
                 elif spec.type == "file":
                     file_refs = cast(List[FileReference], user_res)
@@ -502,24 +505,11 @@ class ChainlitEmitter(BaseChainlitEmitter):
                         if file["id"] in self.session.files
                     ]
                     final_res = files
-                    interaction = ",".join([file["name"] for file in files])
-                    if not self.session.is_thread_persistence_ready() and interaction:
-                        await self.ensure_thread_persistence(interaction=interaction)
                     await self._send_uploaded_elements(files=files, for_id=step_dict["id"])
                 elif spec.type == "action":
-                    action_res = cast(AskActionResponse, user_res)
-                    final_res = action_res
-                    interaction = action_res["name"]
+                    final_res = cast(AskActionResponse, user_res)
                 elif spec.type == "element":
                     final_res = cast(AskElementResponse, user_res)
-                    element_spec = cast(AskElementSpec, spec)
-                    # Ephemeral floating asks (show_reopen_chip=False) must not
-                    # create or flush a durable thread.
-                    if not element_spec.ephemeral:
-                        interaction = "custom_element"
-
-                if not self.session.is_thread_persistence_ready() and interaction:
-                    await self.ensure_thread_persistence(interaction=interaction)
 
             await self.clear("clear_ask")
             return final_res
@@ -568,7 +558,6 @@ class ChainlitEmitter(BaseChainlitEmitter):
 
     def stream_start(self, step_dict: StepDict):
         """Send a stream start signal to the UI."""
-        self._track_assistant_persistence_threshold(step_dict)
         return self.emit(
             "stream_start",
             step_dict,
@@ -628,13 +617,23 @@ class ChainlitEmitter(BaseChainlitEmitter):
             resolve_effective_spontaneous_file_upload_enabled(self.session),
         )
 
-    def set_conversation_history_visibility(self, visible: Optional[bool] = None):
-        """Synchronize conversation-history visibility in the UI."""
+    def set_conversation_history_visibility(
+        self,
+        visible: Optional[bool] = None,
+        *,
+        show_new_thread: Optional[bool] = None,
+        show_delete_threads: Optional[bool] = None,
+    ):
+        """Synchronize conversation-history visibility and action controls in the UI."""
         self.session.conversation_history_visible_override = visible
         self.session.new_chat_button_visible_override = visible
+        self.session.conversation_history_show_new_thread_override = show_new_thread
+        self.session.conversation_history_show_delete_threads_override = (
+            show_delete_threads
+        )
         return self.emit(
             "set_conversation_history_visibility",
-            resolve_effective_conversation_history_visible(self.session),
+            resolve_effective_conversation_history_controls(self.session),
         )
 
     def set_new_chat_button_visibility(self, visible: Optional[bool] = None):
@@ -662,3 +661,11 @@ class ChainlitEmitter(BaseChainlitEmitter):
     async def set_chat_profile(self, profile_name: str):
         """Send a chat profile selection to the UI."""
         await self.emit("set_chat_profile", profile_name)
+
+    async def set_project(self, project_id: Optional[str]):
+        """
+        Send the active conversation project to the UI.
+
+        ``None`` means the global bag (no project). A string is the normalized project id/name.
+        """
+        await self.emit("set_project", project_id)

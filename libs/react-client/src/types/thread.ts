@@ -11,4 +11,5 @@ export interface IThread {
   metadata?: Record<string, any> | string;
   steps: IStep[];
   elements?: IElement[];
+  projectId?: string | null;
 }

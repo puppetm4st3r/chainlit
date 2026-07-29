@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 
 import { useChatData, useChatInteract, useConfig } from '@chainlit/react-client';
+import { MessageSquarePlus } from 'lucide-react';
 
 import { Translator } from '@/components/i18n';
 import { Button } from '@/components/ui/button';
@@ -18,8 +19,6 @@ import {
   TooltipProvider,
   TooltipTrigger
 } from '@/components/ui/tooltip';
-
-import { EditSquare } from '../icons/EditSquare';
 
 type NewChatDialogProps = {
   open: boolean;
@@ -68,7 +67,7 @@ export const NewChatDialog = ({
 };
 
 interface Props extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  navigate?: (to: string) => void;
+  navigate?: (to: string | { pathname: string; search?: string }) => void;
   onConfirm?: () => void;
 }
 
@@ -76,9 +75,13 @@ const NewChatButton = ({ navigate, onConfirm, ...buttonProps }: Props) => {
   const [open, setOpen] = useState(false);
   const { clear } = useChatInteract();
   const { config } = useConfig();
-  const { conversationHistoryVisible } = useChatData();
+  const { conversationHistoryVisible, conversationHistoryShowNewThread } =
+    useChatData();
 
-  if (conversationHistoryVisible === false) {
+  if (
+    conversationHistoryVisible === false ||
+    conversationHistoryShowNewThread === false
+  ) {
     return null;
   }
 
@@ -99,7 +102,7 @@ const NewChatButton = ({ navigate, onConfirm, ...buttonProps }: Props) => {
       onConfirm();
     } else {
       clear();
-      navigate?.('/');
+      navigate?.({ pathname: '/', search: window.location.search });
     }
     handleClose();
   };
@@ -117,7 +120,7 @@ const NewChatButton = ({ navigate, onConfirm, ...buttonProps }: Props) => {
               onClick={handleClickOpen}
               {...buttonProps}
             >
-              <EditSquare className="!size-6" />
+              <MessageSquarePlus className="!size-6" />
             </Button>
           </TooltipTrigger>
           <TooltipContent>

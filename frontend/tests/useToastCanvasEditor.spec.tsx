@@ -13,25 +13,43 @@ const useToastCanvasEditorSource = readFileSync(
   'utf8'
 );
 
-function loadUseToastCanvasEditor(loadCanvasEditorDocxModule: () => Promise<unknown>) {
+function loadUseToastCanvasEditor(loadCanvasEditorExportModule: () => Promise<unknown>) {
+  const downloadOptionsSource = readFileSync(
+    resolve(__dirname, '../../../../backend/public/elements/canvas-editor/downloadOptions.js'),
+    'utf8'
+  );
+  const downloadOptionsModule = Function(
+    `${downloadOptionsSource.replace(/export /g, '')}\nreturn { getDownloadOptions, getDownloadButtonStateFromOptions };`
+  )() as {
+    getDownloadOptions: (...args: unknown[]) => unknown;
+    getDownloadButtonStateFromOptions: (...args: unknown[]) => unknown;
+  };
   const transformedSource = useToastCanvasEditorSource
     .replace('import { useEffect, useRef } from "react";', '')
-    .replace('import { loadCanvasEditorDocxModule } from "../loaders.js";', '')
+    .replace('import { loadCanvasEditorExportModule } from "../loaders.js";', '')
     .replace('import { decodeVisibleSpaceRuns } from "../whitespace.js";', '')
+    .replace(
+      'import {\n  getDownloadButtonStateFromOptions,\n  getDownloadOptions,\n} from "../downloadOptions.js";',
+      ''
+    )
     .replace('export function useToastCanvasEditor', 'function useToastCanvasEditor');
   const executeModule = Function(
     'useEffect',
     'useRef',
-    'loadCanvasEditorDocxModule',
+    'loadCanvasEditorExportModule',
     'decodeVisibleSpaceRuns',
+    'getDownloadOptions',
+    'getDownloadButtonStateFromOptions',
     `${transformedSource}\nreturn { useToastCanvasEditor };`
   );
   return (
     executeModule(
       React.useEffect,
       React.useRef,
-      loadCanvasEditorDocxModule,
-      (value: unknown) => String(value ?? '').replace(/\u00a0/g, ' ')
+      loadCanvasEditorExportModule,
+      (value: unknown) => String(value ?? '').replace(/\u00a0/g, ' '),
+      downloadOptionsModule.getDownloadOptions,
+      downloadOptionsModule.getDownloadButtonStateFromOptions
     ) as {
       useToastCanvasEditor: (...args: unknown[]) => unknown;
     }
@@ -43,18 +61,8 @@ const flushMicrotasks = async () => {
   await Promise.resolve();
 };
 
-const flushAnimationFrames = async () => {
-  await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)));
-  await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)));
-  await flushMicrotasks();
-};
-
 class FakeToastEditor {
   public toolbar: HTMLDivElement;
-  public commentsGroup: HTMLDivElement;
-  public commentsButton: HTMLButtonElement;
-  public trackedGroup: HTMLDivElement;
-  public trackedButton: HTMLButtonElement;
   public plugins: Array<(context: unknown) => unknown>;
   public wwEditor: {
     view: {
@@ -81,25 +89,6 @@ class FakeToastEditor {
     const toolbar = document.createElement('div');
     toolbar.className = 'toastui-editor-defaultUI-toolbar';
     this.toolbar = toolbar;
-
-    const sharedReviewGroup = document.createElement('div');
-    sharedReviewGroup.className = 'toastui-editor-toolbar-group';
-    this.commentsGroup = sharedReviewGroup;
-
-    const commentsButton = document.createElement('button');
-    commentsButton.type = 'button';
-    commentsButton.className = 'toastui-editor-toolbar-icons custom-comments';
-    sharedReviewGroup.appendChild(commentsButton);
-    this.commentsButton = commentsButton;
-
-    this.trackedGroup = sharedReviewGroup;
-
-    const trackedButton = document.createElement('button');
-    trackedButton.type = 'button';
-    trackedButton.className = 'toastui-editor-toolbar-icons custom-tracked-changes';
-    sharedReviewGroup.appendChild(trackedButton);
-    this.trackedButton = trackedButton;
-    toolbar.appendChild(sharedReviewGroup);
 
     const downloadButton = document.createElement('button');
     downloadButton.type = 'button';
@@ -130,25 +119,10 @@ class FakeToastEditor {
   public getMarkdown() {
     return '# Draft';
   }
-
-  public rebuildTrackedToolbarButton() {
-    this.trackedGroup.remove();
-    const nextTrackedGroup = document.createElement('div');
-    nextTrackedGroup.className = 'toastui-editor-toolbar-group';
-    const nextTrackedButton = document.createElement('button');
-    nextTrackedButton.type = 'button';
-    nextTrackedButton.className = 'toastui-editor-toolbar-icons custom-tracked-changes';
-    nextTrackedGroup.appendChild(nextTrackedButton);
-    this.toolbar.insertBefore(nextTrackedGroup, this.toolbar.firstChild);
-    this.trackedGroup = nextTrackedGroup;
-    this.trackedButton = nextTrackedButton;
-  }
 }
 
 type HarnessProps = {
   useToastCanvasEditor: ReturnType<typeof loadUseToastCanvasEditor>;
-  commentsPanelOpen?: boolean;
-  toggleCommentsPanel?: () => void;
   trackedChanges: {
     available: boolean;
     enabled: boolean;
@@ -164,8 +138,6 @@ type HarnessProps = {
 
 function Harness({
   useToastCanvasEditor,
-  commentsPanelOpen = false,
-  toggleCommentsPanel = vi.fn(),
   trackedChanges,
   requestTrackedChangesDialog,
   getCanonicalEditorMarkdown = () => '# Draft',
@@ -190,7 +162,7 @@ function Harness({
   const pendingReadonlyRef = React.useRef(false);
   const uploadInputRef = React.useRef<HTMLInputElement>(null);
 
-  useToastCanvasEditor({
+  const { handleTrackedChangesClick } = useToastCanvasEditor({
     apiClient: { buildEndpoint: (path: string) => path },
     sessionId: 'session-1',
     widgetReadyForUse: true,
@@ -205,7 +177,10 @@ function Harness({
       undo: 'Undo',
       redo: 'Redo',
       copy: 'Copy',
-      downloadDocx: 'Download DOCX',
+      downloadDocument: 'Download {{format}}',
+      downloadOptions: 'Download',
+      downloadUnavailable: 'Download unavailable',
+      generatingDocument: 'Generating {{format}}...',
       uploadDocx: 'Upload DOCX',
       trackedChangesButton: 'Change control',
       trackedChanges: 'Tracked changes',
@@ -227,6 +202,16 @@ function Harness({
       filename: 'draft.docx',
       workspaceKey: 'workspace-1',
       widgetInstanceId: 'widget-1',
+      exportSettings: {
+        sourceFileEditorNodeId: 'file-editor-1',
+        outputFormat: 'docx',
+        enableHeader: false,
+        headerAssetRef: null,
+        enableFooter: false,
+        footerText: '',
+        showPageXOfY: false,
+        justifyParagraphs: true,
+      },
     },
     pendingReadonlyRef,
     setIsReadonly: vi.fn(),
@@ -239,19 +224,24 @@ function Harness({
       detachedCommentsExport: 'Detached comments block export',
       trackedChangesUnavailable: 'Tracked changes unavailable',
       trackedChangesActionFailed: 'Tracked changes failed',
+      exportContractViolation: 'Export contract violation',
+      exportRenderFailed: 'Export render failed',
     },
     logCanvasOperation: vi.fn(),
-    commentsButtonLabel: 'Comments',
     commentThreads,
-    commentsPanelOpen,
     detachedCommentThreadIds: [],
-    toggleCommentsPanel,
     commentDecorationsController,
     trackedChangesDecorationsController,
     setWidgetConfig: vi.fn(),
     trackedChanges,
     requestTrackedChangesDialog,
-  });
+  }) as { handleTrackedChangesClick: () => Promise<void> };
+
+  React.useEffect(() => {
+    (window as typeof window & {
+      __canvasEditorHandlers?: { handleTrackedChangesClick: () => Promise<void> };
+    }).__canvasEditorHandlers = { handleTrackedChangesClick };
+  }, [handleTrackedChangesClick]);
 
   return (
     <>
@@ -270,16 +260,19 @@ describe('useToastCanvasEditor', () => {
     vi.restoreAllMocks();
     delete (window as typeof window & { toastui?: unknown }).toastui;
     delete (window as typeof window & { __lastFakeToastEditor?: FakeToastEditor }).__lastFakeToastEditor;
+    delete (window as typeof window & {
+      __canvasEditorHandlers?: { handleTrackedChangesClick: () => Promise<void> };
+    }).__canvasEditorHandlers;
   });
 
-  it('uses the latest tracked-changes state for the toolbar command', async () => {
+  it('uses the latest tracked-changes state for the header action', async () => {
     const startCanvasTrackedChanges = vi.fn().mockResolvedValue(undefined);
-    const exportCanvasDocx = vi.fn().mockResolvedValue(undefined);
-    const loadCanvasEditorDocxModule = vi.fn(async () => ({
+    const exportCanvasDocument = vi.fn().mockResolvedValue(undefined);
+    const loadCanvasEditorExportModule = vi.fn(async () => ({
       startCanvasTrackedChanges,
-      exportCanvasDocx,
+      exportCanvasDocument,
     }));
-    const useToastCanvasEditor = loadUseToastCanvasEditor(loadCanvasEditorDocxModule);
+    const useToastCanvasEditor = loadUseToastCanvasEditor(loadCanvasEditorExportModule);
     const requestTrackedChangesDialog = vi.fn();
 
     (window as typeof window & { toastui?: unknown }).toastui = {
@@ -297,14 +290,15 @@ describe('useToastCanvasEditor', () => {
       })
     );
 
-    const command = (
-      (window as typeof window & { __lastFakeToastEditor?: FakeToastEditor }).__lastFakeToastEditor
-        ?.commands.get('markdown:customTrackedChanges')
-    );
-    expect(command).toBeTypeOf('function');
+    const getHandler = () =>
+      (window as typeof window & {
+        __canvasEditorHandlers?: { handleTrackedChangesClick: () => Promise<void> };
+      }).__canvasEditorHandlers?.handleTrackedChangesClick;
+
+    expect(getHandler()).toBeTypeOf('function');
 
     await act(async () => {
-      command?.();
+      await getHandler()?.();
       await flushMicrotasks();
     });
 
@@ -323,7 +317,7 @@ describe('useToastCanvasEditor', () => {
     );
 
     await act(async () => {
-      command?.();
+      await getHandler()?.();
       await flushMicrotasks();
     });
 
@@ -332,12 +326,12 @@ describe('useToastCanvasEditor', () => {
   });
 
   it('routes download actions through the unified export helper', async () => {
-    const exportCanvasDocx = vi.fn().mockResolvedValue(undefined);
-    const loadCanvasEditorDocxModule = vi.fn(async () => ({
+    const exportCanvasDocument = vi.fn().mockResolvedValue(undefined);
+    const loadCanvasEditorExportModule = vi.fn(async () => ({
       startCanvasTrackedChanges: vi.fn().mockResolvedValue(undefined),
-      exportCanvasDocx,
+      exportCanvasDocument,
     }));
-    const useToastCanvasEditor = loadUseToastCanvasEditor(loadCanvasEditorDocxModule);
+    const useToastCanvasEditor = loadUseToastCanvasEditor(loadCanvasEditorExportModule);
 
     (window as typeof window & { toastui?: unknown }).toastui = {
       Editor: FakeToastEditor,
@@ -363,8 +357,8 @@ describe('useToastCanvasEditor', () => {
       await flushMicrotasks();
     });
 
-    expect(exportCanvasDocx).toHaveBeenCalledTimes(1);
-    expect(exportCanvasDocx.mock.calls[0]?.[0]).toMatchObject({
+    expect(exportCanvasDocument).toHaveBeenCalledTimes(1);
+    expect(exportCanvasDocument.mock.calls[0]?.[0]).toMatchObject({
       apiClient: { buildEndpoint: expect.any(Function) },
       sessionId: 'session-1',
       filename: 'draft.docx',
@@ -380,15 +374,15 @@ describe('useToastCanvasEditor', () => {
       ],
       detachedCommentThreadIds: [],
     });
-    expect(exportCanvasDocx.mock.calls[0]?.[0]).not.toHaveProperty('trackedChanges');
+    expect(exportCanvasDocument.mock.calls[0]?.[0]).not.toHaveProperty('trackedChanges');
   });
 
   it('registers comment and tracked-changes decoration plugins together', () => {
-    const loadCanvasEditorDocxModule = vi.fn(async () => ({
+    const loadCanvasEditorExportModule = vi.fn(async () => ({
       startCanvasTrackedChanges: vi.fn().mockResolvedValue(undefined),
-      exportCanvasDocx: vi.fn().mockResolvedValue(undefined),
+      exportCanvasDocument: vi.fn().mockResolvedValue(undefined),
     }));
-    const useToastCanvasEditor = loadUseToastCanvasEditor(loadCanvasEditorDocxModule);
+    const useToastCanvasEditor = loadUseToastCanvasEditor(loadCanvasEditorExportModule);
     const commentDecorationsController = {
       toastUiPlugin: vi.fn(() => ({ wysiwygPlugins: [] })),
     };
@@ -422,220 +416,12 @@ describe('useToastCanvasEditor', () => {
     expect(trackedChangesDecorationsController.toastUiPlugin).toHaveBeenCalledTimes(1);
   });
 
-  it('reapplies tracked-changes toolbar decoration after toolbar DOM rebuilds', async () => {
-    const loadCanvasEditorDocxModule = vi.fn(async () => ({
-      startCanvasTrackedChanges: vi.fn().mockResolvedValue(undefined),
-      exportCanvasDocx: vi.fn().mockResolvedValue(undefined),
-    }));
-    const useToastCanvasEditor = loadUseToastCanvasEditor(loadCanvasEditorDocxModule);
-
-    (window as typeof window & { toastui?: unknown }).toastui = {
-      Editor: FakeToastEditor,
-    };
-
-    render(
-      buildHarness(useToastCanvasEditor, {
-        trackedChanges: {
-          available: true,
-          enabled: false,
-          checkpointCount: 0,
-        },
-        requestTrackedChangesDialog: vi.fn(),
-      })
-    );
-
-    const editor = (window as typeof window & { __lastFakeToastEditor?: FakeToastEditor })
-      .__lastFakeToastEditor;
-    expect(editor).toBeDefined();
-    expect(editor?.trackedGroup.classList.contains('canvas-tracked-changes-group')).toBe(true);
-    expect(editor?.trackedButton.dataset.buttonLabel).toBe('Change control');
-    expect(editor?.trackedButton.dataset.tooltipLabel).toBe('Tracked changes');
-    expect(editor?.trackedButton.hasAttribute('title')).toBe(false);
-    editor?.trackedButton.dispatchEvent(
-      new MouseEvent('mousemove', {
-        bubbles: true,
-        clientX: 320,
-        clientY: 36,
-      })
-    );
-    const tooltip = document.body.querySelector('.canvas-editor-toolbar-tooltip');
-    expect(tooltip?.textContent).toBe('Tracked changes');
-    expect((tooltip as HTMLElement | null)?.hidden).toBe(false);
-
-    await act(async () => {
-      editor?.rebuildTrackedToolbarButton();
-      await flushMicrotasks();
-      await flushAnimationFrames();
-    });
-
-    expect(editor?.trackedGroup.classList.contains('canvas-tracked-changes-group')).toBe(true);
-    expect(editor?.trackedButton.dataset.buttonLabel).toBe('Change control');
-    expect(editor?.trackedButton.getAttribute('aria-label')).toBe('Tracked changes');
-    expect(editor?.trackedButton.hasAttribute('title')).toBe(false);
-  });
-
-  it('uses the latest comments-panel toggle state for the toolbar command', async () => {
-    const loadCanvasEditorDocxModule = vi.fn(async () => ({
-      startCanvasTrackedChanges: vi.fn().mockResolvedValue(undefined),
-      exportCanvasDocx: vi.fn().mockResolvedValue(undefined),
-    }));
-    const useToastCanvasEditor = loadUseToastCanvasEditor(loadCanvasEditorDocxModule);
-    const toggleCommentsPanel = vi.fn();
-
-    (window as typeof window & { toastui?: unknown }).toastui = {
-      Editor: FakeToastEditor,
-    };
-
-    const view = render(
-      buildHarness(useToastCanvasEditor, {
-        commentsPanelOpen: false,
-        toggleCommentsPanel,
-        trackedChanges: {
-          available: true,
-          enabled: false,
-          checkpointCount: 0,
-        },
-        requestTrackedChangesDialog: vi.fn(),
-      })
-    );
-
-    const editor = (window as typeof window & { __lastFakeToastEditor?: FakeToastEditor })
-      .__lastFakeToastEditor;
-    const command = editor?.commands.get('markdown:customComments');
-    expect(command).toBeTypeOf('function');
-    expect(editor?.commentsButton.dataset.buttonLabel).toBe('Comments');
-    expect(editor?.commentsButton.classList.contains('active')).toBe(false);
-
-    await act(async () => {
-      command?.();
-      await flushMicrotasks();
-    });
-
-    expect(toggleCommentsPanel).toHaveBeenCalledTimes(1);
-
-    view.rerender(
-      buildHarness(useToastCanvasEditor, {
-        commentsPanelOpen: true,
-        toggleCommentsPanel,
-        trackedChanges: {
-          available: true,
-          enabled: false,
-          checkpointCount: 0,
-        },
-        requestTrackedChangesDialog: vi.fn(),
-      })
-    );
-
-    await act(async () => {
-      await flushAnimationFrames();
-    });
-
-    expect(editor?.commentsButton.classList.contains('active')).toBe(true);
-    expect(editor?.commentsButton.getAttribute('aria-label')).toBe('Comments (1)');
-    expect(editor?.commentsButton.dataset.tooltipLabel).toBe('Comments');
-    expect(editor?.commentsButton.dataset.unresolvedCount).toBe('1');
-    expect(editor?.commentsButton.classList.contains('has-unresolved-comments')).toBe(true);
-    expect(editor?.commentsButton.hasAttribute('title')).toBe(false);
-  });
-
-  it('shows unresolved comment count on the comments toolbar button', async () => {
-    const loadCanvasEditorDocxModule = vi.fn(async () => ({
-      startCanvasTrackedChanges: vi.fn().mockResolvedValue(undefined),
-      exportCanvasDocx: vi.fn().mockResolvedValue(undefined),
-    }));
-    const useToastCanvasEditor = loadUseToastCanvasEditor(loadCanvasEditorDocxModule);
-
-    (window as typeof window & { toastui?: unknown }).toastui = {
-      Editor: FakeToastEditor,
-    };
-
-    const view = render(
-      buildHarness(useToastCanvasEditor, {
-        commentsPanelOpen: false,
-        commentThreads: [
-          { commentThreadId: 'comment-thread-open-1', status: 'open' },
-          { commentThreadId: 'comment-thread-open-2', status: 'open' },
-          { commentThreadId: 'comment-thread-resolved', status: 'resolved' },
-        ],
-        trackedChanges: {
-          available: true,
-          enabled: false,
-          checkpointCount: 0,
-        },
-        requestTrackedChangesDialog: vi.fn(),
-      })
-    );
-
-    const editor = (window as typeof window & { __lastFakeToastEditor?: FakeToastEditor })
-      .__lastFakeToastEditor;
-    expect(editor?.commentsButton.dataset.unresolvedCount).toBe('2');
-    expect(editor?.commentsButton.classList.contains('has-unresolved-comments')).toBe(true);
-    expect(editor?.commentsButton.getAttribute('aria-label')).toBe('Comments (2)');
-
-    view.rerender(
-      buildHarness(useToastCanvasEditor, {
-        commentsPanelOpen: false,
-        commentThreads: [
-          { commentThreadId: 'comment-thread-resolved-1', status: 'resolved' },
-          { commentThreadId: 'comment-thread-resolved-2', status: 'resolved' },
-        ],
-        trackedChanges: {
-          available: true,
-          enabled: false,
-          checkpointCount: 0,
-        },
-        requestTrackedChangesDialog: vi.fn(),
-      })
-    );
-
-    await act(async () => {
-      await flushAnimationFrames();
-    });
-
-    const updatedEditor = (window as typeof window & { __lastFakeToastEditor?: FakeToastEditor })
-      .__lastFakeToastEditor;
-    expect(updatedEditor?.commentsButton.dataset.unresolvedCount).toBeUndefined();
-    expect(updatedEditor?.commentsButton.classList.contains('has-unresolved-comments')).toBe(false);
-    expect(updatedEditor?.commentsButton.getAttribute('aria-label')).toBe('Comments');
-  });
-
-  it('keeps comments visible when tracked changes are unavailable', () => {
-    const loadCanvasEditorDocxModule = vi.fn(async () => ({
-      startCanvasTrackedChanges: vi.fn().mockResolvedValue(undefined),
-      exportCanvasDocx: vi.fn().mockResolvedValue(undefined),
-    }));
-    const useToastCanvasEditor = loadUseToastCanvasEditor(loadCanvasEditorDocxModule);
-
-    (window as typeof window & { toastui?: unknown }).toastui = {
-      Editor: FakeToastEditor,
-    };
-
-    render(
-      buildHarness(useToastCanvasEditor, {
-        commentsPanelOpen: false,
-        trackedChanges: {
-          available: false,
-          enabled: false,
-          checkpointCount: 0,
-        },
-        requestTrackedChangesDialog: vi.fn(),
-      })
-    );
-
-    const editor = (window as typeof window & { __lastFakeToastEditor?: FakeToastEditor })
-      .__lastFakeToastEditor;
-    expect(editor?.commentsButton.nextElementSibling).toBe(editor?.trackedButton);
-    expect(editor?.commentsButton.style.display).toBe('');
-    expect(editor?.trackedButton.style.display).toBe('none');
-    expect(editor?.trackedGroup.style.display).toBe('');
-  });
-
   it('schedules autosave when WYSIWYG input only changes preserved spaces', async () => {
-    const loadCanvasEditorDocxModule = vi.fn(async () => ({
+    const loadCanvasEditorExportModule = vi.fn(async () => ({
       startCanvasTrackedChanges: vi.fn().mockResolvedValue(undefined),
-      exportCanvasDocx: vi.fn().mockResolvedValue(undefined),
+      exportCanvasDocument: vi.fn().mockResolvedValue(undefined),
     }));
-    const useToastCanvasEditor = loadUseToastCanvasEditor(loadCanvasEditorDocxModule);
+    const useToastCanvasEditor = loadUseToastCanvasEditor(loadCanvasEditorExportModule);
     const scheduleAutoSave = vi.fn();
 
     (window as typeof window & { toastui?: unknown }).toastui = {
@@ -667,12 +453,12 @@ describe('useToastCanvasEditor', () => {
 
   it('decodes preserved spaces before tracked changes and DOCX actions leave the editor', async () => {
     const startCanvasTrackedChanges = vi.fn().mockResolvedValue(undefined);
-    const exportCanvasDocx = vi.fn().mockResolvedValue(undefined);
-    const loadCanvasEditorDocxModule = vi.fn(async () => ({
+    const exportCanvasDocument = vi.fn().mockResolvedValue(undefined);
+    const loadCanvasEditorExportModule = vi.fn(async () => ({
       startCanvasTrackedChanges,
-      exportCanvasDocx,
+      exportCanvasDocument,
     }));
-    const useToastCanvasEditor = loadUseToastCanvasEditor(loadCanvasEditorDocxModule);
+    const useToastCanvasEditor = loadUseToastCanvasEditor(loadCanvasEditorExportModule);
 
     (window as typeof window & { toastui?: unknown }).toastui = {
       Editor: FakeToastEditor,
@@ -692,13 +478,17 @@ describe('useToastCanvasEditor', () => {
 
     const editor = (window as typeof window & { __lastFakeToastEditor?: FakeToastEditor })
       .__lastFakeToastEditor;
+    const handleTrackedChangesClick = (window as typeof window & {
+      __canvasEditorHandlers?: { handleTrackedChangesClick: () => Promise<void> };
+    }).__canvasEditorHandlers?.handleTrackedChangesClick;
+
     await act(async () => {
-      editor?.commands.get('markdown:customTrackedChanges')?.();
+      await handleTrackedChangesClick?.();
       editor?.commands.get('markdown:customDownload')?.();
       await flushMicrotasks();
     });
 
     expect(startCanvasTrackedChanges.mock.calls[0]?.[0]?.content).toBe('foo  bar');
-    expect(exportCanvasDocx.mock.calls[0]?.[0]?.content).toBe('foo  bar');
+    expect(exportCanvasDocument.mock.calls[0]?.[0]?.content).toBe('foo  bar');
   });
 });

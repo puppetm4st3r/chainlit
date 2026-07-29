@@ -56,17 +56,16 @@ async def test_send_step(
     mock_websocket_session.emit.assert_called_once_with("new_message", step_dict)
 
 
-async def test_send_step_does_not_initialize_thread_on_first_assistant_turn(
+async def test_send_step_never_ensures_thread_persistence(
     emitter: ChainlitEmitter, mock_websocket_session: MagicMock
 ) -> None:
     step_dict: StepDict = {
         "id": "assistant-first-step",
         "type": "assistant_message",
         "name": "Assistant",
-        "output": "Hello from the assistant first turn",
+        "output": "Hello from the assistant",
     }
     mock_websocket_session.has_first_interaction = False
-    mock_websocket_session.register_logical_assistant_message.return_value = 1
     emitter.ensure_thread_persistence = AsyncMock()  # type: ignore[method-assign]
 
     await emitter.send_step(step_dict)
@@ -75,55 +74,6 @@ async def test_send_step_does_not_initialize_thread_on_first_assistant_turn(
     assert mock_websocket_session.has_first_interaction is False
     emitter.ensure_thread_persistence.assert_not_awaited()  # type: ignore[attr-defined]
     mock_websocket_session.emit.assert_called_once_with("new_message", step_dict)
-
-
-async def test_send_step_ignores_timeout_followup_messages_for_thread_threshold(
-    emitter: ChainlitEmitter, mock_websocket_session: MagicMock
-) -> None:
-    step_dict: StepDict = {
-        "id": "assistant-timeout-step",
-        "type": "assistant_message",
-        "name": "Assistant",
-        "output": "The response timeout expired, so the system selected the default option",
-        "metadata": {"countsTowardThreadPersistenceThreshold": False},
-    }
-    mock_websocket_session.has_first_interaction = False
-    emitter.ensure_thread_persistence = AsyncMock()  # type: ignore[method-assign]
-
-    await emitter.send_step(step_dict)
-    await asyncio.sleep(0)
-
-    mock_websocket_session.register_logical_assistant_message.assert_not_called()
-    emitter.ensure_thread_persistence.assert_not_awaited()  # type: ignore[attr-defined]
-    mock_websocket_session.emit.assert_called_once_with("new_message", step_dict)
-
-
-async def test_send_step_initializes_thread_on_second_assistant_turn(
-    emitter: ChainlitEmitter, mock_websocket_session: MagicMock
-) -> None:
-    first_step: StepDict = {
-        "id": "assistant-first-step",
-        "type": "assistant_message",
-        "name": "Assistant",
-        "output": "Hello from the assistant first turn",
-    }
-    second_step: StepDict = {
-        "id": "assistant-second-step",
-        "type": "assistant_message",
-        "name": "Assistant",
-        "output": "Hello from the assistant second turn",
-    }
-    mock_websocket_session.has_first_interaction = False
-    mock_websocket_session.register_logical_assistant_message.side_effect = [1, 2]
-    emitter.ensure_thread_persistence = AsyncMock()  # type: ignore[method-assign]
-
-    await emitter.send_step(first_step)
-    await emitter.send_step(second_step)
-    await asyncio.sleep(0)
-
-    emitter.ensure_thread_persistence.assert_awaited_once_with(  # type: ignore[attr-defined]
-        "Hello from the assistant second turn"
-    )
 
 
 async def test_send_step_with_icon(
@@ -243,44 +193,7 @@ async def test_stream_start(
     mock_websocket_session.emit.assert_called_once_with("stream_start", step_dict)
 
 
-async def test_update_step_does_not_count_as_new_assistant_message(
-    emitter: ChainlitEmitter, mock_websocket_session: MagicMock
-) -> None:
-    step_dict: StepDict = {
-        "id": "assistant-update-step",
-        "type": "assistant_message",
-        "name": "Assistant",
-        "output": "Updated assistant content",
-    }
-
-    await emitter.update_step(step_dict)
-
-    mock_websocket_session.register_logical_assistant_message.assert_not_called()
-    mock_websocket_session.emit.assert_called_once_with("update_message", step_dict)
-
-
-async def test_stream_start_does_not_initialize_thread_on_first_assistant_turn(
-    emitter: ChainlitEmitter, mock_websocket_session: MagicMock
-) -> None:
-    step_dict: StepDict = {
-        "id": "assistant-first-stream",
-        "type": "assistant_message",
-        "name": "Assistant",
-        "output": "Streaming hello",
-    }
-    mock_websocket_session.has_first_interaction = False
-    mock_websocket_session.register_logical_assistant_message.return_value = 1
-    emitter.ensure_thread_persistence = AsyncMock()  # type: ignore[method-assign]
-
-    await emitter.stream_start(step_dict)
-    await asyncio.sleep(0)
-
-    assert mock_websocket_session.has_first_interaction is False
-    emitter.ensure_thread_persistence.assert_not_awaited()  # type: ignore[attr-defined]
-    mock_websocket_session.emit.assert_called_once_with("stream_start", step_dict)
-
-
-async def test_stream_start_initializes_thread_on_second_assistant_turn(
+async def test_stream_start_never_ensures_thread_persistence(
     emitter: ChainlitEmitter, mock_websocket_session: MagicMock
 ) -> None:
     first_step: StepDict = {
@@ -296,14 +209,13 @@ async def test_stream_start_initializes_thread_on_second_assistant_turn(
         "output": "Streaming again",
     }
     mock_websocket_session.has_first_interaction = False
-    mock_websocket_session.register_logical_assistant_message.side_effect = [1, 2]
     emitter.ensure_thread_persistence = AsyncMock()  # type: ignore[method-assign]
 
     await emitter.stream_start(first_step)
     await emitter.stream_start(second_step)
     await asyncio.sleep(0)
 
-    emitter.ensure_thread_persistence.assert_awaited_once_with("Streaming again")  # type: ignore[attr-defined]
+    emitter.ensure_thread_persistence.assert_not_awaited()  # type: ignore[attr-defined]
     assert mock_websocket_session.emit.call_count == 2
 
 
@@ -321,12 +233,11 @@ async def test_stream_start_with_icon(
     mock_websocket_session.emit.assert_called_once_with("stream_start", step_dict)
 
 
-async def test_send_token_does_not_count_as_new_message(
+async def test_send_token(
     emitter: ChainlitEmitter, mock_websocket_session: MagicMock
 ) -> None:
     await emitter.send_token("assistant-stream", "token-chunk", is_sequence=False, is_input=False)
 
-    mock_websocket_session.register_logical_assistant_message.assert_not_called()
     mock_websocket_session.emit.assert_called_once_with(
         "stream_token",
         {"id": "assistant-stream", "token": "token-chunk", "isSequence": False, "isInput": False},
@@ -364,6 +275,7 @@ async def test_flush_thread_queues_creates_thread_without_auto_title(
 ) -> None:
     mock_websocket_session.thread_id = "thread-1"
     mock_websocket_session.chat_profile = None
+    mock_websocket_session.project_id = None
     mock_websocket_session.user = PersistedUser(
         id="user-1",
         createdAt="2024-01-01T00:00:00Z",
@@ -381,6 +293,7 @@ async def test_flush_thread_queues_creates_thread_without_auto_title(
         thread_id="thread-1",
         user_id="user-1",
         tags=None,
+        project_id=None,
     )
     mock_websocket_session.flush_method_queue.assert_awaited_once()
 
@@ -391,6 +304,7 @@ async def test_flush_thread_queues_persists_staged_metadata_before_queue_flush(
     call_order = []
     mock_websocket_session.thread_id = "thread-1"
     mock_websocket_session.chat_profile = None
+    mock_websocket_session.project_id = None
     mock_websocket_session.user = PersistedUser(
         id="user-1",
         createdAt="2024-01-01T00:00:00Z",
@@ -426,7 +340,7 @@ async def test_flush_thread_queues_persists_staged_metadata_before_queue_flush(
     ]
 
 
-async def test_ensure_thread_persistence_without_data_layer_keeps_ui_interaction_only(
+async def test_ensure_thread_persistence_without_data_layer_raises(
     emitter: ChainlitEmitter, mock_websocket_session: MagicMock
 ) -> None:
     mock_websocket_session.thread_id = "thread-1"
@@ -434,14 +348,22 @@ async def test_ensure_thread_persistence_without_data_layer_keeps_ui_interaction
     mock_websocket_session.thread_persistence_ready = False
 
     with patch("chainlit.emitter.get_data_layer", return_value=None):
-        await emitter.ensure_thread_persistence("hello")
+        with pytest.raises(RuntimeError, match="Thread persistence flush failed"):
+            await emitter.ensure_thread_persistence("hello")
 
-    assert mock_websocket_session.has_first_interaction is True
+    assert mock_websocket_session.has_first_interaction is False
     assert mock_websocket_session.thread_persistence_ready is False
-    mock_websocket_session.emit.assert_called_once_with(
-        "first_interaction",
-        {"interaction": "hello", "thread_id": "thread-1"},
-    )
+    mock_websocket_session.emit.assert_not_called()
+
+
+async def test_ensure_thread_persistence_raises_when_already_in_progress(
+    emitter: ChainlitEmitter, mock_websocket_session: MagicMock
+) -> None:
+    mock_websocket_session.thread_persistence_ready = False
+    mock_websocket_session.thread_persistence_in_progress = True
+
+    with pytest.raises(RuntimeError, match="Thread persistence already in progress"):
+        await emitter.ensure_thread_persistence("hello")
 
 
 async def test_set_thread_title_persists_name_and_emits_runtime_update(
@@ -449,6 +371,7 @@ async def test_set_thread_title_persists_name_and_emits_runtime_update(
 ) -> None:
     mock_websocket_session.thread_id = "thread-1"
     mock_websocket_session.chat_profile = None
+    mock_websocket_session.thread_persistence_ready = True
     mock_websocket_session.user = PersistedUser(
         id="user-1",
         createdAt="2024-01-01T00:00:00Z",
@@ -472,7 +395,45 @@ async def test_set_thread_title_persists_name_and_emits_runtime_update(
     )
 
 
-async def test_set_thread_title_skips_runtime_update_without_data_layer(
+async def test_set_thread_title_flushes_then_renames_when_not_ready(
+    emitter: ChainlitEmitter, mock_websocket_session: MagicMock
+) -> None:
+    mock_websocket_session.thread_id = "thread-1"
+    mock_websocket_session.chat_profile = None
+    mock_websocket_session.project_id = None
+    mock_websocket_session.thread_persistence_ready = False
+    mock_websocket_session.user = PersistedUser(
+        id="user-1",
+        createdAt="2024-01-01T00:00:00Z",
+        identifier="user@example.com",
+    )
+    mock_websocket_session.flush_method_queue = AsyncMock()
+    mock_websocket_session.consume_pending_thread_metadata_patches.return_value = {}
+    mock_data_layer = AsyncMock()
+
+    with patch("chainlit.emitter.get_data_layer", return_value=mock_data_layer):
+        result = await emitter.set_thread_title("Manual title")
+
+    assert result is True
+    assert mock_data_layer.update_thread.await_count == 2
+    first_call = mock_data_layer.update_thread.await_args_list[0].kwargs
+    second_call = mock_data_layer.update_thread.await_args_list[1].kwargs
+    assert first_call == {
+        "thread_id": "thread-1",
+        "user_id": "user-1",
+        "tags": None,
+        "project_id": None,
+    }
+    assert second_call == {
+        "thread_id": "thread-1",
+        "name": "Manual title",
+        "user_id": "user-1",
+        "tags": None,
+    }
+    assert mock_websocket_session.thread_persistence_ready is True
+
+
+async def test_set_thread_title_raises_without_data_layer(
     emitter: ChainlitEmitter, mock_websocket_session: MagicMock
 ) -> None:
     mock_websocket_session.thread_id = "thread-1"
@@ -480,16 +441,23 @@ async def test_set_thread_title_skips_runtime_update_without_data_layer(
     mock_websocket_session.user = None
 
     with patch("chainlit.emitter.get_data_layer", return_value=None):
-        result = await emitter.set_thread_title("My first request")
+        with pytest.raises(RuntimeError, match="No data layer is configured"):
+            await emitter.set_thread_title("My first request")
 
-    assert result is False
     mock_websocket_session.emit.assert_not_called()
+
+
+async def test_set_thread_title_raises_on_empty_title(
+    emitter: ChainlitEmitter, mock_websocket_session: MagicMock
+) -> None:
+    with pytest.raises(ValueError, match="Thread title cannot be empty"):
+        await emitter.set_thread_title("   ")
 
 
 async def test_send_ask_user_ephemeral_element_skips_thread_persistence(
     emitter: ChainlitEmitter, mock_websocket_session: MagicMock
 ) -> None:
-    """Ephemeral AskElement replies must not flush thread persistence."""
+    """AskElement replies must not flush thread persistence."""
     from chainlit.types import AskElementSpec
 
     step_dict: StepDict = {
@@ -498,7 +466,6 @@ async def test_send_ask_user_ephemeral_element_skips_thread_persistence(
         "type": "assistant_message",
         "name": "Assistant",
         "output": "Motd",
-        "metadata": {"countsTowardThreadPersistenceThreshold": False},
     }
     spec = AskElementSpec(
         type="element",
@@ -522,10 +489,10 @@ async def test_send_ask_user_ephemeral_element_skips_thread_persistence(
     emitter.ensure_thread_persistence.assert_not_awaited()  # type: ignore[attr-defined]
 
 
-async def test_send_ask_user_durable_element_ensures_thread_persistence(
+async def test_send_ask_user_durable_element_skips_thread_persistence(
     emitter: ChainlitEmitter, mock_websocket_session: MagicMock
 ) -> None:
-    """Non-ephemeral AskElement replies still cross the persistence threshold."""
+    """Non-ephemeral AskElement replies also do not persist the thread."""
     from chainlit.types import AskElementSpec
 
     step_dict: StepDict = {
@@ -554,6 +521,174 @@ async def test_send_ask_user_durable_element_ensures_thread_persistence(
     result = await emitter.send_ask_user(step_dict, spec)
 
     assert result == {"submitted": True}
-    emitter.ensure_thread_persistence.assert_awaited_once_with(  # type: ignore[attr-defined]
-        interaction="custom_element"
+    emitter.ensure_thread_persistence.assert_not_awaited()  # type: ignore[attr-defined]
+
+
+async def test_send_ask_user_file_ensures_thread_persistence_when_not_ready(
+    emitter: ChainlitEmitter, mock_websocket_session: MagicMock
+) -> None:
+    """AskFile replies flush the thread before durable element persistence."""
+    from chainlit.types import AskFileSpec, FileDict
+
+    step_dict: StepDict = {
+        "id": "ask-file-1",
+        "parentId": "parent-1",
+        "type": "assistant_message",
+        "name": "Assistant",
+        "output": "Please upload a file",
+    }
+    spec = AskFileSpec(
+        type="file",
+        step_id="ask-file-1",
+        timeout=60,
+        accept=["text/plain"],
+        max_files=1,
+        max_size_mb=5,
     )
+    uploaded: FileDict = {
+        "id": "file-1",
+        "name": "brief.txt",
+        "path": "/tmp/brief.txt",
+        "size": 12,
+        "type": "text/plain",
+    }
+    mock_websocket_session.files_spec = {}
+    mock_websocket_session.files = {"file-1": uploaded}
+    mock_websocket_session.thread_persistence_ready = False
+    mock_websocket_session.emit_call = AsyncMock(return_value=[{"id": "file-1"}])
+    emitter.ensure_thread_persistence = AsyncMock()  # type: ignore[method-assign]
+    emitter.task_end = AsyncMock()  # type: ignore[method-assign]
+    emitter.task_start = AsyncMock()  # type: ignore[method-assign]
+    emitter.clear = AsyncMock()  # type: ignore[method-assign]
+
+    with patch("chainlit.emitter.Element") as mock_element_cls:
+        mock_element = MagicMock()
+        mock_element.send = AsyncMock()
+        mock_element_cls.from_dict.return_value = mock_element
+        mock_element_cls.infer_type_from_mime.return_value = "file"
+
+        result = await emitter.send_ask_user(step_dict, spec)
+
+    assert result == [uploaded]
+    emitter.ensure_thread_persistence.assert_awaited_once_with("brief.txt")  # type: ignore[attr-defined]
+    mock_element.send.assert_awaited_once_with(
+        for_id="ask-file-1", await_data_layer=True
+    )
+
+
+async def test_send_ask_user_file_skips_ensure_when_already_ready(
+    emitter: ChainlitEmitter, mock_websocket_session: MagicMock
+) -> None:
+    """AskFile must not re-flush when the thread row already exists."""
+    from chainlit.types import AskFileSpec, FileDict
+
+    step_dict: StepDict = {
+        "id": "ask-file-2",
+        "parentId": "parent-1",
+        "type": "assistant_message",
+        "name": "Assistant",
+        "output": "Please upload a file",
+    }
+    spec = AskFileSpec(
+        type="file",
+        step_id="ask-file-2",
+        timeout=60,
+        accept=["text/plain"],
+        max_files=1,
+        max_size_mb=5,
+    )
+    uploaded: FileDict = {
+        "id": "file-2",
+        "name": "ready.txt",
+        "path": "/tmp/ready.txt",
+        "size": 4,
+        "type": "text/plain",
+    }
+    mock_websocket_session.files_spec = {}
+    mock_websocket_session.files = {"file-2": uploaded}
+    mock_websocket_session.thread_persistence_ready = True
+    mock_websocket_session.emit_call = AsyncMock(return_value=[{"id": "file-2"}])
+    emitter.ensure_thread_persistence = AsyncMock()  # type: ignore[method-assign]
+    emitter.task_end = AsyncMock()  # type: ignore[method-assign]
+    emitter.task_start = AsyncMock()  # type: ignore[method-assign]
+    emitter.clear = AsyncMock()  # type: ignore[method-assign]
+
+    with patch("chainlit.emitter.Element") as mock_element_cls:
+        mock_element = MagicMock()
+        mock_element.send = AsyncMock()
+        mock_element_cls.from_dict.return_value = mock_element
+        mock_element_cls.infer_type_from_mime.return_value = "file"
+
+        result = await emitter.send_ask_user(step_dict, spec)
+
+    assert result == [uploaded]
+    emitter.ensure_thread_persistence.assert_not_awaited()  # type: ignore[attr-defined]
+    mock_element.send.assert_awaited_once_with(
+        for_id="ask-file-2", await_data_layer=True
+    )
+
+
+async def test_process_message_ensures_thread_persistence_when_not_ready(
+    emitter: ChainlitEmitter, mock_websocket_session: MagicMock
+) -> None:
+    """Composer user messages flush thread persistence when the session is not ready."""
+    import uuid
+
+    message_id = str(uuid.uuid4())
+    step_dict: StepDict = {
+        "id": message_id,
+        "type": "user_message",
+        "name": "User",
+        "output": "hello from composer",
+        "createdAt": "2024-01-01T00:00:00Z",
+    }
+    mock_websocket_session.thread_persistence_ready = False
+    emitter.ensure_thread_persistence = AsyncMock()  # type: ignore[method-assign]
+
+    fake_message = MagicMock()
+    fake_message.id = message_id
+    fake_message.content = "hello from composer"
+    fake_message._create = AsyncMock()
+
+    with (
+        patch("chainlit.emitter.Message.from_dict", return_value=fake_message),
+        patch("chainlit.emitter.chat_context.add"),
+    ):
+        result = await emitter.process_message(
+            {"message": step_dict, "fileReferences": None}
+        )
+
+    assert result is fake_message
+    emitter.ensure_thread_persistence.assert_awaited_once_with(  # type: ignore[attr-defined]
+        "hello from composer"
+    )
+
+
+async def test_process_message_skips_ensure_when_already_ready(
+    emitter: ChainlitEmitter, mock_websocket_session: MagicMock
+) -> None:
+    import uuid
+
+    message_id = str(uuid.uuid4())
+    step_dict: StepDict = {
+        "id": message_id,
+        "type": "user_message",
+        "name": "User",
+        "output": "hello again",
+        "createdAt": "2024-01-01T00:00:00Z",
+    }
+    mock_websocket_session.thread_persistence_ready = True
+    emitter.ensure_thread_persistence = AsyncMock()  # type: ignore[method-assign]
+
+    fake_message = MagicMock()
+    fake_message.id = message_id
+    fake_message.content = "hello again"
+    fake_message._create = AsyncMock()
+
+    with (
+        patch("chainlit.emitter.Message.from_dict", return_value=fake_message),
+        patch("chainlit.emitter.chat_context.add"),
+    ):
+        await emitter.process_message({"message": step_dict, "fileReferences": None})
+
+    emitter.ensure_thread_persistence.assert_not_awaited()  # type: ignore[attr-defined]

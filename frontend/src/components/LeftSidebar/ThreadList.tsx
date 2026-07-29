@@ -12,6 +12,7 @@ import {
   ClientError,
   ThreadHistory, // sessionIdState,
   threadHistoryState,
+  useChatData,
   useChatInteract,
   useChatMessages,
   useChatSession,
@@ -56,9 +57,9 @@ import {
   TooltipProvider,
   TooltipTrigger
 } from '@/components/ui/tooltip';
-import { getSelectedChatProfile } from '@/lib/assistantAvatar';
 
 import { Translator } from '../i18n';
+import MoveThreadProjectDialog from './MoveThreadProjectDialog';
 import ThreadOptions from './ThreadOptions';
 
 interface ThreadListProps {
@@ -68,6 +69,53 @@ interface ThreadListProps {
   isLoadingMore: boolean;
 }
 
+type ThreadWithProfile = {
+  metadata?: Record<string, any> | string | null;
+  tags?: string[] | null;
+};
+
+/**
+ * Resolve the chat profile associated with a historical thread.
+ * Prefers metadata.chat_profile and falls back to a matching configured tag.
+ */
+const getThreadMetadata = (
+  thread: ThreadWithProfile
+): Record<string, any> => {
+  if (!thread.metadata) {
+    return {};
+  }
+
+  if (typeof thread.metadata === 'string') {
+    try {
+      const parsedMetadata = JSON.parse(thread.metadata);
+      return parsedMetadata && typeof parsedMetadata === 'object'
+        ? parsedMetadata
+        : {};
+    } catch {
+      return {};
+    }
+  }
+
+  return thread.metadata;
+};
+
+/**
+ * Return the chat profile name for a thread, or undefined when unknown.
+ */
+const getThreadProfileName = (
+  thread: ThreadWithProfile,
+  configuredProfileNames: Set<string>
+) => {
+  const metadata = getThreadMetadata(thread);
+  const metadataProfileName = metadata.chat_profile;
+
+  if (typeof metadataProfileName === 'string' && metadataProfileName.trim()) {
+    return metadataProfileName;
+  }
+
+  return thread.tags?.find((tag) => configuredProfileNames.has(tag));
+};
+
 export function ThreadList({
   threadHistory,
   error,
@@ -76,12 +124,17 @@ export function ThreadList({
 }: ThreadListProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { idToResume } = useChatSession();
+  const { idToResume, chatProfile } = useChatSession();
   const { clear } = useChatInteract();
   const { threadId: currentThreadId } = useChatMessages();
+  const { loading: agentGenerating } = useChatData();
   const [threadIdToDelete, setThreadIdToDelete] = useState<string>();
   const [threadIdToRename, setThreadIdToRename] = useState<string>();
   const [threadNewName, setThreadNewName] = useState<string>();
+  const [threadIdToMove, setThreadIdToMove] = useState<string>();
+  const [threadProjectIdToMove, setThreadProjectIdToMove] = useState<
+    string | null
+  >();
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>(
     {}
   );
@@ -103,6 +156,43 @@ export function ThreadList({
     setIsShareDialogOpen(true);
     // ShareDialog handles its own internal state; we just open it
   };
+
+  const configuredProfileNames = useMemo(
+    () => new Set((config?.chatProfiles || []).map((profile) => profile.name)),
+    [config?.chatProfiles]
+  );
+
+  /**
+   * Keep only threads that belong to the currently selected agent profile.
+   * Filter whenever a profile is selected, even if chatProfiles failed to load
+   * (metadata.chat_profile is still enough to match).
+   */
+  const filteredTimeGroupedThreads = useMemo(() => {
+    const groups = threadHistory?.timeGroupedThreads;
+    if (!groups) {
+      return undefined;
+    }
+
+    if (!chatProfile) {
+      return groups;
+    }
+
+    const filtered: typeof groups = {};
+    for (const [group, items] of Object.entries(groups)) {
+      const matchingItems = items.filter(
+        (thread) =>
+          getThreadProfileName(thread, configuredProfileNames) === chatProfile
+      );
+      if (matchingItems.length > 0) {
+        filtered[group] = matchingItems;
+      }
+    }
+    return filtered;
+  }, [
+    threadHistory?.timeGroupedThreads,
+    chatProfile,
+    configuredProfileNames
+  ]);
 
   type ParsedGroupLabel = {
     month: string;
@@ -167,14 +257,14 @@ export function ThreadList({
   };
 
   const sortedTimeGroupKeys = useMemo(() => {
-    if (!threadHistory?.timeGroupedThreads) return [];
+    if (!filteredTimeGroupedThreads) return [];
     const fixedOrder = [
       'Today',
       'Yesterday',
       'Previous 7 days',
       'Previous 30 days'
     ];
-    return Object.keys(threadHistory.timeGroupedThreads).sort((a, b) => {
+    return Object.keys(filteredTimeGroupedThreads).sort((a, b) => {
       const aIndex = fixedOrder.indexOf(a);
       const bIndex = fixedOrder.indexOf(b);
       if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
@@ -182,9 +272,9 @@ export function ThreadList({
       if (bIndex !== -1) return 1;
       return sortGroupsByDate(a, b);
     });
-  }, [threadHistory?.timeGroupedThreads]);
+  }, [filteredTimeGroupedThreads]);
 
-  if (isFetching || (!threadHistory?.timeGroupedThreads && isLoadingMore)) {
+  if (isFetching || (!filteredTimeGroupedThreads && isLoadingMore)) {
     return (
       <div className="flex items-center justify-center p-2">
         <Loader />
@@ -200,7 +290,7 @@ export function ThreadList({
     );
   }
 
-  if (!threadHistory || size(threadHistory?.timeGroupedThreads) === 0) {
+  if (!threadHistory || size(filteredTimeGroupedThreads) === 0) {
     return (
       <Alert variant="info" className="m-3">
         <Translator path="threadHistory.sidebar.empty" />
@@ -230,7 +320,10 @@ export function ThreadList({
         if (isDeletingCurrentThread) {
           clear();
         }
-        navigate('/', { replace: isDeletingCurrentThread });
+        navigate(
+          { pathname: '/', search: window.location.search },
+          { replace: isDeletingCurrentThread }
+        );
         return (
           <Translator path="threadHistory.thread.actions.delete.success" />
         );
@@ -287,6 +380,15 @@ export function ThreadList({
     });
   };
 
+  const handleThreadMoved = (movedThreadId: string, _projectId: string) => {
+    setThreadHistory((prev) => ({
+      ...prev,
+      threads: prev?.threads?.filter((thread) => thread.id !== movedThreadId)
+    }));
+    setThreadIdToMove(undefined);
+    setThreadProjectIdToMove(undefined);
+  };
+
   const getTimeGroupLabel = (group: string) => {
     const labels = {
       Today: <Translator path="threadHistory.sidebar.timeframes.today" />,
@@ -301,58 +403,6 @@ export function ThreadList({
       )
     };
     return labels[group as keyof typeof labels] || group;
-  };
-
-  const getThreadMetadata = (thread: {
-    metadata?: Record<string, any> | string | null;
-  }): Record<string, any> => {
-    if (!thread.metadata) {
-      return {};
-    }
-
-    if (typeof thread.metadata === 'string') {
-      try {
-        const parsedMetadata = JSON.parse(thread.metadata);
-        return parsedMetadata && typeof parsedMetadata === 'object'
-          ? parsedMetadata
-          : {};
-      } catch {
-        return {};
-      }
-    }
-
-    return thread.metadata;
-  };
-
-  const getThreadProfileName = (thread: {
-    metadata?: Record<string, any> | string | null;
-    tags?: string[] | null;
-  }) => {
-    const metadata = getThreadMetadata(thread);
-    const metadataProfileName = metadata.chat_profile;
-
-    if (typeof metadataProfileName === 'string' && metadataProfileName.trim()) {
-      return metadataProfileName;
-    }
-
-    const configuredProfileNames = new Set(
-      (config?.chatProfiles || []).map((profile) => profile.name)
-    );
-
-    return thread.tags?.find((tag) => configuredProfileNames.has(tag));
-  };
-
-  const getThreadProfileLabel = (thread: {
-    metadata?: Record<string, any> | string | null;
-    tags?: string[] | null;
-  }) => {
-    const profileName = getThreadProfileName(thread);
-    if (!profileName) {
-      return undefined;
-    }
-
-    const profile = getSelectedChatProfile(config, profileName);
-    return profile?.display_name || profile?.name || profileName;
   };
 
   const isGroupCollapsed = (group: string) => collapsedGroups[group] ?? false;
@@ -441,9 +491,21 @@ export function ThreadList({
         }}
         threadId={threadIdToShare || null}
       />
+      <MoveThreadProjectDialog
+        open={Boolean(threadIdToMove)}
+        threadId={threadIdToMove}
+        currentProjectId={threadProjectIdToMove}
+        onOpenChange={(open) => {
+          if (!open) {
+            setThreadIdToMove(undefined);
+            setThreadProjectIdToMove(undefined);
+          }
+        }}
+        onMoved={handleThreadMoved}
+      />
       <TooltipProvider delayDuration={300}>
         {sortedTimeGroupKeys.map((group, groupIndex) => {
-          const items = threadHistory!.timeGroupedThreads![group];
+          const items = filteredTimeGroupedThreads![group];
           const groupCollapsed = isGroupCollapsed(group);
           return (
             <SidebarGroup
@@ -487,8 +549,6 @@ export function ThreadList({
                       const isSelected =
                         isResumed || threadHistory!.currentThreadId === thread.id;
                       const threadMetadata = getThreadMetadata(thread);
-                      const threadProfileLabel = getThreadProfileLabel(thread);
-                      const threadProfileSubtitle = threadProfileLabel || '---';
                       return (
                         <SidebarMenuItem
                           key={thread.id}
@@ -496,28 +556,31 @@ export function ThreadList({
                         >
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <Link to={isResumed ? '' : `/thread/${thread.id}`}>
+                              <Link
+                                to={
+                                  isResumed
+                                    ? ''
+                                    : {
+                                        pathname: `/thread/${thread.id}`,
+                                        search: window.location.search
+                                      }
+                                }
+                              >
                                 <SidebarMenuButton
                                   isActive={isSelected}
-                                  size="lg"
-                                  className="relative h-auto min-h-12 items-start group/thread"
+                                  className="relative group/thread"
                                 >
-                                  <span className="flex min-w-0 flex-1 items-start gap-2 pr-10">
+                                  <span className="flex min-w-0 flex-1 items-center gap-2 pr-10">
                                     {threadMetadata.is_shared ? (
                                       <Share2
-                                        className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground"
+                                        className="h-4 w-4 shrink-0 text-muted-foreground"
                                         aria-hidden="true"
                                       />
                                     ) : null}
-                                    <span className="min-w-0 flex-1">
-                                      <span className="block truncate">
-                                        {thread.name || (
-                                          <Translator path="threadHistory.thread.untitled" />
-                                        )}
-                                      </span>
-                                      <span className="block truncate text-xs font-normal text-muted-foreground">
-                                        {threadProfileSubtitle}
-                                      </span>
+                                    <span className="min-w-0 flex-1 truncate">
+                                      {thread.name || (
+                                        <Translator path="threadHistory.thread.untitled" />
+                                      )}
                                     </span>
                                   </span>
                                   <ThreadOptions
@@ -528,6 +591,17 @@ export function ThreadList({
                                       setThreadIdToRename(thread.id);
                                       setThreadNewName(thread.name);
                                     }}
+                                    onMove={
+                                      dataPersistence
+                                        ? () => {
+                                            setThreadIdToMove(thread.id);
+                                            setThreadProjectIdToMove(
+                                              thread.projectId ?? null
+                                            );
+                                          }
+                                        : undefined
+                                    }
+                                    moveDisabled={agentGenerating}
                                     onShare={
                                       dataPersistence && threadSharingReady
                                         ? () => handleShareThread(thread.id)

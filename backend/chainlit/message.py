@@ -602,9 +602,6 @@ class AskElementMessage(AskMessageBase):
 
         if ephemeral:
             # Session-only ask: never create/update a durable assistant step.
-            metadata = dict(self.metadata or {})
-            metadata["countsTowardThreadPersistenceThreshold"] = False
-            self.metadata = metadata
             step_dict = self.to_dict()
         else:
             step_dict = await self._create()

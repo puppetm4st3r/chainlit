@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState
 } from 'react';
 import { Runner } from 'react-runner';
@@ -36,6 +37,8 @@ const CustomElement = memo(function ({ element }: { element: ICustomElement }) {
   // Recoil ask state works for floating hosts (outside MessageContext) and inline asks.
   const { askUser } = useChatData();
   const dismissFloatingView = useDismissFloatingView();
+  const elementRef = useRef(element);
+  elementRef.current = element;
 
   const [sourceCode, setSourceCode] = useState<string>();
   const [localImports, setLocalImports] = useState<Record<string, unknown>>({});
@@ -97,19 +100,29 @@ const CustomElement = memo(function ({ element }: { element: ICustomElement }) {
     };
   }, [apiClient, baseImports, element.name]);
 
+  const askUserRef = useRef(askUser);
+  askUserRef.current = askUser;
+  const dismissFloatingViewRef = useRef(dismissFloatingView);
+  dismissFloatingViewRef.current = dismissFloatingView;
+
   const updateElement = useCallback(
     (nextProps: Record<string, unknown>) => {
       if (!sessionId) return;
-      const nextElement: IElement = { ...element, props: nextProps };
+      const nextElement: IElement = { ...elementRef.current, props: nextProps };
       return apiClient.updateElement(nextElement, sessionId);
     },
-    [element, sessionId, apiClient]
+    [sessionId, apiClient]
   );
 
   const deleteElement = useCallback(() => {
     if (!sessionId) return;
-    return apiClient.deleteElement(element, sessionId);
-  }, [element, sessionId, apiClient]);
+    return apiClient.deleteElement(elementRef.current, sessionId);
+  }, [sessionId, apiClient]);
+
+  const sendMessageRef = useRef(sendMessage);
+  sendMessageRef.current = sendMessage;
+  const userIdentifierRef = useRef(user?.identifier);
+  userIdentifierRef.current = user?.identifier;
 
   const callAction = useCallback(
     (action: IAction) => {
@@ -119,54 +132,103 @@ const CustomElement = memo(function ({ element }: { element: ICustomElement }) {
     [sessionId, apiClient]
   );
 
-  const sendUserMessage = useCallback(
-    (message: string, command?: string) => {
-      return sendMessage({
-        threadId: '',
-        id: uuidv4(),
-        name: user?.identifier || 'User',
-        type: 'user_message',
-        output: message,
-        createdAt: new Date().toISOString(),
-        metadata: { location: window.location.href },
-        command
-      });
-    },
-    [sendMessage, user]
-  );
+  const sendUserMessage = useCallback((message: string, command?: string) => {
+    return sendMessageRef.current({
+      threadId: '',
+      id: uuidv4(),
+      name: userIdentifierRef.current || 'User',
+      type: 'user_message',
+      output: message,
+      createdAt: new Date().toISOString(),
+      metadata: { location: window.location.href },
+      command
+    });
+  }, []);
 
-  const submitElement = useCallback(
-    (props: Record<string, unknown>) => {
-      if (
-        askUser?.spec.type === 'element' &&
-        askUser.spec.step_id === element.forId
-      ) {
-        askUser.callback({ ...props, submitted: true });
-        // Blocking floating asks (e.g. Motd) must close immediately; waiting for
-        // backend remove_element leaves the overlay open after Continuar / timeout.
-        if (element.display === 'floating') {
-          dismissFloatingView(element);
-        }
+  // Keep ask/dismiss out of Runner scope identity. Otherwise any askUser atom
+  // update would remount every CustomElement (including canvas Toast UI) and
+  // re-emit canvas:ready in a loop.
+  const submitElement = useCallback((props: Record<string, unknown>) => {
+    const currentElement = elementRef.current;
+    const currentAskUser = askUserRef.current;
+    if (
+      currentAskUser?.spec.type === 'element' &&
+      currentAskUser.spec.step_id === currentElement.forId
+    ) {
+      currentAskUser.callback({ ...props, submitted: true });
+      if (currentElement.display === 'floating') {
+        dismissFloatingViewRef.current(currentElement);
       }
-    },
-    [askUser, dismissFloatingView, element]
-  );
+      return true;
+    }
+    console.warn(
+      '[ask_element] submitElement ignored: no matching active ask',
+      {
+        elementId: currentElement.id,
+        elementForId: currentElement.forId,
+        askStepId: currentAskUser?.spec?.step_id,
+        askType: currentAskUser?.spec?.type
+      }
+    );
+    return false;
+  }, []);
 
   const cancelElement = useCallback(() => {
+    const currentElement = elementRef.current;
+    const currentAskUser = askUserRef.current;
     if (
-      askUser?.spec.type === 'element' &&
-      askUser.spec.step_id === element.forId
+      currentAskUser?.spec.type === 'element' &&
+      currentAskUser.spec.step_id === currentElement.forId
     ) {
-      askUser.callback({ submitted: false });
-      if (element.display === 'floating') {
-        dismissFloatingView(element);
+      currentAskUser.callback({ submitted: false });
+      if (currentElement.display === 'floating') {
+        dismissFloatingViewRef.current(currentElement);
       }
     }
-  }, [askUser, dismissFloatingView, element]);
+  }, []);
 
+  // react-runner remounts the entire tree whenever `scope` identity changes.
+  // Stabilize props by value so equivalent element.props object replacements do
+  // not tear down long-lived editors (canvas sidebar shells).
+  const propsSignature = useMemo(
+    () => JSON.stringify(element.props ?? {}),
+    [element.props]
+  );
   const props = useMemo(() => {
-    return JSON.parse(JSON.stringify(element.props));
-  }, [element.props]);
+    try {
+      return JSON.parse(propsSignature);
+    } catch {
+      return {};
+    }
+  }, [propsSignature]);
+
+  const runnerScope = useMemo(
+    () => ({
+      import: { ...baseImports, ...localImports },
+      props,
+      apiClient,
+      sessionId,
+      updateElement,
+      deleteElement,
+      callAction,
+      sendUserMessage,
+      submitElement,
+      cancelElement
+    }),
+    [
+      apiClient,
+      baseImports,
+      callAction,
+      cancelElement,
+      deleteElement,
+      localImports,
+      props,
+      sendUserMessage,
+      sessionId,
+      submitElement,
+      updateElement
+    ]
+  );
 
   if (error) return <Alert variant="error">{error}</Alert>;
   if (!sourceCode) {
@@ -194,18 +256,7 @@ const CustomElement = memo(function ({ element }: { element: ICustomElement }) {
     >
       <Runner
         code={sourceCode}
-        scope={{
-          import: { ...baseImports, ...localImports },
-          props,
-          apiClient,
-          sessionId,
-          updateElement,
-          deleteElement,
-          callAction,
-          sendUserMessage,
-          submitElement,
-          cancelElement
-        }}
+        scope={runnerScope}
         onRendered={(error) => setError(error?.message)}
       />
     </div>

@@ -25,6 +25,16 @@ export const isCanvasShellElement = (element?: IMessageElement): boolean => {
   return String(props.workspaceKey || '').trim().length > 0;
 };
 
+/**
+ * Canvas shells are owned by ElementSidebar (`set_sidebar_elements` + key).
+ * MessagesContainer must not auto-open them from accumulated `elementState`.
+ */
+export const excludeCanvasShellElements = (
+  elements: IMessageElement[]
+): IMessageElement[] => {
+  return (elements || []).filter((element) => !isCanvasShellElement(element));
+};
+
 export const getCanvasShellCloseDetail = (
   elements?: IMessageElement[]
 ): CanvasShellCloseDetail | null => {

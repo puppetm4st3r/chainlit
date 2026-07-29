@@ -43,9 +43,7 @@ def mock_session_factory(persisted_test_user: PersistedUser) -> Callable[..., Mo
         mock.thread_persistence_in_progress = kwargs.get(
             "thread_persistence_in_progress", False
         )
-        mock.assistant_persistence_turn_count = kwargs.get(
-            "assistant_persistence_turn_count", 0
-        )
+        mock.project_id = kwargs.get("project_id", None)
         mock.files = kwargs.get("files", {})
         mock.files_spec = kwargs.get("files_spec", {})
         mock.is_thread_persistence_ready = Mock(
@@ -63,17 +61,6 @@ def mock_session_factory(persisted_test_user: PersistedUser) -> Callable[..., Mo
         )
         mock.abort_thread_persistence = Mock(
             side_effect=lambda: setattr(mock, "thread_persistence_in_progress", False)
-        )
-        def _register_logical_assistant_message(message_id: str) -> int:
-            counted_ids = getattr(mock, "_assistant_message_ids", set())
-            if message_id and message_id not in counted_ids:
-                counted_ids.add(message_id)
-                mock.assistant_persistence_turn_count += 1
-                mock._assistant_message_ids = counted_ids
-            return mock.assistant_persistence_turn_count
-
-        mock.register_logical_assistant_message = Mock(
-            side_effect=_register_logical_assistant_message
         )
         mock.consume_pending_thread_metadata_patches = Mock(return_value={})
         mock.reset_pre_persistence_state = Mock()
@@ -132,7 +119,7 @@ def mock_websocket_session():
     session.has_first_interaction = False
     session.thread_persistence_ready = False
     session.thread_persistence_in_progress = False
-    session.assistant_persistence_turn_count = 0
+    session.project_id = None
     session.is_thread_persistence_ready = Mock(
         side_effect=lambda: session.thread_persistence_ready
     )
@@ -148,17 +135,6 @@ def mock_websocket_session():
     )
     session.abort_thread_persistence = Mock(
         side_effect=lambda: setattr(session, "thread_persistence_in_progress", False)
-    )
-    def _register_logical_assistant_message(message_id: str) -> int:
-        counted_ids = getattr(session, "_assistant_message_ids", set())
-        if message_id and message_id not in counted_ids:
-            counted_ids.add(message_id)
-            session.assistant_persistence_turn_count += 1
-            session._assistant_message_ids = counted_ids
-        return session.assistant_persistence_turn_count
-
-    session.register_logical_assistant_message = Mock(
-        side_effect=_register_logical_assistant_message
     )
     session.consume_pending_thread_metadata_patches = Mock(return_value={})
     session.reset_pre_persistence_state = Mock()

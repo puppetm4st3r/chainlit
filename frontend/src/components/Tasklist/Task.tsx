@@ -9,65 +9,68 @@ export interface ITask {
 }
 
 export interface ITaskList {
-  status: 'ready' | 'running' | 'done';
+  title?: string;
+  status: string;
   tasks: ITask[];
 }
 
 interface TaskProps {
-  index: number;
   task: ITask;
   allowHtml?: boolean;
   latex?: boolean;
 }
 
-export const Task = ({ index, task, allowHtml, latex }: TaskProps) => {
-  const statusStyles = {
-    ready: '',
-    running: 'font-semibold',
-    done: 'text-muted-foreground',
-    failed: 'text-muted-foreground'
-  };
-
+/**
+ * One TaskList row: status icon + title.
+ *
+ * Title color is owned by CSS (``.task-title`` under ``.task-status-*``):
+ * completed/done → foreground; every other status → muted. Do not set Tailwind
+ * color / text-inherit utilities here — they fight Markdown ``prose``.
+ */
+export const Task = ({ task, allowHtml, latex }: TaskProps) => {
   const handleClick = () => {
     if (task.forId) {
       const parent = document.getElementById(`step-${task.forId}`);
       if (parent) {
-        // Find the child div below the main step container
         const child = parent.querySelector('div');
         if (child) {
-          child.classList.add('bg-card', 'rounded');
+          const clearFlash = () => {
+            child.classList.remove('task-step-flash');
+            child.removeEventListener('animationend', clearFlash);
+          };
+          child.classList.remove('task-step-flash');
+          void child.offsetWidth;
+          child.classList.add('task-step-flash');
+          child.addEventListener('animationend', clearFlash);
           parent.scrollIntoView({
             behavior: 'smooth',
             block: 'start',
             inline: 'start'
           });
-          setTimeout(() => {
-            child.classList.remove('bg-card', 'rounded');
-          }, 600); // 2 blinks at 0.3s each
         }
       }
     }
   };
 
   return (
-    <div className={`task task-status-${task.status}`}>
+    <div
+      className={`task task-status-${task.status}`}
+      data-task-status={task.status}
+    >
       <div
-        className={`w-full grid grid-cols-[auto_auto_1fr] items-start gap-1.5 font-medium py-0.5 px-1 text-sm leading-tight ${
-          statusStyles[task.status]
-        } ${task.forId ? 'cursor-pointer' : 'cursor-default'}`}
+        className={`w-full grid grid-cols-[auto_1fr] items-start gap-2.5 font-normal py-0.5 px-1 text-xs leading-tight ${
+          task.forId ? 'cursor-pointer' : 'cursor-default'
+        }`}
         onClick={handleClick}
       >
-        <div className="text-xs text-muted-foreground text-right pr-1 pt-[1px]">
-          {index}
-        </div>
-        <div className="flex items-start pt-[1px]">
+        <div className="flex w-4 shrink-0 items-start justify-center pt-[1px]">
           <TaskStatusIcon status={task.status} />
         </div>
         <div className="min-w-0">
           <Markdown
             allowHtml={allowHtml}
             latex={latex}
-            className="max-w-none prose-sm text-left break-words [&_p]:m-0 [&_p]:leading-snug [&_div]:leading-snug [&_div]:mt-0 [&_strong]:font-semibold"
+            className="task-title max-w-none prose-sm text-xs text-left break-words font-normal [&_*]:font-normal [&_*]:text-xs [&_p]:m-0 [&_p]:leading-snug [&_div]:leading-snug [&_div]:mt-0"
           >
             {task.title}
           </Markdown>

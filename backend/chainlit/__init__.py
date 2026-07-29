@@ -148,15 +148,28 @@ async def set_spontaneous_file_upload(enabled: Optional[bool] = None):
     await context.emitter.set_spontaneous_file_upload(enabled)
 
 
-async def set_conversation_history_visibility(enabled: Optional[bool] = None):
+async def set_conversation_history_visibility(
+    enabled: Optional[bool] = None,
+    *,
+    show_new_thread: Optional[bool] = None,
+    show_delete_threads: Optional[bool] = None,
+):
     """
     Override the visibility of the past-conversation history surface for the active session.
 
     Args:
         enabled (Optional[bool]): ``True`` shows the history UI, ``False`` hides it,
             and ``None`` restores the frontend default for the current session.
+        show_new_thread (Optional[bool]): When history is visible, whether the new-thread
+            button is shown. ``None`` restores the default (shown).
+        show_delete_threads (Optional[bool]): When history is visible, whether bulk-delete
+            is shown. ``None`` restores the default (shown).
     """
-    await context.emitter.set_conversation_history_visibility(enabled)
+    await context.emitter.set_conversation_history_visibility(
+        enabled,
+        show_new_thread=show_new_thread,
+        show_delete_threads=show_delete_threads,
+    )
 
 
 async def set_new_chat_button_visibility(enabled: Optional[bool] = None):
@@ -168,7 +181,7 @@ async def set_new_chat_button_visibility(enabled: Optional[bool] = None):
 
 async def set_thread_title(title: str) -> bool:
     """
-    Programmatically update the current thread title.
+    Flush thread persistence when needed, then update the current thread title.
 
     Args:
         title (str): The thread title chosen by the backend application.

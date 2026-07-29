@@ -8,7 +8,14 @@ const mocks = vi.hoisted(() => ({
   clear: vi.fn(),
   navigate: vi.fn(),
   setThreadHistory: vi.fn(),
-  threadHistory: undefined as any
+  threadHistory: undefined as any,
+  threadId: 'current-thread' as string | undefined,
+  idToResume: undefined as string | undefined,
+  useChatData: vi.fn(() => ({
+    conversationHistoryVisible: true,
+    conversationHistoryShowDeleteThreads: true,
+    projectId: null
+  }))
 }));
 
 vi.mock('@chainlit/react-client', async () => {
@@ -17,9 +24,10 @@ vi.mock('@chainlit/react-client', async () => {
     ChainlitContext: React.createContext(mocks.apiClient),
     ClientError: class ClientError extends Error {},
     threadHistoryState: { key: 'ThreadHistory' },
-    useChatData: () => ({ conversationHistoryVisible: true }),
+    useChatData: () => mocks.useChatData(),
     useChatInteract: () => ({ clear: mocks.clear }),
-    useChatMessages: () => ({ threadId: 'current-thread' }),
+    useChatMessages: () => ({ threadId: mocks.threadId }),
+    useChatSession: () => ({ idToResume: mocks.idToResume }),
     useConfig: () => ({ config: { dataPersistence: true } })
   };
 });
@@ -34,8 +42,12 @@ vi.mock('react-router-dom', () => ({
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (_key: string, options?: { defaultValue?: string }) =>
-      options?.defaultValue || _key
+    t: (key: string, options?: { project?: string }) => {
+      if (options?.project) {
+        return `${key}:${options.project}`;
+      }
+      return key;
+    }
   })
 }));
 
@@ -76,9 +88,17 @@ vi.mock('@/components/i18n', () => ({
 describe('DeleteThreadsButton', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.threadId = 'current-thread';
+    mocks.idToResume = undefined;
+    mocks.useChatData.mockReturnValue({
+      conversationHistoryVisible: true,
+      conversationHistoryShowDeleteThreads: true,
+      projectId: null
+    });
     mocks.threadHistory = {
-      threads: [{ id: 'thread-1' }],
-      timeGroupedThreads: { Today: [{ id: 'thread-1' }] }
+      currentThreadId: 'current-thread',
+      threads: [{ id: 'thread-1' }, { id: 'current-thread' }],
+      timeGroupedThreads: { Today: [{ id: 'thread-1' }, { id: 'current-thread' }] }
     };
     mocks.apiClient.deleteThreads.mockResolvedValue({
       success: true,
@@ -86,25 +106,92 @@ describe('DeleteThreadsButton', () => {
     });
   });
 
-  it('opens a destructive confirmation and deletes all threads', () => {
+  it('opens a destructive confirmation and deletes other bag threads', () => {
     render(<DeleteThreadsButton />);
 
     fireEvent.click(screen.getByRole('button', { name: '' }));
-    expect(screen.getByText('Delete all threads?')).toBeInTheDocument();
+    expect(
+      screen.getByText('threadHistory.sidebar.actions.deleteAll.bag.title')
+    ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Delete all threads' }));
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'threadHistory.sidebar.actions.deleteAll.bag.confirm'
+      })
+    );
 
-    expect(mocks.apiClient.deleteThreads).toHaveBeenCalledTimes(1);
+    expect(mocks.apiClient.deleteThreads).toHaveBeenCalledWith(null, 'current-thread');
     expect(mocks.setThreadHistory).toHaveBeenCalledTimes(1);
-    expect(mocks.clear).toHaveBeenCalledTimes(1);
-    expect(mocks.navigate).toHaveBeenCalledWith('/', { replace: true });
+    // Current conversation stays open.
+    expect(mocks.clear).not.toHaveBeenCalled();
+    expect(mocks.navigate).not.toHaveBeenCalled();
   });
 
-  it('disables the action when there are no threads', () => {
-    mocks.threadHistory = { threads: [] };
+  it('deletes only the active project scope and excludes the current thread', () => {
+    mocks.useChatData.mockReturnValue({
+      conversationHistoryVisible: true,
+      conversationHistoryShowDeleteThreads: true,
+      projectId: 'Mi Proyecto'
+    });
+
+    render(<DeleteThreadsButton />);
+
+    fireEvent.click(screen.getByRole('button', { name: '' }));
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'threadHistory.sidebar.actions.deleteAll.project.confirm'
+      })
+    );
+
+    expect(mocks.apiClient.deleteThreads).toHaveBeenCalledWith(
+      'Mi Proyecto',
+      'current-thread'
+    );
+  });
+
+  it('disables the action when there are no other threads to delete', () => {
+    mocks.threadHistory = {
+      currentThreadId: 'current-thread',
+      threads: [{ id: 'current-thread' }]
+    };
 
     render(<DeleteThreadsButton />);
 
     expect(screen.getByRole('button', { name: '' })).toBeDisabled();
+  });
+
+  it('excludes the sidebar/resume current thread when session threadId is not hydrated yet', () => {
+    mocks.threadId = undefined;
+    mocks.idToResume = 'current-thread';
+    mocks.threadHistory = {
+      currentThreadId: 'current-thread',
+      threads: [{ id: 'thread-1' }, { id: 'current-thread' }]
+    };
+
+    render(<DeleteThreadsButton />);
+
+    fireEvent.click(screen.getByRole('button', { name: '' }));
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'threadHistory.sidebar.actions.deleteAll.bag.confirm'
+      })
+    );
+
+    expect(mocks.apiClient.deleteThreads).toHaveBeenCalledWith(
+      null,
+      'current-thread'
+    );
+    expect(mocks.clear).not.toHaveBeenCalled();
+  });
+
+  it('returns null when runtime hides the bulk-delete action', () => {
+    mocks.useChatData.mockReturnValue({
+      conversationHistoryVisible: true,
+      conversationHistoryShowDeleteThreads: false,
+      projectId: null
+    });
+
+    const { container } = render(<DeleteThreadsButton />);
+    expect(container).toBeEmptyDOMElement();
   });
 });

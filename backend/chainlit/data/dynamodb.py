@@ -579,7 +579,12 @@ class DynamoDBDataLayer(BaseDataLayer):
         user_id: Optional[str] = None,
         metadata: Optional[Dict] = None,
         tags: Optional[List[str]] = None,
+        project_id: Optional[str] = None,
     ):
+        if project_id is not None:
+            raise ValueError(
+                "This data layer does not persist project_id; use the Dolf SQLAlchemyDataLayer."
+            )
         _logger.info("DynamoDB: update_thread thread=%s userId=%s", thread_id, user_id)
         _logger.debug(
             "DynamoDB: update_thread name=%s tags=%s metadata=%s", name, tags, metadata

@@ -7,10 +7,9 @@ describe('Upload file', () => {
     );
     cy.get('#ask-button-input').should('exist');
 
-    // Upload a text file
+    // Upload a text file (transfer starts automatically after selection)
     cy.fixture('state_of_the_union.txt', 'utf-8').as('txtFile');
     cy.get('#ask-button-input').selectFile('@txtFile', { force: true });
-    cy.get('#ask-upload-submit').click();
 
     cy.get('.step')
       .eq(1)
@@ -32,10 +31,9 @@ describe('Upload file', () => {
 
     cy.get('.step').should('have.length', 3);
 
-    // Upload a python file
+    // Upload a python file (transfer starts automatically after selection)
     cy.fixture('hello.py', 'utf-8').as('pyFile');
     cy.get('#ask-button-input').selectFile('@pyFile', { force: true });
-    cy.get('#ask-upload-submit').click();
 
     cy.get('.step')
       .should('have.length', 4)

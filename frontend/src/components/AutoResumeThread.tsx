@@ -37,14 +37,14 @@ export default function AutoResumeThread({ id }: Props) {
     // Only redirect away if we have loaded threads and this thread is not among them
     if (threadHistory?.threads && !threadHistory.threads.some(t => t.id === id)) {
       // Thread doesn't exist (likely deleted), redirect to home
-      navigate('/');
+      navigate({ pathname: '/', search: window.location.search });
       return;
     }
     
     clear();
     setIdToResume(id);
     if (!config?.dataPersistence) {
-      navigate('/');
+      navigate({ pathname: '/', search: window.location.search });
     }
   }, [config?.threadResumable, config?.dataPersistence, id, idToResume, threadHistory, location.pathname, session]);
 
@@ -54,14 +54,14 @@ export default function AutoResumeThread({ id }: Props) {
     }
     if (session?.error) {
       toast.error("Couldn't resume chat");
-      navigate('/');
+      navigate({ pathname: '/', search: window.location.search });
     }
   }, [session, idToResume, id, navigate]);
 
   useEffect(() => {
     if (resumeThreadError) {
       toast.error("Couldn't resume chat: " + resumeThreadError);
-      navigate('/');
+      navigate({ pathname: '/', search: window.location.search });
       setResumeThreadError(undefined);
     }
   }, [resumeThreadError, id, navigate, setResumeThreadError]);

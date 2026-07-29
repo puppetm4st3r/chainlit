@@ -1,11 +1,13 @@
 import { uniqBy } from 'lodash';
 import { useContext, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useRecoilState } from 'recoil';
 
 import {
   ChainlitContext,
   threadHistoryState,
+  useChatData,
   useChatMessages
 } from '@chainlit/react-client';
 
@@ -21,16 +23,22 @@ const BATCH_SIZE = 35;
 let _scrollTop = 0;
 
 export function ThreadHistory() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const scrollRef = useRef<HTMLDivElement>(null);
   const apiClient = useContext(ChainlitContext);
   const { firstInteraction, messages, threadId } = useChatMessages();
+  const { projectId } = useChatData();
   const [threadHistory, setThreadHistory] = useRecoilState(threadHistoryState);
   const [error, setError] = useState<string>();
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
   const [shouldLoadMore, setShouldLoadMore] = useState(false);
   const prevMessageCountRef = useRef(0);
+  // firstInteraction / scroll effects may close over an older fetchThreads;
+  // keep project scope current for every listThreads call.
+  const projectIdRef = useRef(projectId);
+  projectIdRef.current = projectId;
 
   // Restore scroll position
   useEffect(() => {
@@ -56,7 +64,10 @@ export function ThreadHistory() {
 
       const currentPage = new URL(window.location.href);
       if (threadId && currentPage.pathname === '/') {
-        navigate(`/thread/${threadId}`);
+        navigate({
+          pathname: `/thread/${threadId}`,
+          search: window.location.search
+        });
       }
     };
 
@@ -111,7 +122,7 @@ export function ThreadHistory() {
 
       const { pageInfo, data } = await apiClient.listThreads(
         { first: BATCH_SIZE, cursor },
-        {}
+        { projectId: projectIdRef.current }
       );
 
       setError(undefined);
@@ -130,7 +141,11 @@ export function ThreadHistory() {
         }));
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error occurred');
+      setError(
+        err instanceof Error
+          ? err.message
+          : t('common.status.error.default')
+      );
     } finally {
       setShouldLoadMore(false);
       setIsLoadingMore(false);
@@ -138,12 +153,12 @@ export function ThreadHistory() {
     }
   };
 
-  // Initial fetch
+  // Initial fetch and refetch when project scope changes (set_project clears threads).
   useEffect(() => {
     if (!isFetching && !threadHistory?.threads && !error) {
       fetchThreads();
     }
-  }, [isFetching, threadHistory, error]);
+  }, [isFetching, threadHistory, error, projectId]);
 
   // Handle infinite scroll
   useEffect(() => {

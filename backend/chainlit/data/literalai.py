@@ -507,7 +507,12 @@ class LiteralDataLayer(BaseDataLayer):
         user_id: Optional[str] = None,
         metadata: Optional[Dict] = None,
         tags: Optional[List[str]] = None,
+        project_id: Optional[str] = None,
     ):
+        if project_id is not None:
+            raise ValueError(
+                "This data layer does not persist project_id; use the Dolf SQLAlchemyDataLayer."
+            )
         await self.client.api.upsert_thread(
             id=thread_id,
             name=name,

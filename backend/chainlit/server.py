@@ -75,10 +75,13 @@ from chainlit.types import (
     ConnectMCPRequest,
     DeleteFeedbackRequest,
     DeleteThreadRequest,
+    DeleteThreadsRequest,
     DisconnectMCPRequest,
     ElementRequest,
     GetThreadsRequest,
+    MoveThreadProjectRequest,
     Pagination,
+    SearchProjectsRequest,
     ShareThreadRequest,
     ThreadFilter,
     Theme,
@@ -1321,6 +1324,95 @@ async def rename_thread(
     return JSONResponse(content={"success": True})
 
 
+@router.put("/project/thread/project")
+async def move_thread_project(
+    request: Request,
+    payload: MoveThreadProjectRequest,
+    current_user: UserParam,
+):
+    """
+    Move a thread to another conversation project.
+
+    Destination must already exist and the current user must already own at least
+    one thread in that project. The global bag is not a valid destination.
+    """
+
+    data_layer = get_data_layer()
+
+    if not data_layer:
+        raise HTTPException(status_code=400, detail="Data persistence is not enabled")
+
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    await is_thread_author(current_user.identifier, payload.threadId)
+    user_id = await _get_current_user_id(current_user)
+
+    try:
+        normalized_project_id = await data_layer.set_thread_project_id(
+            payload.threadId,
+            payload.projectId,
+            user_id=user_id,
+        )
+    except (AttributeError, NotImplementedError) as exc:
+        raise HTTPException(
+            status_code=500,
+            detail="The configured data layer does not support moving threads between projects.",
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    return JSONResponse(
+        content={
+            "success": True,
+            "threadId": payload.threadId,
+            "projectId": normalized_project_id,
+        }
+    )
+
+
+@router.post("/project/projects/search")
+async def search_projects(
+    request: Request,
+    payload: SearchProjectsRequest,
+    current_user: UserParam,
+):
+    """
+    Search conversation projects the current user already participates in.
+
+    Participation means the user owns at least one thread with that projectId.
+    """
+
+    data_layer = get_data_layer()
+
+    if not data_layer:
+        raise HTTPException(status_code=400, detail="Data persistence is not enabled")
+
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    user_id = await _get_current_user_id(current_user)
+
+    try:
+        projects = await data_layer.list_projects(
+            user_id=user_id,
+            search=payload.search,
+            limit=payload.first,
+            exclude_project_id=payload.excludeProjectId,
+        )
+    except (AttributeError, NotImplementedError) as exc:
+        raise HTTPException(
+            status_code=500,
+            detail="The configured data layer does not support listing projects.",
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    return JSONResponse(content={"data": projects})
+
+
 @router.put("/project/thread/share")
 async def share_thread(
     request: Request,
@@ -1400,9 +1492,16 @@ async def delete_thread(
 @router.delete("/project/threads")
 async def delete_user_threads(
     request: Request,
+    payload: DeleteThreadsRequest,
     current_user: UserParam,
 ):
-    """Delete all persisted threads owned by the current user."""
+    """
+    Delete persisted threads owned by the current user within one project scope.
+
+    ``filter.projectId`` null deletes only the global bag; a string deletes only
+    that project. Cross-scope bulk delete is not supported. When
+    ``excludeThreadId`` is set, that thread is kept (typically the current chat).
+    """
 
     data_layer = get_data_layer()
 
@@ -1410,26 +1509,15 @@ async def delete_user_threads(
         raise HTTPException(status_code=400, detail="Data persistence is not enabled")
 
     user_id = await _get_current_user_id(current_user)
-    thread_ids: List[str] = []
-    cursor: Optional[str] = None
-
-    while True:
-        res = await data_layer.list_threads(
-            Pagination(first=100, cursor=cursor),
-            ThreadFilter(userId=user_id),
-        )
-        thread_ids.extend(thread["id"] for thread in res.data if thread.get("id"))
-
-        if not res.pageInfo.hasNextPage or not res.pageInfo.endCursor:
-            break
-
-        cursor = res.pageInfo.endCursor
-
-    for thread_id in thread_ids:
-        await data_layer.delete_thread(thread_id)
+    exclude_thread_id = str(payload.excludeThreadId or "").strip() or None
+    deleted_count = await data_layer.delete_user_threads(
+        user_id=user_id,
+        project_id=payload.filter.projectId,
+        exclude_thread_id=exclude_thread_id,
+    )
 
     return JSONResponse(
-        content={"success": True, "deletedThreadCount": len(thread_ids)}
+        content={"success": True, "deletedThreadCount": int(deleted_count)}
     )
 
 
@@ -1462,9 +1550,6 @@ async def call_action(
 
     callback = config.code.action_callbacks.get(action.name)
     if callback:
-        if not context.session.is_thread_persistence_ready():
-            asyncio.create_task(context.emitter.ensure_thread_persistence(action.name))
-
         response = await callback(action)
     else:
         raise HTTPException(
@@ -1947,7 +2032,14 @@ async def get_file(
 
     if file_id in session.files:
         file = session.files[file_id]
-        return FileResponse(file["path"], media_type=file["type"])
+        # Snapshot the bytes first so Content-Length matches the body even if a
+        # concurrent persist_file rewrites the same path (updatable TaskList).
+        file_path = Path(file["path"])
+        try:
+            body = file_path.read_bytes()
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail="File not found") from exc
+        return Response(content=body, media_type=file["type"])
     else:
         raise HTTPException(status_code=404, detail="File not found")
 

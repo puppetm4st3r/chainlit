@@ -26,6 +26,8 @@ import {
   isAiSpeakingState,
   loadingState,
   mcpState,
+  conversationHistoryShowDeleteThreadsState,
+  conversationHistoryShowNewThreadState,
   conversationHistoryVisibleState,
   messagesState,
   modesState,
@@ -41,6 +43,7 @@ import {
   wavRecorderState,
   wavStreamPlayerState,
   workflowHelpState,
+  projectState,
   normalizeComposerInputRestriction
 } from 'src/state';
 import type { IComposerInputRestriction } from 'src/state';
@@ -91,6 +94,20 @@ const stableSidebarElementsSignature = (elements: IMessageElement[]): string => 
   }
 };
 
+/**
+ * Document-workspace canvas shells carry props.workspaceKey and must not accumulate
+ * in elementState across ElementSidebar open/close cycles.
+ */
+const isSidebarCanvasShellElement = (element: IMessageElement): boolean => {
+  if (element.type !== 'custom' || element.display !== 'side') {
+    return false;
+  }
+  const props =
+    element.props && typeof element.props === 'object' ? element.props : {};
+  return String((props as { workspaceKey?: unknown }).workspaceKey || '').trim()
+    .length > 0;
+};
+
 const useChatSession = () => {
   const client = useContext(ChainlitContext);
   const sessionId = useRecoilValue(sessionIdState);
@@ -119,6 +136,12 @@ const useChatSession = () => {
   const setConversationHistoryVisible = useSetRecoilState(
     conversationHistoryVisibleState
   );
+  const setConversationHistoryShowNewThread = useSetRecoilState(
+    conversationHistoryShowNewThreadState
+  );
+  const setConversationHistoryShowDeleteThreads = useSetRecoilState(
+    conversationHistoryShowDeleteThreadsState
+  );
   const setModes = useSetRecoilState(modesState);
   const setSideView = useSetRecoilState(sideViewState);
   const setDocumentWorkspace = useSetRecoilState(documentWorkspaceState);
@@ -129,6 +152,7 @@ const useChatSession = () => {
   const setChatSettingsInputs = useSetRecoilState(chatSettingsInputsState);
   const setTokenCount = useSetRecoilState(tokenCountState);
   const [chatProfile, setChatProfile] = useRecoilState(chatProfileState);
+  const [projectId, setProjectId] = useRecoilState(projectState);
   const idToResume = useRecoilValue(threadIdToResumeState);
   const setThreadResumeError = useSetRecoilState(resumeThreadErrorState);
   const setFavoriteMessages = useSetRecoilState(favoriteMessagesState);
@@ -140,11 +164,16 @@ const useChatSession = () => {
     new Map()
   );
   const streamFlushHandleRef = useRef<number | null>(null);
+  // Socket listeners are attached once per connect; project scope often arrives
+  // later via set_project. Always read the latest value so title-refresh list
+  // calls do not fall back to the bag (projectId=null from the initial connect).
+  const projectIdRef = useRef(projectId);
+  projectIdRef.current = projectId;
   const refreshThreadHistoryPage = useCallback(async () => {
     try {
       const { pageInfo, data } = await client.listThreads(
         { first: 20, cursor: undefined },
-        {}
+        { projectId: projectIdRef.current }
       );
 
       setThreadHistory((previousHistory) => {
@@ -350,6 +379,14 @@ const useChatSession = () => {
         extraHeaders['X-Client-Origin'] = currentOrigin;
       }
 
+      // Prefer the live page URL for project scope; Referer alone is often stripped by proxies.
+      const pageSearch =
+        typeof window !== 'undefined' ? window.location.search : '';
+      const pageQueryParams = Object.fromEntries(
+        new URLSearchParams(pageSearch).entries()
+      );
+      const pageProjectId = pageQueryParams.project_id || null;
+
       const socket = io(uri, {
         path,
         withCredentials: true,
@@ -360,7 +397,8 @@ const useChatSession = () => {
           sessionId,
           threadId: idToResume || '',
           userEnv: JSON.stringify(userEnv),
-          chatProfile: chatProfile ? encodeURIComponent(chatProfile) : ''
+          chatProfile: chatProfile ? encodeURIComponent(chatProfile) : '',
+          projectId: pageProjectId ? encodeURIComponent(pageProjectId) : ''
         }
       });
       setSession((old) => {
@@ -373,6 +411,8 @@ const useChatSession = () => {
       setWorkflowHelp(undefined);
       setSpontaneousFileUploadEnabled(undefined);
       setConversationHistoryVisible(undefined);
+      setConversationHistoryShowNewThread(undefined);
+      setConversationHistoryShowDeleteThreads(undefined);
 
       socket.on('connect', () => {
         socket.emit('connection_successful');
@@ -497,14 +537,11 @@ const useChatSession = () => {
         const isReadOnlyView = Boolean(
           (thread as any)?.metadata?.viewer_read_only
         );
-        const isSwitchingToDifferentThread = Boolean(
-          thread?.id &&
-            thread.id !== currentThreadId &&
-            (!idToResume || thread.id === idToResume)
-        );
-        if (isSwitchingToDifferentThread) {
-          setDocumentWorkspace(undefined);
-        }
+        // Do not clear documentWorkspace here. Chainlit emits resume_thread after
+        // on_chat_resume, which already published document_workspace_state for the
+        // file-editor shell badge. Clearing on this event races that restore and
+        // drops the button. Stale chrome is reset by the idToResume effect and by
+        // subsequent document_workspace_state payloads.
         if (!isReadOnlyView && idToResume && thread.id !== idToResume) {
           window.location.href = `/thread/${thread.id}`;
         }
@@ -695,16 +732,73 @@ const useChatSession = () => {
         setSpontaneousFileUploadEnabled(Boolean(enabled));
       });
 
-      socket.on('set_conversation_history_visibility', (visible: boolean) => {
-        setConversationHistoryVisible(Boolean(visible));
-      });
+      socket.on(
+        'set_conversation_history_visibility',
+        (
+          payload:
+            | boolean
+            | {
+                visible?: boolean;
+                show_new_thread?: boolean;
+                show_delete_threads?: boolean;
+              }
+        ) => {
+          if (typeof payload === 'boolean') {
+            setConversationHistoryVisible(Boolean(payload));
+            setConversationHistoryShowNewThread(undefined);
+            setConversationHistoryShowDeleteThreads(undefined);
+            return;
+          }
+
+          if (payload && typeof payload === 'object') {
+            if (typeof payload.visible === 'boolean') {
+              setConversationHistoryVisible(Boolean(payload.visible));
+            }
+            if (typeof payload.show_new_thread === 'boolean') {
+              setConversationHistoryShowNewThread(
+                Boolean(payload.show_new_thread)
+              );
+            }
+            if (typeof payload.show_delete_threads === 'boolean') {
+              setConversationHistoryShowDeleteThreads(
+                Boolean(payload.show_delete_threads)
+              );
+            }
+            return;
+          }
+
+          setConversationHistoryVisible(undefined);
+          setConversationHistoryShowNewThread(undefined);
+          setConversationHistoryShowDeleteThreads(undefined);
+        }
+      );
 
       socket.on('set_new_chat_button_visibility', (visible: boolean) => {
         setConversationHistoryVisible(Boolean(visible));
+        setConversationHistoryShowNewThread(undefined);
+        setConversationHistoryShowDeleteThreads(undefined);
       });
 
       socket.on('set_chat_profile', (profileName: string) => {
-        setChatProfile(profileName);
+        // Bail out when unchanged so profile-driven config refetch stays quiet.
+        setChatProfile((previous) =>
+          previous === profileName ? previous : profileName
+        );
+      });
+
+      socket.on('set_project', (nextProjectId: string | null) => {
+        const normalizedProjectId = nextProjectId ?? null;
+        // Reconnect/resume re-emits the same scope; skip wipe+refetch when unchanged.
+        if (projectIdRef.current === normalizedProjectId) {
+          return;
+        }
+        setProjectId(normalizedProjectId);
+        setThreadHistory((previousHistory) => ({
+          ...previousHistory,
+          pageInfo: undefined,
+          threads: undefined,
+          timeGroupedThreads: undefined
+        }));
       });
 
       socket.on('set_modes', (modes: IMode[]) => {
@@ -748,7 +842,13 @@ const useChatSession = () => {
       socket.on('set_sidebar_title', (title: string) => {
         setSideView((prev) => {
           if (prev?.title === title) return prev;
-          return { title, elements: prev?.elements || [] };
+          // Preserve sidebar key so MessagesContainer does not treat this as an
+          // unkeyed view and fight ElementSidebar ownership of canvas shells.
+          return {
+            title,
+            elements: prev?.elements || [],
+            key: prev?.key
+          };
         });
       });
 
@@ -757,6 +857,11 @@ const useChatSession = () => {
         ({ elements, key }: { elements: IMessageElement[]; key?: string }) => {
           if (!elements.length) {
             setSideView(undefined);
+            // Drop only accumulated canvas shells. Keep PDF/other side elements so
+            // MessagesContainer can still auto-open non-canvas side content.
+            setElements((old) =>
+              old.filter((element) => !isSidebarCanvasShellElement(element))
+            );
           } else {
             elements.forEach((element) => {
               if (!element.url && element.chainlitKey) {
@@ -765,6 +870,28 @@ const useChatSession = () => {
                   sessionId
                 );
               }
+            });
+            const nextIds = new Set(elements.map((element) => element.id));
+            const nextHasCanvasShell = elements.some(isSidebarCanvasShellElement);
+            // Replace prior canvas shells so they do not accumulate across remounts.
+            // Non-canvas side elements (PDF, etc.) stay in elementState.
+            setElements((old) => {
+              const retained = old.filter((element) => {
+                if (!isSidebarCanvasShellElement(element)) {
+                  return true;
+                }
+                if (nextHasCanvasShell) {
+                  return nextIds.has(element.id);
+                }
+                return false;
+              });
+              const byId = new Map(
+                retained.map((element) => [element.id, element] as const)
+              );
+              elements.forEach((element) => {
+                byId.set(element.id, element);
+              });
+              return Array.from(byId.values());
             });
             setSideView((prev) => {
               const previousSignature = stableSidebarElementsSignature(
@@ -788,6 +915,12 @@ const useChatSession = () => {
         }
 
         if (element.type === 'tasklist') {
+          // TaskList content lives at a stable /project/file URL. Bust the query
+          // so SWR refetches on every send() instead of keeping the first snapshot.
+          if (element.url) {
+            const separator = element.url.includes('?') ? '&' : '?';
+            element.url = `${element.url}${separator}_ts=${Date.now()}`;
+          }
           setTasklists((old) => {
             const index = old.findIndex((e) => e.id === element.id);
             if (index === -1) {
@@ -874,8 +1007,15 @@ const useChatSession = () => {
       flushBufferedStreamTokens,
       currentThreadId,
       refreshThreadHistoryPage,
+      setChatProfile,
+      setProjectId,
+      setThreadHistory,
       setConversationHistoryVisible,
+      setConversationHistoryShowNewThread,
+      setConversationHistoryShowDeleteThreads,
       setDocumentWorkspace,
+      setElements,
+      setSideView,
       setSpontaneousFileUploadEnabled,
       setWorkflowHelp
     ]

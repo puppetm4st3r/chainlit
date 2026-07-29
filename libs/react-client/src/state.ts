@@ -79,6 +79,15 @@ export const chatProfileState = atom<string | undefined>({
   default: undefined
 });
 
+/**
+ * Active conversation project scope for thread history.
+ * ``null`` = global bag; a string = that project id/name.
+ */
+export const projectState = atom<string | null>({
+  key: 'ConversationProject',
+  default: null
+});
+
 const sessionIdAtom = atom<string>({
   key: 'SessionId',
   default: uuidv4()
@@ -125,6 +134,18 @@ export const spontaneousFileUploadEnabledState = atom<boolean | undefined>({
 
 export const conversationHistoryVisibleState = atom<boolean | undefined>({
   key: 'ConversationHistoryVisible',
+  default: undefined
+});
+
+export const conversationHistoryShowNewThreadState = atom<boolean | undefined>({
+  key: 'ConversationHistoryShowNewThread',
+  default: undefined
+});
+
+export const conversationHistoryShowDeleteThreadsState = atom<
+  boolean | undefined
+>({
+  key: 'ConversationHistoryShowDeleteThreads',
   default: undefined
 });
 

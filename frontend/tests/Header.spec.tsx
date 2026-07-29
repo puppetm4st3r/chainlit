@@ -67,6 +67,7 @@ vi.mock('@/components/ui/button', () => ({
 vi.mock('@/components/ui/tooltip', () => ({
   Tooltip: ({ children }: any) => <>{children}</>,
   TooltipContent: ({ children }: any) => <>{children}</>,
+  TooltipProvider: ({ children }: any) => <>{children}</>,
   TooltipTrigger: ({ children }: any) => <>{children}</>
 }));
 
@@ -77,6 +78,10 @@ vi.mock('@/components/ui/hover-card', () => ({
 }));
 
 vi.mock('components/i18n', () => ({
+  Translator: ({ path }: { path: string }) => <span>{path}</span>
+}));
+
+vi.mock('@/components/i18n', () => ({
   Translator: ({ path }: { path: string }) => <span>{path}</span>
 }));
 
@@ -172,6 +177,8 @@ describe('Header', () => {
 
     const closeButton = document.querySelector('#side-view-title button');
     expect(closeButton).not.toBeNull();
+    // Canvas title lives in CanvasDocumentHeader; chrome label next to close is hidden.
+    expect(screen.queryByText('Document')).not.toBeInTheDocument();
 
     fireEvent.click(closeButton!);
 
@@ -238,7 +245,7 @@ describe('Header', () => {
     expect(screen.queryByTestId('user-nav')).not.toBeInTheDocument();
   });
 
-  it('renders the active file editing badge and open-editor action when the workspace exists but the canvas is closed', () => {
+  it('renders the workspace editor icon next to thread actions and opens the editor when the canvas is closed', () => {
     mockUseConfig.mockReturnValue({ config: { ui: {} } });
     mockUseRecoilValue.mockImplementation((atom: { key?: string }) => {
       if (atom?.key === 'DocumentWorkspaceState') {
@@ -254,12 +261,24 @@ describe('Header', () => {
 
     render(<Header />);
 
-    expect(screen.getByText('chat.workspace.activePrimary')).toBeInTheDocument();
-    expect(screen.getByText('chat.workspace.activeSecondary')).toBeInTheDocument();
     expect(screen.getByText('chat.workspace.openEditorWord')).toBeInTheDocument();
+    expect(
+      screen.queryByText('chat.workspace.activePrimary')
+    ).not.toBeInTheDocument();
 
-    const workspaceButton = document.querySelector('#document-workspace-header-button');
+    const workspaceButton = document.querySelector(
+      '#document-workspace-header-button'
+    );
     expect(workspaceButton).not.toBeNull();
+    const newChatButton = screen.getByTestId('new-chat');
+    expect(newChatButton).toBeInTheDocument();
+    // Workspace control must sit immediately left of new-thread.
+    expect(
+      Boolean(
+        workspaceButton!.compareDocumentPosition(newChatButton) &
+          Node.DOCUMENT_POSITION_FOLLOWING
+      )
+    ).toBe(true);
     fireEvent.click(workspaceButton!);
 
     expect(mockWindowMessage).toHaveBeenCalledWith({
@@ -267,7 +286,7 @@ describe('Header', () => {
     });
   });
 
-  it('renders the active file editing badge without open-editor action when the canvas is already open', () => {
+  it('renders the workspace editor icon without open-editor action when the canvas is already open', () => {
     mockUseConfig.mockReturnValue({ config: { ui: {} } });
     mockUseRecoilValue.mockImplementation((atom: { key?: string }) => {
       if (atom?.key === 'DocumentWorkspaceState') {
@@ -283,8 +302,13 @@ describe('Header', () => {
 
     render(<Header />);
 
+    expect(
+      document.querySelector('#document-workspace-header-button')
+    ).not.toBeNull();
     expect(screen.getByText('chat.workspace.activePrimary')).toBeInTheDocument();
-    expect(screen.getByText('chat.workspace.activeSecondary')).toBeInTheDocument();
+    expect(
+      screen.getByText('chat.workspace.activeSecondary')
+    ).toBeInTheDocument();
     expect(
       screen.queryByText('chat.workspace.openEditorWord')
     ).not.toBeInTheDocument();

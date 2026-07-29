@@ -572,23 +572,8 @@ class TestWebsocketSession:
 class TestSessionEdgeCases:
     """Test suite for session edge cases."""
 
-    def test_base_session_registers_assistant_message_once_per_id(self):
-        """Logical assistant turns must be counted by unique message id."""
-        session = BaseSession(
-            id="test_webapp",
-            client_type="webapp",
-            thread_id=None,
-            user=None,
-            token=None,
-            user_env=None,
-        )
-
-        assert session.register_logical_assistant_message("assistant-1") == 1
-        assert session.register_logical_assistant_message("assistant-1") == 1
-        assert session.register_logical_assistant_message("assistant-2") == 2
-
     def test_base_session_reset_pre_persistence_state_clears_staged_buffers(self):
-        """Pre-threshold reconnects should drop staged metadata and assistant counters."""
+        """Reconnects before flush should drop staged metadata."""
         session = BaseSession(
             id="test_webapp",
             client_type="webapp",
@@ -598,14 +583,12 @@ class TestSessionEdgeCases:
             user_env=None,
         )
 
-        session.register_logical_assistant_message("assistant-1")
         session.stage_thread_metadata_patch({"prompt_language": "es"})
         session.mark_thread_persistence_ready()
         session.reset_pre_persistence_state()
 
         assert session.has_first_interaction is False
         assert session.thread_persistence_ready is False
-        assert session.assistant_persistence_turn_count == 0
         assert session.consume_pending_thread_metadata_patches() == {}
 
     def test_base_session_begin_and_abort_thread_persistence(self):

@@ -14,6 +14,8 @@ from typing import (
     Union,
 )
 
+from typing_extensions import NotRequired
+
 if TYPE_CHECKING:
     from chainlit.element import ElementDict
     from chainlit.step import StepDict
@@ -21,7 +23,7 @@ if TYPE_CHECKING:
 from dataclasses import field
 
 from dataclasses_json import DataClassJsonMixin
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from pydantic.dataclasses import dataclass
 
 InputWidgetType = Literal[
@@ -50,6 +52,7 @@ class ThreadDict(TypedDict):
     metadata: Optional[Dict]
     steps: List["StepDict"]
     elements: Optional[List["ElementDict"]]
+    projectId: NotRequired[Optional[str]]
 
 
 class Pagination(BaseModel):
@@ -61,6 +64,18 @@ class ThreadFilter(BaseModel):
     feedback: Literal[0, 1] | None = None
     userId: str | None = None
     search: str | None = None
+    # Required key: JSON null = global bag; non-empty string = that project.
+    projectId: str | None
+
+    @field_validator("projectId")
+    @classmethod
+    def reject_blank_project_id(cls, value: str | None) -> str | None:
+        """Reject empty/whitespace projectId; null means the global bag."""
+        if value is None:
+            return None
+        if not str(value).strip():
+            raise ValueError("projectId must be null or a non-empty string")
+        return value
 
 
 @dataclass
@@ -226,6 +241,36 @@ class UpdateThreadRequest(BaseModel):
     name: str
 
 
+class MoveThreadProjectRequest(BaseModel):
+    """Move a thread to a destination conversation project."""
+
+    threadId: str
+    projectId: str
+
+    @field_validator("projectId")
+    @classmethod
+    def require_non_empty_project_id(cls, value: str) -> str:
+        """Destination must be a non-empty project id (not the global bag)."""
+        if value is None or not str(value).strip():
+            raise ValueError("projectId must be a non-empty string")
+        return value
+
+
+class SearchProjectsRequest(BaseModel):
+    """Search tenant conversation projects for move-thread destination picking."""
+
+    search: Optional[str] = None
+    first: int = 20
+    excludeProjectId: Optional[str] = None
+
+    @field_validator("first")
+    @classmethod
+    def validate_first(cls, value: int) -> int:
+        if value < 1 or value > 100:
+            raise ValueError("first must be between 1 and 100")
+        return value
+
+
 class ShareThreadRequest(BaseModel):
     threadId: str
     isShared: bool
@@ -233,6 +278,30 @@ class ShareThreadRequest(BaseModel):
 
 class DeleteThreadRequest(BaseModel):
     threadId: str
+
+
+class DeleteThreadsFilter(BaseModel):
+    """Scope for bulk thread deletion: null projectId = global bag only."""
+
+    projectId: str | None
+
+    @field_validator("projectId")
+    @classmethod
+    def reject_blank_project_id(cls, value: str | None) -> str | None:
+        """Reject empty/whitespace projectId; null means the global bag."""
+        if value is None:
+            return None
+        if not str(value).strip():
+            raise ValueError("projectId must be null or a non-empty string")
+        return value
+
+
+class DeleteThreadsRequest(BaseModel):
+    """Delete threads in the requested project scope for the current user."""
+
+    filter: DeleteThreadsFilter
+    # Keep the active conversation when bulk-deleting history.
+    excludeThreadId: Optional[str] = None
 
 
 class DeleteFeedbackRequest(BaseModel):

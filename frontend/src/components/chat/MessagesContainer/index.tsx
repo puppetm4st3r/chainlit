@@ -23,8 +23,8 @@ import {
 
 import { Messages } from '@/components/chat/Messages';
 import {
+  excludeCanvasShellElements,
   getCanvasShellCloseDetail,
-  isCanvasShellElement,
   logCanvasCloseDiag
 } from '@/lib/canvas';
 import {
@@ -42,22 +42,6 @@ import { useTranslation } from 'components/i18n/Translator';
 interface Props {
   navigate?: (to: string) => void;
 }
-
-const keepSingleCanvasShellElement = (
-  sideElements: IMessageElement[]
-): IMessageElement[] => {
-  const latestCanvasElement = [...sideElements]
-    .reverse()
-    .find(isCanvasShellElement);
-
-  if (!latestCanvasElement) {
-    return sideElements;
-  }
-
-  return sideElements.filter(
-    (element) => !isCanvasShellElement(element) || element === latestCanvasElement
-  );
-};
 
 const MessagesContainer = ({ navigate }: Props) => {
   const apiClient = useContext(ChainlitContext);
@@ -170,11 +154,15 @@ const MessagesContainer = ({ navigate }: Props) => {
   ]);
 
   useEffect(() => {
-    const sideElements = keepSingleCanvasShellElement(
+    // Canvas shells stay under ElementSidebar ownership. Auto-open only non-canvas
+    // side elements (PDF, etc.) so stale canvas CustomElements cannot remount loops.
+    const sideElements = excludeCanvasShellElements(
       elements.filter((e) => e.display === 'side')
     );
     const nextSignature = buildSideViewElementsSignature(sideElements);
-    const canvasDetail = getCanvasShellCloseDetail(sideElements);
+    const canvasDetail = getCanvasShellCloseDetail(
+      elements.filter((e) => e.display === 'side')
+    );
 
     if (sideElements.length === 0) {
       knownSideElementsRef.current = new Map();

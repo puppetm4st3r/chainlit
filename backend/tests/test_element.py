@@ -414,7 +414,11 @@ class TestTaskListElement:
     async def test_tasklist_preprocess_content(self, mock_chainlit_context):
         """Test TaskList content preprocessing."""
         async with mock_chainlit_context:
-            tasklist = TaskList(name="test_tasklist", status="In Progress")
+            tasklist = TaskList(
+                name="test_tasklist",
+                status="In Progress",
+                title="Consulting documents",
+            )
             task = Task(title="Test Task", status=TaskStatus.DONE)
             await tasklist.add_task(task)
 
@@ -424,6 +428,46 @@ class TestTaskListElement:
             assert "Test Task" in tasklist.content
             assert "done" in tasklist.content
             assert "In Progress" in tasklist.content
+            assert "Consulting documents" in tasklist.content
+            assert '"title": "Consulting documents"' in tasklist.content
+
+    async def test_tasklist_preprocess_keeps_empty_title_for_locale_default(
+        self, mock_chainlit_context
+    ):
+        """Empty panel title stays empty so the UI can apply locale i18n."""
+        async with mock_chainlit_context:
+            tasklist = TaskList(name="test_tasklist")
+            await tasklist.preprocess_content()
+
+            assert '"title": ""' in tasklist.content
+
+    async def test_tasklist_send_rewrites_session_file_on_update(
+        self, mock_chainlit_context
+    ):
+        """Updatable TaskList must rewrite session file content on every send()."""
+        async with mock_chainlit_context as ctx:
+            tasklist_id = "tasklist-1"
+            ctx.session.persist_file = AsyncMock(return_value={"id": tasklist_id})
+            tasklist = TaskList(id=tasklist_id, name="tasklist", status="Running...")
+            await tasklist.add_task(
+                Task(title="Consultando documentos", status=TaskStatus.RUNNING)
+            )
+
+            with patch("chainlit.element.get_data_layer", return_value=None):
+                await tasklist.send()
+                tasklist.tasks[0].status = TaskStatus.DONE
+                tasklist.status = "Done"
+                await tasklist.send()
+
+            assert ctx.session.persist_file.await_count == 2
+            first_content = ctx.session.persist_file.await_args_list[0].kwargs["content"]
+            second_content = ctx.session.persist_file.await_args_list[1].kwargs["content"]
+            assert "Consultando documentos" in first_content
+            assert '"status": "running"' in first_content
+            assert '"status": "done"' in second_content
+            assert ctx.session.persist_file.await_args_list[1].kwargs["file_id"] == (
+                tasklist_id
+            )
 
 
 @pytest.mark.asyncio

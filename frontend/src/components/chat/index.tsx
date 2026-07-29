@@ -175,7 +175,10 @@ const Chat = () => {
       threadId &&
       currentPage.pathname === '/'
     ) {
-      navigate(`/thread/${threadId}`);
+      navigate({
+        pathname: `/thread/${threadId}`,
+        search: window.location.search
+      });
     } else {
       setThreads((prev) => ({
         ...prev,

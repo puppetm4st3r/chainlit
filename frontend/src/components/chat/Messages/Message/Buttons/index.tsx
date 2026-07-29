@@ -10,6 +10,7 @@ import CopyButton from '@/components/CopyButton';
 
 import MessageActions from './Actions';
 import { DebugButton } from './DebugButton';
+import DocxExportButton from './DocxExportButton';
 import { FeedbackButtons } from './FeedbackButtons';
 import { TTSButton } from './TTSButton';
 
@@ -46,6 +47,7 @@ const MessageButtons = ({ message, actions, run, contentRef, elements }: Props) 
       {showCopyButton ? (
         <CopyButton content={message.output} contentRef={contentRef} />
       ) : null}
+      {showCopyButton ? <DocxExportButton contentRef={contentRef} /> : null}
       {run ? <FeedbackButtons message={run} /> : null}
       {/* TTS playback for assistant messages */}
       {!isUser && hasContent ? <TTSButton message={message} elements={elements} /> : null}

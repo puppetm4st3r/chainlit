@@ -210,7 +210,6 @@ const Message = memo(
                         run={
                           scorableRun && isScorable ? scorableRun : undefined
                         }
-                        elements={elements}
                         contentRef={contentRef}
                       />
                     </div>

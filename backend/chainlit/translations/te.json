@@ -141,9 +141,8 @@
             "customize": "మీ చాట్ సెట్టింగ్‌లను ఇక్కడ అనుకూలీకరించండి"
         },
         "workspace": {
-            "activePrimary": "ఫైల్ సవరణ",
-            "activeSecondary": "అందుబాటులో",
-            "openEditorWord": "Word ఫైల్ ఎడిటర్‌ను తెరవండి"
+            "openEditorWord": "Word ఫైల్ ఎడిటర్‌ను తెరవండి",
+            "closeEditorWord": "Close Word file editor"
         },
         "watermark": "LLMలు తప్పులు చేయవచ్చు. ముఖ్యమైన సమాచారాన్ని తనిఖీ చేయడాన్ని పరిగణించండి.",
         "notifications": {
@@ -155,6 +154,16 @@
             "maximize": "Maximize",
             "restore": "Reduce size",
             "close": "Go to chat"
+        },
+        "userMessage": {
+            "fileCommandChip": "AI ఫైల్ టాస్క్"
+        },
+        "customElement": {
+            "errors": {
+                "timeout": "Loading custom element '{{name}}' timed out before the source code became available.",
+                "fetchFailed": "Failed to fetch custom element module '{{path}}' ({{status}}).",
+                "emptySource": "Custom element '{{name}}' did not provide renderable source code."
+            }
         }
     },
     "threadHistory": {

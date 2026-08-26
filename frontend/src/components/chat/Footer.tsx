@@ -24,7 +24,7 @@ export default function ChatFooter({ showIfEmptyThread, ...props }: Props) {
       {/* Soft fade into the chat so the composer does not sit flush against messages. */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 bottom-full h-[15px] bg-gradient-to-t from-background to-transparent"
+        className="pointer-events-none absolute inset-x-0 bottom-full h-[25px] bg-gradient-to-t from-background to-transparent"
       />
       <MessageComposer {...props} />
       <WaterMark />

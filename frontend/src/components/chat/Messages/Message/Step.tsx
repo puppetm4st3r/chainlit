@@ -129,7 +129,7 @@ export default function Step({
             </span>
           </AccordionTrigger>
           <AccordionContent>
-            <div className="flex-grow mt-4 ml-1 pl-4 border-l-2 border-primary">
+            <div className="flex-grow mt-4 ml-1 pl-4 border-l-2 border-primary/25">
               {children}
             </div>
           </AccordionContent>

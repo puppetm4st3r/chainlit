@@ -141,9 +141,8 @@
             "customize": "Personnalisez vos paramètres de chat ici"
         },
         "workspace": {
-            "activePrimary": "Édition de fichiers",
-            "activeSecondary": "Disponible",
-            "openEditorWord": "Ouvrir l’éditeur de fichiers Word"
+            "openEditorWord": "Ouvrir l’éditeur de fichiers Word",
+            "closeEditorWord": "Fermer l’éditeur de fichiers Word"
         },
         "watermark": "Les LLMs peuvent se tromper. Vérifiez les réponses.",
         "notifications": {
@@ -155,6 +154,16 @@
             "maximize": "Agrandir",
             "restore": "Réduire la taille",
             "close": "Aller au chat"
+        },
+        "userMessage": {
+            "fileCommandChip": "Tâche IA sur fichier"
+        },
+        "customElement": {
+            "errors": {
+                "timeout": "Le chargement de l'élément personnalisé '{{name}}' a expiré avant que le code source ne soit disponible.",
+                "fetchFailed": "Échec du chargement du module d'élément personnalisé '{{path}}' ({{status}}).",
+                "emptySource": "L'élément personnalisé '{{name}}' n'a pas fourni de code source affichable."
+            }
         }
     },
     "threadHistory": {

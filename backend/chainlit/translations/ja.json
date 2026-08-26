@@ -141,9 +141,8 @@
             "customize": "ここでチャット設定をカスタマイズします"
         },
         "workspace": {
-            "activePrimary": "ファイル編集",
-            "activeSecondary": "利用可能",
-            "openEditorWord": "Wordファイルエディターを開く"
+            "openEditorWord": "Wordファイルエディターを開く",
+            "closeEditorWord": "Close Word file editor"
         },
         "watermark": "大規模言語モデルは間違いを犯す可能性があります。重要な情報については確認を検討してください。",
         "notifications": {
@@ -155,6 +154,16 @@
             "maximize": "Maximize",
             "restore": "Reduce size",
             "close": "Go to chat"
+        },
+        "userMessage": {
+            "fileCommandChip": "AIファイルタスク"
+        },
+        "customElement": {
+            "errors": {
+                "timeout": "Loading custom element '{{name}}' timed out before the source code became available.",
+                "fetchFailed": "Failed to fetch custom element module '{{path}}' ({{status}}).",
+                "emptySource": "Custom element '{{name}}' did not provide renderable source code."
+            }
         }
     },
     "threadHistory": {

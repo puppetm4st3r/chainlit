@@ -140,9 +140,8 @@
             "customize": "خصص إعدادات المحادثة هنا"
         },
         "workspace": {
-            "activePrimary": "تحرير الملفات",
-            "activeSecondary": "متاح",
-            "openEditorWord": "افتح محرر ملفات Word"
+            "openEditorWord": "افتح محرر ملفات Word",
+            "closeEditorWord": "Close Word file editor"
         },
         "watermark": "قد تخطئ نماذج الذكاء الاصطناعي. تحقق من المعلومات المهمة.",
         "notifications": {
@@ -154,6 +153,16 @@
             "maximize": "Maximize",
             "restore": "Reduce size",
             "close": "Go to chat"
+        },
+        "userMessage": {
+            "fileCommandChip": "مهمة ذكاء اصطناعي للملف"
+        },
+        "customElement": {
+            "errors": {
+                "timeout": "Loading custom element '{{name}}' timed out before the source code became available.",
+                "fetchFailed": "Failed to fetch custom element module '{{path}}' ({{status}}).",
+                "emptySource": "Custom element '{{name}}' did not provide renderable source code."
+            }
         }
     },
     "threadHistory": {

@@ -692,10 +692,10 @@ async def jwt_auth(request: Request):
 
     try:
         user = decode_jwt(token)
-        # This method must be used only in DEXA Navigator mode
+        # This method must be used only in Agent Navigator mode
         user_roles = (user.metadata or {}).get("roles", [])
         if "navigator" not in user_roles:
-            raise HTTPException(status_code=401, detail="Invalid token (DEXA Navigator mode only)")
+            raise HTTPException(status_code=401, detail="Invalid token (Agent Navigator mode only)")
         response = await _authenticate_user(request, user)
         return response
     except InvalidTokenError:
@@ -1929,18 +1929,16 @@ def validate_file_upload(
         ValueError: If the file is not allowed.
     """
     if not spec:
-        runtime_override = _get_runtime_spontaneous_file_upload_override(session)
+        runtime_override = get_runtime_spontaneous_file_upload_override(session)
         if runtime_override is False:
             raise ValueError("File upload is not enabled")
         if runtime_override is True:
-            _validate_runtime_spontaneous_file_upload_config()
-
-    if not spec and _get_runtime_spontaneous_file_upload_override(session) is None and config.features.spontaneous_file_upload is None:
-        """Default for a missing config is to allow the fileupload without any restrictions"""
-        return
-
-    if not spec and _get_runtime_spontaneous_file_upload_override(session) is None and not config.features.spontaneous_file_upload.enabled:
-        raise ValueError("File upload is not enabled")
+            validate_runtime_spontaneous_file_upload_config()
+        elif config.features.spontaneous_file_upload is None:
+            """Default for a missing config is to allow the fileupload without any restrictions"""
+            return
+        elif not config.features.spontaneous_file_upload.enabled:
+            raise ValueError("File upload is not enabled")
 
     validate_file_mime_type(file, spec)
     validate_file_size(file, spec)

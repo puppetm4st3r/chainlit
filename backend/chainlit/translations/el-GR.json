@@ -141,9 +141,8 @@
             "customize": "Προσαρμογή"
         },
         "workspace": {
-            "activePrimary": "Επεξεργασία αρχείων",
-            "activeSecondary": "Διαθέσιμο",
-            "openEditorWord": "Άνοιγμα επεξεργαστή αρχείων Word"
+            "openEditorWord": "Άνοιγμα επεξεργαστή αρχείων Word",
+            "closeEditorWord": "Close Word file editor"
         },
         "watermark": "Τα ΜΓΜ μπορεί να κάνουν λάθη. Ελέγξτε σημαντικές πληροφορίες.",
         "notifications": {
@@ -155,6 +154,16 @@
             "maximize": "Maximize",
             "restore": "Reduce size",
             "close": "Go to chat"
+        },
+        "userMessage": {
+            "fileCommandChip": "Εργασία AI αρχείου"
+        },
+        "customElement": {
+            "errors": {
+                "timeout": "Loading custom element '{{name}}' timed out before the source code became available.",
+                "fetchFailed": "Failed to fetch custom element module '{{path}}' ({{status}}).",
+                "emptySource": "Custom element '{{name}}' did not provide renderable source code."
+            }
         }
     },
     "threadHistory": {

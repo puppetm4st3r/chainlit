@@ -23,7 +23,10 @@ import {
 } from '@chainlit/react-client';
 
 import Alert from '@/components/Alert';
+import { useTranslation } from '@/components/i18n/Translator';
+import { Loader } from '@/components/Loader';
 import { useDismissFloatingView } from '@/hooks/useDismissFloatingView';
+import { Translator } from 'components/i18n';
 
 import Imports from './Imports';
 import { loadCustomElementModuleTree } from './moduleLoader';
@@ -37,13 +40,19 @@ const CustomElement = memo(function ({ element }: { element: ICustomElement }) {
   // Recoil ask state works for floating hosts (outside MessageContext) and inline asks.
   const { askUser } = useChatData();
   const dismissFloatingView = useDismissFloatingView();
+  const { t } = useTranslation();
   const elementRef = useRef(element);
   elementRef.current = element;
+  // Keep translator off the fetch effect deps: JSX load must not restart on
+  // render identity churn (or language ticks mid-request).
+  const tRef = useRef(t);
+  tRef.current = t;
 
   const [sourceCode, setSourceCode] = useState<string>();
   const [localImports, setLocalImports] = useState<Record<string, unknown>>({});
   const [error, setError] = useState<string>();
-  const [isLoadingSource, setIsLoadingSource] = useState(false);
+  // Start true so the first paint never flashes the "not found" error before fetch begins.
+  const [isLoadingSource, setIsLoadingSource] = useState(true);
 
   const baseImports = useMemo(
     () => ({
@@ -58,8 +67,11 @@ const CustomElement = memo(function ({ element }: { element: ICustomElement }) {
     const sourceLoadTimeout = window.setTimeout(() => {
       if (isCancelled) return;
       setError(
-        `Loading custom element '${element.name}' timed out before the source code became available.`
+        tRef.current('chat.customElement.errors.timeout', {
+          name: element.name
+        })
       );
+      setIsLoadingSource(false);
     }, 10000);
 
     setError(undefined);
@@ -73,7 +85,10 @@ const CustomElement = memo(function ({ element }: { element: ICustomElement }) {
         const response = await apiClient.get(publicPath);
         if ('ok' in response && !response.ok) {
           throw new Error(
-            `Failed to fetch custom element module '${publicPath}' (${response.status}).`
+            tRef.current('chat.customElement.errors.fetchFailed', {
+              path: publicPath,
+              status: response.status
+            })
           );
         }
         return response.text();
@@ -90,7 +105,7 @@ const CustomElement = memo(function ({ element }: { element: ICustomElement }) {
       .catch((err) => {
         if (isCancelled) return;
         window.clearTimeout(sourceLoadTimeout);
-        setError(String(err));
+        setError(err instanceof Error ? err.message : String(err));
         setIsLoadingSource(false);
       });
 
@@ -232,14 +247,23 @@ const CustomElement = memo(function ({ element }: { element: ICustomElement }) {
 
   if (error) return <Alert variant="error">{error}</Alert>;
   if (!sourceCode) {
-    return isLoadingSource ? (
-      <Alert variant="info">
-        {`Loading custom element '${element.name}'...`}
-      </Alert>
-    ) : (
-      <Alert variant="error">
-        {`Custom element '${element.name}' did not provide renderable source code.`}
-      </Alert>
+    // Only treat empty source as a hard failure after the fetch settled.
+    if (!isLoadingSource) {
+      return (
+        <Alert variant="error">
+          {t('chat.customElement.errors.emptySource', {
+            name: element.name
+          })}
+        </Alert>
+      );
+    }
+    return (
+      <div className="flex flex-col items-center justify-center gap-2 py-6">
+        <Loader className="!size-6" />
+        <span className="text-sm text-muted-foreground">
+          <Translator path="common.status.loading" />
+        </span>
+      </div>
     );
   }
 

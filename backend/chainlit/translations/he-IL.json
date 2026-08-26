@@ -141,9 +141,8 @@
             "customize": "התאם אישית את הגדרות הצ'אט שלך כאן"
         },
         "workspace": {
-            "activePrimary": "עריכת קבצים",
-            "activeSecondary": "זמין",
-            "openEditorWord": "פתח את עורך קבצי Word"
+            "openEditorWord": "פתח את עורך קבצי Word",
+            "closeEditorWord": "Close Word file editor"
         },
         "watermark": "מודלי שפה גדולים עלולים לעשות טעויות. כדאי לבדוק מידע חשוב.",
         "notifications": {
@@ -155,6 +154,16 @@
             "maximize": "Maximize",
             "restore": "Reduce size",
             "close": "Go to chat"
+        },
+        "userMessage": {
+            "fileCommandChip": "משימת AI לקובץ"
+        },
+        "customElement": {
+            "errors": {
+                "timeout": "Loading custom element '{{name}}' timed out before the source code became available.",
+                "fetchFailed": "Failed to fetch custom element module '{{path}}' ({{status}}).",
+                "emptySource": "Custom element '{{name}}' did not provide renderable source code."
+            }
         }
     },
     "threadHistory": {

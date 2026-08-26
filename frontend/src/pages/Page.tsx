@@ -8,6 +8,7 @@ import ChatSettingsSidebar from '@/components/ChatSettings/ChatSettingsSidebar';
 import ElementFloatingView from '@/components/ElementFloatingView';
 import ElementSideView from '@/components/ElementSideView';
 import LeftSidebar from '@/components/LeftSidebar';
+import { ConversationReferenceTooltipLayer } from '@/components/Markdown';
 import { TaskList } from '@/components/Tasklist';
 import { Header } from '@/components/header';
 import ChatSidebarOpenControl from '@/components/header/ChatSidebarOpenControl';
@@ -135,6 +136,8 @@ const Page = ({ children }: Props) => {
     <SidebarProvider
       defaultOpen={config?.ui.default_sidebar_state !== 'closed'}
     >
+      {/* One portal for the whole shell; Markdown instances must not each mount listeners. */}
+      <ConversationReferenceTooltipLayer />
       {showConversationHistory ? (
         <>
           <LeftSidebar />

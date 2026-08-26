@@ -58,6 +58,11 @@ code {
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
     --message-first-item-padding: 0.7em;
+    /* Pastel feedback icons: idle soft, strong on hover/selected (light). */
+    --feedback-positive: 142 38% 52%;
+    --feedback-positive-strong: 142 52% 36%;
+    --feedback-negative: 350 48% 62%;
+    --feedback-negative-strong: 350 68% 48%;
   }
   .dark {
     --background: 0 0% 13%;
@@ -97,6 +102,11 @@ code {
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Pastel feedback icons: lighter pastels on dark backgrounds. */
+    --feedback-positive: 142 36% 58%;
+    --feedback-positive-strong: 142 48% 68%;
+    --feedback-negative: 350 42% 68%;
+    --feedback-negative-strong: 350 58% 74%;
   }
 }
 
@@ -106,6 +116,94 @@ code {
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+/**
+ * Assistant message action row (copy / docx / feedback / TTS).
+ * Idle: subdued transparency on pointer devices. Hover/focus: full opacity.
+ * Feedback thumbs keep pastel green / rose and intensify on hover.
+ * `!important` is required so Button ghost `hover:text-accent-foreground`
+ * cannot replace the feedback colors (utilities otherwise win the cascade).
+ */
+.positive-feedback-off,
+.positive-feedback-off svg {
+  color: hsl(var(--feedback-positive)) !important;
+}
+
+.positive-feedback-off:hover,
+.positive-feedback-off:focus-visible,
+.positive-feedback-off:hover svg,
+.positive-feedback-off:focus-visible svg {
+  color: hsl(var(--feedback-positive-strong)) !important;
+}
+
+.positive-feedback-on,
+.positive-feedback-on:hover,
+.positive-feedback-on:focus-visible,
+.positive-feedback-on svg,
+.positive-feedback-on:hover svg,
+.positive-feedback-on:focus-visible svg {
+  color: hsl(var(--feedback-positive-strong)) !important;
+}
+
+.negative-feedback-off,
+.negative-feedback-off svg {
+  color: hsl(var(--feedback-negative)) !important;
+}
+
+.negative-feedback-off:hover,
+.negative-feedback-off:focus-visible,
+.negative-feedback-off:hover svg,
+.negative-feedback-off:focus-visible svg {
+  color: hsl(var(--feedback-negative-strong)) !important;
+}
+
+.negative-feedback-on,
+.negative-feedback-on:hover,
+.negative-feedback-on:focus-visible,
+.negative-feedback-on svg,
+.negative-feedback-on:hover svg,
+.negative-feedback-on:focus-visible svg {
+  color: hsl(var(--feedback-negative-strong)) !important;
+}
+
+@layer components {
+  @media (hover: hover) and (pointer: fine) {
+    .message-action-row button {
+      opacity: 0.42;
+      transition:
+        opacity 150ms ease,
+        color 150ms ease;
+    }
+
+    .message-action-row:hover button,
+    .message-action-row:focus-within button,
+    .message-action-row button:hover,
+    .message-action-row button:focus-visible {
+      opacity: 1;
+    }
+
+    /* Neutral icons (copy / docx / TTS); feedback colors live outside this layer. */
+    .message-action-row button.text-muted-foreground:hover,
+    .message-action-row button.text-muted-foreground:focus-visible {
+      color: hsl(var(--foreground));
+    }
+
+    /* Selected feedback remains readable while the row is idle. */
+    .message-action-row .positive-feedback-on,
+    .message-action-row .negative-feedback-on {
+      opacity: 0.78;
+    }
+
+    .message-action-row:hover .positive-feedback-on,
+    .message-action-row:hover .negative-feedback-on,
+    .message-action-row .positive-feedback-on:hover,
+    .message-action-row .negative-feedback-on:hover,
+    .message-action-row .positive-feedback-on:focus-visible,
+    .message-action-row .negative-feedback-on:focus-visible {
+      opacity: 1;
+    }
   }
 }
 

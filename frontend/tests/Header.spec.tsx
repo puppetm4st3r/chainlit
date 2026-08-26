@@ -9,6 +9,7 @@ const mockUseConfig = vi.fn();
 const mockWindowMessage = vi.fn();
 const mockUseRecoilValue = vi.fn();
 const mockSetSideView = vi.fn();
+const mockDispatchCanvasShellCloseRequest = vi.fn();
 
 vi.mock('@chainlit/react-client', async () => {
   const actual =
@@ -47,6 +48,21 @@ vi.mock('@/components/ui/sidebar', () => ({
 vi.mock('@/hooks/useDismissSideView', () => ({
   useDismissSideView: () => mockSetSideView
 }));
+
+vi.mock('@/lib/canvas', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/canvas')>(
+    '@/lib/canvas'
+  );
+  return {
+    ...actual,
+    dispatchCanvasShellCloseRequest: (
+      ...args: Parameters<typeof actual.dispatchCanvasShellCloseRequest>
+    ) => {
+      mockDispatchCanvasShellCloseRequest(...args);
+      return actual.dispatchCanvasShellCloseRequest(...args);
+    }
+  };
+});
 
 vi.mock('@/components/AudioPresence', () => ({
   default: () => <div data-testid="audio-presence" />
@@ -263,13 +279,14 @@ describe('Header', () => {
 
     expect(screen.getByText('chat.workspace.openEditorWord')).toBeInTheDocument();
     expect(
-      screen.queryByText('chat.workspace.activePrimary')
+      screen.queryByText('chat.workspace.closeEditorWord')
     ).not.toBeInTheDocument();
 
     const workspaceButton = document.querySelector(
       '#document-workspace-header-button'
     );
     expect(workspaceButton).not.toBeNull();
+    expect(workspaceButton).toHaveAttribute('aria-pressed', 'false');
     const newChatButton = screen.getByTestId('new-chat');
     expect(newChatButton).toBeInTheDocument();
     // Workspace control must sit immediately left of new-thread.
@@ -284,10 +301,21 @@ describe('Header', () => {
     expect(mockWindowMessage).toHaveBeenCalledWith({
       type: 'canvas:open_active_workspace'
     });
+    expect(mockSetSideView).not.toHaveBeenCalled();
+    expect(mockDispatchCanvasShellCloseRequest).not.toHaveBeenCalled();
   });
 
-  it('renders the workspace editor icon without open-editor action when the canvas is already open', () => {
+  it('toggles the workspace editor closed when the canvas is already open', () => {
     mockUseConfig.mockReturnValue({ config: { ui: {} } });
+    const sideElements = [
+      {
+        id: 'canvas-shell',
+        type: 'custom',
+        name: 'Canvas Editor',
+        display: 'side',
+        props: { workspaceKey: 'ws-1', widgetInstanceId: 'w-1' }
+      }
+    ];
     mockUseRecoilValue.mockImplementation((atom: { key?: string }) => {
       if (atom?.key === 'DocumentWorkspaceState') {
         return {
@@ -297,20 +325,28 @@ describe('Header', () => {
           workspaceNodeName: 'Workspace Contrato'
         };
       }
+      if (atom?.key === 'SideView') {
+        return { title: 'Canvas', elements: sideElements };
+      }
       return undefined;
     });
 
     render(<Header />);
 
-    expect(
-      document.querySelector('#document-workspace-header-button')
-    ).not.toBeNull();
-    expect(screen.getByText('chat.workspace.activePrimary')).toBeInTheDocument();
-    expect(
-      screen.getByText('chat.workspace.activeSecondary')
-    ).toBeInTheDocument();
+    const workspaceButton = document.querySelector(
+      '#document-workspace-header-button'
+    );
+    expect(workspaceButton).not.toBeNull();
+    expect(workspaceButton).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText('chat.workspace.closeEditorWord')).toBeInTheDocument();
     expect(
       screen.queryByText('chat.workspace.openEditorWord')
     ).not.toBeInTheDocument();
+
+    fireEvent.click(workspaceButton!);
+
+    expect(mockWindowMessage).not.toHaveBeenCalled();
+    expect(mockSetSideView).toHaveBeenCalledWith(sideElements);
+    expect(mockDispatchCanvasShellCloseRequest).toHaveBeenCalledWith(sideElements);
   });
 });

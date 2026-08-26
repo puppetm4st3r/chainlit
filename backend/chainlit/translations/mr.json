@@ -141,9 +141,8 @@
             "customize": "या वेळी तुमच्या चॅट सेटिंग्ज कस्टमाइझ करा"
         },
         "workspace": {
-            "activePrimary": "फाइल संपादन",
-            "activeSecondary": "उपलब्ध",
-            "openEditorWord": "Word फाइल संपादक उघडा"
+            "openEditorWord": "Word फाइल संपादक उघडा",
+            "closeEditorWord": "Close Word file editor"
         },
         "watermark": "LLM चुका करू शकतात. महत्त्वाची माहिती तपासण्याचा विचार करा.",
         "notifications": {
@@ -155,6 +154,16 @@
             "maximize": "Maximize",
             "restore": "Reduce size",
             "close": "Go to chat"
+        },
+        "userMessage": {
+            "fileCommandChip": "AI फाइल कार्य"
+        },
+        "customElement": {
+            "errors": {
+                "timeout": "Loading custom element '{{name}}' timed out before the source code became available.",
+                "fetchFailed": "Failed to fetch custom element module '{{path}}' ({{status}}).",
+                "emptySource": "Custom element '{{name}}' did not provide renderable source code."
+            }
         }
     },
     "threadHistory": {

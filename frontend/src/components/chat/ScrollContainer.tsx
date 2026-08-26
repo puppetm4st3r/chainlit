@@ -12,6 +12,9 @@ import { useChatMessages } from '@chainlit/react-client';
 
 import { Button } from '@/components/ui/button';
 
+/** Distance from the bottom that still counts as "pinned" during streaming/layout growth. */
+const NEAR_BOTTOM_PX = 80;
+
 interface Props {
   autoScrollUserMessage?: boolean;
   autoScrollAssistantMessage?: boolean;
@@ -19,6 +22,9 @@ interface Props {
   children: React.ReactNode;
   className?: string;
 }
+
+const isNearBottom = (el: HTMLDivElement, thresholdPx = NEAR_BOTTOM_PX) =>
+  el.scrollTop + el.clientHeight >= el.scrollHeight - thresholdPx;
 
 export default function ScrollContainer({
   autoScrollRef,
@@ -28,11 +34,25 @@ export default function ScrollContainer({
   className
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const spacerRef = useRef<HTMLDivElement>(null);
   const lastUserMessageRef = useRef<HTMLDivElement | null>(null);
+  // Instant scrollTop writes fire `scroll`; ignore those so stick-to-bottom is not cleared mid-stream.
+  const programmaticScrollRef = useRef(false);
   const { messages } = useChatMessages();
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [isScrolling, setIsScrolling] = useState(false);
+
+  const applyStickToBottom = useCallback(() => {
+    if (!ref.current) return;
+    if (!autoScrollAssistantMessage || !autoScrollRef?.current) return;
+
+    programmaticScrollRef.current = true;
+    ref.current.scrollTop = ref.current.scrollHeight;
+    requestAnimationFrame(() => {
+      programmaticScrollRef.current = false;
+    });
+  }, [autoScrollAssistantMessage, autoScrollRef]);
 
   // Calculate and update spacer height
   const updateSpacerHeight = useCallback(() => {
@@ -65,13 +85,13 @@ export default function ScrollContainer({
       // Scroll to position the message at the top
       if (afterMessagesHeight === 0) {
         scrollToPosition();
-      } else if (autoScrollAssistantMessage && autoScrollRef?.current) {
-        ref.current.scrollTop = ref.current.scrollHeight;
+      } else {
+        applyStickToBottom();
       }
-    } else if (autoScrollAssistantMessage && autoScrollRef?.current) {
-      ref.current.scrollTop = ref.current.scrollHeight;
+    } else {
+      applyStickToBottom();
     }
-  }, [autoScrollUserMessage, autoScrollAssistantMessage, autoScrollRef]);
+  }, [applyStickToBottom, autoScrollUserMessage]);
 
   // Find and set a ref to the last user message element
   useEffect(() => {
@@ -115,16 +135,34 @@ export default function ScrollContainer({
     };
   }, [autoScrollUserMessage, updateSpacerHeight]);
 
+  // Follow content height changes that do not always retick `messages`
+  // (streamed markdown reflow, CoT accordion, CustomElement mount).
+  useEffect(() => {
+    const scrollEl = ref.current;
+    const contentEl = contentRef.current;
+    if (!scrollEl || !contentEl) return;
+
+    const observer = new ResizeObserver(() => {
+      if (autoScrollRef?.current) {
+        updateSpacerHeight();
+        return;
+      }
+      setShowScrollButton(!isNearBottom(scrollEl));
+    });
+
+    observer.observe(contentEl);
+    observer.observe(scrollEl);
+
+    return () => observer.disconnect();
+  }, [autoScrollRef, updateSpacerHeight]);
+
   // Check scroll position on mount
   useEffect(() => {
     if (!ref.current) return;
 
     setTimeout(() => {
       if (!ref.current) return;
-
-      const { scrollTop, scrollHeight, clientHeight } = ref.current;
-      const atBottom = scrollTop + clientHeight >= scrollHeight - 10;
-      setShowScrollButton(!atBottom);
+      setShowScrollButton(!isNearBottom(ref.current));
     }, 500);
   }, []);
 
@@ -139,10 +177,7 @@ export default function ScrollContainer({
       const currentScrollTop = ref.current.scrollTop;
       if (currentScrollTop === prevScrollTop) {
         setIsScrolling(false);
-
-        const { scrollTop, scrollHeight, clientHeight } = ref.current;
-        const atBottom = scrollTop + clientHeight >= scrollHeight - 10;
-        setShowScrollButton(!atBottom);
+        setShowScrollButton(!isNearBottom(ref.current));
       } else {
         checkScrollEnd();
       }
@@ -183,9 +218,9 @@ export default function ScrollContainer({
   };
 
   const handleScroll = () => {
-    if (!ref.current || isScrolling) return;
-    const { scrollTop, scrollHeight, clientHeight } = ref.current;
-    const atBottom = scrollTop + clientHeight >= scrollHeight - 10;
+    // Ignore smooth-scroll animation frames and our own stick-to-bottom writes.
+    if (!ref.current || isScrolling || programmaticScrollRef.current) return;
+    const atBottom = isNearBottom(ref.current);
 
     if (autoScrollRef) {
       autoScrollRef.current = atBottom;
@@ -201,7 +236,9 @@ export default function ScrollContainer({
         className={cn('flex flex-col flex-grow overflow-y-auto', className)}
         onScroll={handleScroll}
       >
-        {children}
+        <div ref={contentRef} className="flex flex-col flex-grow">
+          {children}
+        </div>
         {/* Dynamic spacer to position the last user message at the top */}
         <div ref={spacerRef} className="flex-shrink-0" />
       </div>
@@ -211,7 +248,7 @@ export default function ScrollContainer({
           <Button
             size="icon"
             variant="outline"
-            className="rounded-full"
+            className="rounded-full border-2"
             onClick={scrollToBottom}
           >
             <ArrowDown className="size-4" />

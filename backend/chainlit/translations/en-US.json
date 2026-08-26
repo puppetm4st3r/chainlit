@@ -150,9 +150,8 @@
             "customize": "Customize your chat settings here"
         },
         "workspace": {
-            "activePrimary": "File editing",
-            "activeSecondary": "Available",
-            "openEditorWord": "Open Word file editor"
+            "openEditorWord": "Open Word file editor",
+            "closeEditorWord": "Close Word file editor"
         },
         "watermark": "LLMs can make mistakes. Check important info.",
         "notifications": {
@@ -164,6 +163,16 @@
             "maximize": "Maximize",
             "restore": "Reduce size",
             "close": "Go to chat"
+        },
+        "userMessage": {
+            "fileCommandChip": "AI file task"
+        },
+        "customElement": {
+            "errors": {
+                "timeout": "Loading custom element '{{name}}' timed out before the source code became available.",
+                "fetchFailed": "Failed to fetch custom element module '{{path}}' ({{status}}).",
+                "emptySource": "Custom element '{{name}}' did not provide renderable source code."
+            }
         }
     },
     "threadHistory": {

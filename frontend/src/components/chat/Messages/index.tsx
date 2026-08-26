@@ -10,6 +10,7 @@ import {
 
 import BlinkingCursor from '@/components/BlinkingCursor';
 import { useLayoutMaxWidth } from 'hooks/useLayoutMaxWidth';
+import { isContentAssistantMessage } from '@/lib/assistantMessageActions';
 
 import { MessageSiblingsContext } from './MessageSiblingsContext';
 import { Message } from './Message';
@@ -52,14 +53,13 @@ const Messages = memo(
     const layoutMaxWidth = useLayoutMaxWidth();
     const { config } = useConfig();
     
+    // Action row targets the last content assistant, never Ask/action scaffolding.
     const lastAssistantMessage = useMemo(() => {
-      return messages.findLast((m) => m.type === 'assistant_message');
+      return messages.findLast(isContentAssistantMessage);
     }, [messages]);
 
     const lastScorableAssistantMessage = useMemo(() => {
-      return scorableRun?.steps?.findLast(
-        (m) => m.type === 'assistant_message'
-      );
+      return scorableRun?.steps?.findLast(isContentAssistantMessage);
     }, [scorableRun]);
 
     return (
@@ -144,9 +144,6 @@ const Messages = memo(
 
             // Show avatar for any COT that is running, regardless of steps
             const showCoTAvatar = isRunning && (isToolCallCoT || isHiddenCoT);
-            // Ignore on_chat_start for scorable run
-            const scorableRun =
-              !isRunning && m.name !== 'on_chat_start' ? m : undefined;
             return (
               <React.Fragment key={m.id}>
                 {m.steps?.length ? (
@@ -156,7 +153,9 @@ const Messages = memo(
                     actions={actions}
                     indent={indent}
                     isRunning={isRunning}
-                    scorableRun={scorableRun}
+                    // Every run owns its turn, including on_chat_start: workflows
+                    // that auto-start still produce content that must be scorable.
+                    scorableRun={m}
                   />
                 ) : null}
                 {showCoTAvatar && m.name !== 'on_chat_start' && !m.steps?.length ? (

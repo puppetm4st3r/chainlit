@@ -140,9 +140,8 @@
             "customize": "Tilpas dine chatindstillinger her"
         },
         "workspace": {
-            "activePrimary": "Filredigering",
-            "activeSecondary": "Tilgængelig",
-            "openEditorWord": "Åbn Word-fileditor"
+            "openEditorWord": "Åbn Word-fileditor",
+            "closeEditorWord": "Close Word file editor"
         },
         "watermark": "Bygget med",
         "notifications": {
@@ -154,6 +153,16 @@
             "maximize": "Maximize",
             "restore": "Reduce size",
             "close": "Go to chat"
+        },
+        "userMessage": {
+            "fileCommandChip": "AI-filopgave"
+        },
+        "customElement": {
+            "errors": {
+                "timeout": "Loading custom element '{{name}}' timed out before the source code became available.",
+                "fetchFailed": "Failed to fetch custom element module '{{path}}' ({{status}}).",
+                "emptySource": "Custom element '{{name}}' did not provide renderable source code."
+            }
         }
     },
     "threadHistory": {

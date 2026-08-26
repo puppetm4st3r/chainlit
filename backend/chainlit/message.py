@@ -342,6 +342,12 @@ class ErrorMessage(MessageBase):
 
 
 class AskMessageBase(MessageBase):
+    def _mark_as_assistant_interaction(self) -> None:
+        """Tag Ask/action prompts so the UI never attaches the content icon group."""
+        metadata = dict(self.metadata or {})
+        metadata["assistantInteraction"] = True
+        self.metadata = metadata
+
     async def remove(self):
         removed = await super().remove()
         if removed:
@@ -390,6 +396,7 @@ class AskUserMessage(AskMessageBase):
         if self.streaming:
             self.streaming = False
 
+        self._mark_as_assistant_interaction()
         self.wait_for_answer = True
 
         step_dict = await self._create()
@@ -457,6 +464,7 @@ class AskFileMessage(AskMessageBase):
         if config.code.author_rename:
             self.author = await config.code.author_rename(self.author)
 
+        self._mark_as_assistant_interaction()
         self.wait_for_answer = True
 
         step_dict = await self._create()
@@ -527,6 +535,7 @@ class AskActionMessage(AskMessageBase):
         if config.code.author_rename:
             self.author = await config.code.author_rename(self.author)
 
+        self._mark_as_assistant_interaction()
         self.wait_for_answer = True
 
         step_dict = await self._create()
@@ -597,6 +606,7 @@ class AskElementMessage(AskMessageBase):
         if config.code.author_rename:
             self.author = await config.code.author_rename(self.author)
 
+        self._mark_as_assistant_interaction()
         self.wait_for_answer = True
         ephemeral = self._is_ephemeral_ask()
 

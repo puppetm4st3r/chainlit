@@ -652,6 +652,66 @@ def test_upload_file_disabled(
     assert response.status_code == 400
 
 
+def test_upload_file_runtime_override_enables_disabled_toml(
+    test_client: TestClient,
+    test_config: ChainlitConfig,
+    mock_session_get_by_id_patched: Mock,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """Session override True must allow upload when TOML has enabled=False but a complete spec."""
+    monkeypatch.setattr(
+        test_config.features,
+        "spontaneous_file_upload",
+        SpontaneousFileUploadFeature(
+            enabled=False,
+            accept=["text/plain"],
+            max_files=1,
+            max_size_mb=1,
+        ),
+    )
+    mock_session_get_by_id_patched.spontaneous_file_upload_enabled_override = True
+    file_content = b"Sample file content"
+    mock_session_get_by_id_patched.persist_file = AsyncMock(
+        return_value={
+            "id": "mocked_file_id",
+            "name": "test_upload.txt",
+            "type": "text/plain",
+            "size": len(file_content),
+        }
+    )
+
+    response = test_client.post(
+        "/project/file",
+        files={"file": ("test_upload.txt", file_content, "text/plain")},
+        params={"session_id": mock_session_get_by_id_patched.id},
+    )
+
+    assert response.status_code == 200
+
+
+def test_upload_file_runtime_override_disables_enabled_toml(
+    test_client: TestClient,
+    test_config: ChainlitConfig,
+    mock_session_get_by_id_patched: Mock,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """Session override False must reject upload even when TOML has enabled=True."""
+    monkeypatch.setattr(
+        test_config.features,
+        "spontaneous_file_upload",
+        SpontaneousFileUploadFeature(enabled=True, accept=["text/plain"]),
+    )
+    mock_session_get_by_id_patched.spontaneous_file_upload_enabled_override = False
+
+    response = test_client.post(
+        "/project/file",
+        files={"file": ("test_upload.txt", b"Sample file content", "text/plain")},
+        params={"session_id": mock_session_get_by_id_patched.id},
+    )
+
+    assert response.status_code == 400
+
+
 @pytest.mark.parametrize(
     ("accept_pattern", "mime_type", "expected_status"),
     [

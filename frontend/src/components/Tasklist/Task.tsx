@@ -1,4 +1,5 @@
 import { Markdown } from '@/components/Markdown';
+import { memo } from 'react';
 
 import { TaskStatusIcon } from './TaskStatusIcon';
 
@@ -20,6 +21,42 @@ interface TaskProps {
   latex?: boolean;
 }
 
+interface TaskTitleProps {
+  title: string;
+  allowHtml?: boolean;
+  latex?: boolean;
+}
+
+/** Cheap gate: Hybrid RAG / plain titles skip the full remark pipeline. */
+const MARKDOWN_HINT_RE = /[*_`#[\]|>~]|https?:\/\/|^\s*[-+]\s|\n/;
+
+/**
+ * Markdown title isolated from status-icon updates so TaskList progress pulses
+ * do not re-parse every row on each SWR snapshot. Plain strings render as text.
+ */
+const TaskTitle = memo(function TaskTitle({
+  title,
+  allowHtml,
+  latex
+}: TaskTitleProps) {
+  const titleClassName =
+    'task-title max-w-none prose-sm text-xs text-left break-words font-normal [&_*]:font-normal [&_*]:text-xs [&_p]:m-0 [&_p]:leading-snug [&_div]:leading-snug [&_div]:mt-0';
+
+  if (!allowHtml && !latex && !MARKDOWN_HINT_RE.test(title)) {
+    return (
+      <div className={titleClassName}>
+        <p className="m-0 leading-snug">{title}</p>
+      </div>
+    );
+  }
+
+  return (
+    <Markdown allowHtml={allowHtml} latex={latex} className={titleClassName}>
+      {title}
+    </Markdown>
+  );
+});
+
 /**
  * One TaskList row: status icon + title.
  *
@@ -27,7 +64,7 @@ interface TaskProps {
  * completed/done → foreground; every other status → muted. Do not set Tailwind
  * color / text-inherit utilities here — they fight Markdown ``prose``.
  */
-export const Task = ({ task, allowHtml, latex }: TaskProps) => {
+export const Task = memo(function Task({ task, allowHtml, latex }: TaskProps) {
   const handleClick = () => {
     if (task.forId) {
       const parent = document.getElementById(`step-${task.forId}`);
@@ -67,15 +104,13 @@ export const Task = ({ task, allowHtml, latex }: TaskProps) => {
           <TaskStatusIcon status={task.status} />
         </div>
         <div className="min-w-0">
-          <Markdown
+          <TaskTitle
+            title={task.title}
             allowHtml={allowHtml}
             latex={latex}
-            className="task-title max-w-none prose-sm text-xs text-left break-words font-normal [&_*]:font-normal [&_*]:text-xs [&_p]:m-0 [&_p]:leading-snug [&_div]:leading-snug [&_div]:mt-0"
-          >
-            {task.title}
-          </Markdown>
+          />
         </div>
       </div>
     </div>
   );
-};
+});

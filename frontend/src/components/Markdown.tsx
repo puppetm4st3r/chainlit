@@ -2,6 +2,7 @@ import { cn } from '@/lib/utils';
 import { omit } from 'lodash';
 import {
   type ReactNode,
+  memo,
   useContext,
   useEffect,
   useLayoutEffect,
@@ -464,7 +465,8 @@ function ReferenceTooltipBody({
   );
 }
 
-function ConversationReferenceTooltipLayer() {
+const ConversationReferenceTooltipLayer = memo(
+  function ConversationReferenceTooltipLayer() {
   const tooltipRef = useRef<HTMLDivElement | null>(null);
   const closeTimerRef = useRef<number | null>(null);
   const [activeTooltip, setActiveTooltip] = useState<{
@@ -585,12 +587,23 @@ function ConversationReferenceTooltipLayer() {
       setActiveTooltip(null);
     };
     /**
-     * Any scroll outside the tooltip portal closes it immediately.
-     * Internal tooltip list scroll is allowed and must not dismiss.
+     * Dismiss only when a scroll container that contains the message anchor
+     * moves (conversation stick-to-bottom / user chat scroll). Side panels such
+     * as TaskList autoscroll on their own and must not kill the open tooltip.
+     * Internal tooltip list scroll stays allowed.
      */
     const handleScroll = (event: Event) => {
       const scrollTarget = event.target;
-      if (scrollTarget instanceof Node && tooltipRef.current?.contains(scrollTarget)) {
+      if (!(scrollTarget instanceof Node)) {
+        return;
+      }
+      if (tooltipRef.current?.contains(scrollTarget)) {
+        return;
+      }
+      if (
+        scrollTarget instanceof Element &&
+        !scrollTarget.contains(anchorElement)
+      ) {
         return;
       }
       dismissImmediately();
@@ -657,7 +670,7 @@ function ConversationReferenceTooltipLayer() {
     </div>,
     document.body
   );
-}
+});
 
 function ConversationReferenceLink({
   tooltip,
@@ -834,41 +847,39 @@ const Markdown = ({
   }, [latex]);
 
   return (
-    <>
-      <ConversationReferenceTooltipLayer />
-      <div className={cn('prose lg:prose-xl', className)}>
-        <ReactMarkdown
-          remarkPlugins={remarkPlugins}
-          rehypePlugins={rehypePlugins}
-          components={{
-        ...alertComponents, // add alert components
-        code(props) {
-          return (
-            <code
-              {...omit(props, ['node'])}
-              className="relative rounded bg-[hsl(var(--markdown-code-bg))] px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold"
-            />
-          );
-        },
-        pre({ children, ...props }: any) {
-          return <CodeSnippet {...props} />;
-        },
-        a({ children, href, ...props }) {
-          const name = children as string;
-          // Prefer #element:NAME (floating chips with human labels), then name match,
-          // then #link:KEY for conversation reference links.
-          let element: IMessageElement | undefined;
-          if (typeof href === 'string' && href.startsWith('#element:')) {
-            const elementName = decodeURIComponent(href.slice('#element:'.length));
-            element = referenceElementsByName.get(elementName);
-          }
-          if (!element) {
-            element = referenceElementsByName.get(name);
-          }
-          if (!element && typeof href === 'string' && href.startsWith('#link:')) {
-            const key = href.replace('#link:', '');
-            element = referenceLinkElementsByKey.get(key);
-          }
+    <div className={cn('prose lg:prose-xl', className)}>
+      <ReactMarkdown
+        remarkPlugins={remarkPlugins}
+        rehypePlugins={rehypePlugins}
+        components={{
+      ...alertComponents, // add alert components
+      code(props) {
+        return (
+          <code
+            {...omit(props, ['node'])}
+            className="relative rounded bg-[hsl(var(--markdown-code-bg))] px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold"
+          />
+        );
+      },
+      pre({ children, ...props }: any) {
+        return <CodeSnippet {...props} />;
+      },
+      a({ children, href, ...props }) {
+        const name = children as string;
+        // Prefer #element:NAME (floating chips with human labels), then name match,
+        // then #link:KEY for conversation reference links.
+        let element: IMessageElement | undefined;
+        if (typeof href === 'string' && href.startsWith('#element:')) {
+          const elementName = decodeURIComponent(href.slice('#element:'.length));
+          element = referenceElementsByName.get(elementName);
+        }
+        if (!element) {
+          element = referenceElementsByName.get(name);
+        }
+        if (!element && typeof href === 'string' && href.startsWith('#link:')) {
+          const key = href.replace('#link:', '');
+          element = referenceLinkElementsByKey.get(key);
+        }
           if (element) {
             if ((element as any).type === 'link') {
               const anyEl = element as any;
@@ -1085,9 +1096,8 @@ const Markdown = ({
         >
           {children}
         </ReactMarkdown>
-      </div>
-    </>
+    </div>
   );
 };
 
-export { Markdown };
+export { ConversationReferenceTooltipLayer, Markdown };

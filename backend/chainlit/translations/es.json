@@ -145,9 +145,8 @@
             "customize": "Personaliza la configuración de tu chat aquí"
         },
         "workspace": {
-            "activePrimary": "Edición de archivos",
-            "activeSecondary": "Disponible",
-            "openEditorWord": "Abrir editor de archivos word"
+            "openEditorWord": "Abrir editor de archivos word",
+            "closeEditorWord": "Cerrar editor de archivos word"
         },
         "watermark": "Los LLM pueden cometer errores. Verifica la información importante.",
         "notifications": {
@@ -159,6 +158,16 @@
             "maximize": "Maximizar",
             "restore": "Reducir tamaño",
             "close": "Ir al chat"
+        },
+        "userMessage": {
+            "fileCommandChip": "Tarea de IA"
+        },
+        "customElement": {
+            "errors": {
+                "timeout": "La carga del elemento personalizado '{{name}}' agotó el tiempo de espera antes de obtener el código fuente.",
+                "fetchFailed": "No se pudo obtener el módulo del elemento personalizado '{{path}}' ({{status}}).",
+                "emptySource": "El elemento personalizado '{{name}}' no proporcionó código fuente renderizable."
+            }
         }
     },
     "threadHistory": {

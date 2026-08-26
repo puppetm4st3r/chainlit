@@ -141,9 +141,8 @@
             "customize": "ಈಗ ನಿಮ್ಮ ಚಾಟ್ ಸೆಟ್ಟಿಂಗ್‌ಗಳನ್ನು ಕಸ್ಟಮೈಸ್ ಮಾಡಿ"
         },
         "workspace": {
-            "activePrimary": "ಫೈಲ್ ಸಂಪಾದನೆ",
-            "activeSecondary": "ಲಭ್ಯ",
-            "openEditorWord": "Word ಫೈಲ್ ಸಂಪಾದಕವನ್ನು ತೆರೆಯಿರಿ"
+            "openEditorWord": "Word ಫೈಲ್ ಸಂಪಾದಕವನ್ನು ತೆರೆಯಿರಿ",
+            "closeEditorWord": "Close Word file editor"
         },
         "watermark": "LLM ಗಳು ತಪ್ಪುಗಳನ್ನು ಮಾಡಬಹುದು. ಪ್ರಮುಖ ಮಾಹಿತಿಯನ್ನು ಪರಿಶೀಲಿಸುವುದನ್ನು ಪರಿಗಣಿಸಿ.",
         "notifications": {
@@ -155,6 +154,16 @@
             "maximize": "Maximize",
             "restore": "Reduce size",
             "close": "Go to chat"
+        },
+        "userMessage": {
+            "fileCommandChip": "AI ಫೈಲ್ ಕಾರ್ಯ"
+        },
+        "customElement": {
+            "errors": {
+                "timeout": "Loading custom element '{{name}}' timed out before the source code became available.",
+                "fetchFailed": "Failed to fetch custom element module '{{path}}' ({{status}}).",
+                "emptySource": "Custom element '{{name}}' did not provide renderable source code."
+            }
         }
     },
     "threadHistory": {

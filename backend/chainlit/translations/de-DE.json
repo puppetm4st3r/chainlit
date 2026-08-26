@@ -141,9 +141,8 @@
             "customize": "Passe die Chat Einstellungen hier an"
         },
         "workspace": {
-            "activePrimary": "Dateibearbeitung",
-            "activeSecondary": "Verfügbar",
-            "openEditorWord": "Word-Datei-Editor öffnen"
+            "openEditorWord": "Word-Datei-Editor öffnen",
+            "closeEditorWord": "Word-Datei-Editor schließen"
         },
         "watermark": "LLMs können Fehler machen. Überprüfe bitte stets die Inhalte.",
         "notifications": {
@@ -155,6 +154,16 @@
             "maximize": "Maximieren",
             "restore": "Größe reduzieren",
             "close": "Zum Chat"
+        },
+        "userMessage": {
+            "fileCommandChip": "KI-Dateiaufgabe"
+        },
+        "customElement": {
+            "errors": {
+                "timeout": "Das Laden des Custom Elements '{{name}}' ist abgelaufen, bevor der Quellcode verfügbar war.",
+                "fetchFailed": "Custom-Element-Modul '{{path}}' konnte nicht geladen werden ({{status}}).",
+                "emptySource": "Custom Element '{{name}}' hat keinen darstellbaren Quellcode bereitgestellt."
+            }
         }
     },
     "threadHistory": {

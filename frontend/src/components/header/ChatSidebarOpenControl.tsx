@@ -23,7 +23,7 @@ export default function ChatSidebarOpenControl() {
   }
 
   return (
-    <div className="pointer-events-auto absolute left-2 top-2 z-30 flex flex-row items-center gap-1">
+    <div className="pointer-events-auto absolute left-2 top-2 z-30 flex flex-row items-center gap-0.5 rounded-[4px] border border-border bg-background p-0.5">
       <SidebarTrigger />
       <WorkspaceEditorButton />
       <NewChatButton navigate={navigate} />

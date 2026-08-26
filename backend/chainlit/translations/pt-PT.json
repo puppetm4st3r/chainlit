@@ -141,9 +141,8 @@
             "customize": "Personalize aqui as configurações do seu chat"
         },
         "workspace": {
-            "activePrimary": "Edição de ficheiros",
-            "activeSecondary": "Disponível",
-            "openEditorWord": "Abrir editor de ficheiros Word"
+            "openEditorWord": "Abrir editor de ficheiros Word",
+            "closeEditorWord": "Fechar editor de ficheiros Word"
         },
         "watermark": "Os modelos de linguagem podem cometer erros. Verifique sempre informações importantes.",
         "notifications": {
@@ -155,6 +154,16 @@
             "maximize": "Maximizar",
             "restore": "Reduzir tamanho",
             "close": "Ir para o chat"
+        },
+        "userMessage": {
+            "fileCommandChip": "Tarefa de IA no ficheiro"
+        },
+        "customElement": {
+            "errors": {
+                "timeout": "O carregamento do elemento personalizado '{{name}}' excedeu o tempo limite antes de o código-fonte ficar disponível.",
+                "fetchFailed": "Falha ao obter o módulo do elemento personalizado '{{path}}' ({{status}}).",
+                "emptySource": "O elemento personalizado '{{name}}' não forneceu código-fonte renderizável."
+            }
         }
     },
     "threadHistory": {

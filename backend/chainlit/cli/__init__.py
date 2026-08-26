@@ -107,6 +107,10 @@ def run_chainlit(target: str):
             ws_per_message_deflate=ws_per_message_deflate,
             ssl_keyfile=ssl_keyfile,
             ssl_certfile=ssl_certfile,
+            # Protocol pings race with debug-event writes in websockets' drain
+            # helper and abort the stream. App-level ping/pong keeps the socket.
+            ws_ping_interval=None,
+            ws_ping_timeout=None,
         )
         server = uvicorn.Server(config)
         await server.serve()

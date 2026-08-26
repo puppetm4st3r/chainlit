@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils';
 import { X } from 'lucide-react';
-import { useEffect, useLayoutEffect, useRef } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import { useRecoilValue } from 'recoil';
 import useSWR from 'swr';
 
@@ -178,20 +178,12 @@ const TaskList = ({ isMobile, isCopilot }: TaskListProps) => {
   const allowHtml = config?.features?.unsafe_allow_html;
   const latex = config?.features?.latex;
 
-  const { error, data, isLoading, mutate } = useSWR<ITaskList>(
-    tasklist?.url,
-    fetcher,
-    {
-      keepPreviousData: true
-    }
-  );
+  const { error, data, isLoading } = useSWR<ITaskList>(tasklist?.url, fetcher, {
+    keepPreviousData: true
+  });
 
-  // Revalidate when the socket delivers a new tasklist element (same file id,
-  // possibly cache-busted URL). Keeps the sidebar in sync with progressive send().
-  useEffect(() => {
-    if (!tasklist?.url) return;
-    void mutate();
-  }, [tasklist, mutate]);
+  // Socket updates already cache-bust `tasklist.url` (`_ts=…`), which changes the
+  // SWR key and refetches once. Do not call mutate() again on the same tick.
 
   const content = data as ITaskList | undefined;
   const tasks = content?.tasks;
@@ -264,7 +256,7 @@ const TaskList = ({ isMobile, isCopilot }: TaskListProps) => {
     if (nextTop <= el.scrollTop) {
       return;
     }
-    el.scrollTo({ top: nextTop, behavior: 'smooth' });
+    el.scrollTo({ top: nextTop, behavior: 'auto' });
   }, [tasklist?.id, tasklist?.url, tasks]);
 
   if (!tasklist?.url) return null;
@@ -341,7 +333,7 @@ const TaskList = ({ isMobile, isCopilot }: TaskListProps) => {
           >
             {tasks?.map((task, index) => (
               <Task
-                key={index}
+                key={task.forId || `${index}:${task.title}`}
                 task={task}
                 allowHtml={allowHtml}
                 latex={latex}

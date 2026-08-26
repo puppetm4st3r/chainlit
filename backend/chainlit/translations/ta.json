@@ -141,9 +141,8 @@
             "customize": "உங்கள் உரையாடல் அமைப்புகளை இங்கே தனிப்பயனாக்கவும்"
         },
         "workspace": {
-            "activePrimary": "கோப்பு திருத்தம்",
-            "activeSecondary": "கிடைக்கும்",
-            "openEditorWord": "Word கோப்பு தொகுப்பியைத் திறக்கவும்"
+            "openEditorWord": "Word கோப்பு தொகுப்பியைத் திறக்கவும்",
+            "closeEditorWord": "Close Word file editor"
         },
         "watermark": "LLM கள் தவறுகள் செய்யலாம். முக்கியமான தகவல்களைச் சரிபார்ப்பதைக் கருத்தில் கொள்ளுங்கள்.",
         "notifications": {
@@ -155,6 +154,16 @@
             "maximize": "Maximize",
             "restore": "Reduce size",
             "close": "Go to chat"
+        },
+        "userMessage": {
+            "fileCommandChip": "AI கோப்பு பணி"
+        },
+        "customElement": {
+            "errors": {
+                "timeout": "Loading custom element '{{name}}' timed out before the source code became available.",
+                "fetchFailed": "Failed to fetch custom element module '{{path}}' ({{status}}).",
+                "emptySource": "Custom element '{{name}}' did not provide renderable source code."
+            }
         }
     },
     "threadHistory": {

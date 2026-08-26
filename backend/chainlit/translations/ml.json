@@ -141,9 +141,8 @@
             "customize": "ഈ സമയം നിങ്ങളുടെ ചാറ്റ് ക്രമീകരണങ്ങൾ കസ്റ്റമൈസ് ചെയ്യുക"
         },
         "workspace": {
-            "activePrimary": "ഫയൽ തിരുത്തൽ",
-            "activeSecondary": "ലഭ്യം",
-            "openEditorWord": "Word ഫയൽ എഡിറ്റർ തുറക്കുക"
+            "openEditorWord": "Word ഫയൽ എഡിറ്റർ തുറക്കുക",
+            "closeEditorWord": "Close Word file editor"
         },
         "watermark": "LLM കൾക്ക് തെറ്റുകൾ വരുത്താം. പ്രധാനപ്പെട്ട വിവരങ്ങൾ പരിശോധിക്കുന്നത് പരിഗണിക്കുക.",
         "notifications": {
@@ -155,6 +154,16 @@
             "maximize": "Maximize",
             "restore": "Reduce size",
             "close": "Go to chat"
+        },
+        "userMessage": {
+            "fileCommandChip": "AI ഫയൽ ടാസ്ക്"
+        },
+        "customElement": {
+            "errors": {
+                "timeout": "Loading custom element '{{name}}' timed out before the source code became available.",
+                "fetchFailed": "Failed to fetch custom element module '{{path}}' ({{status}}).",
+                "emptySource": "Custom element '{{name}}' did not provide renderable source code."
+            }
         }
     },
     "threadHistory": {

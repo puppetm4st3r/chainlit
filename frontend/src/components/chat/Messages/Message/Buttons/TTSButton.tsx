@@ -114,7 +114,10 @@ interface Props {
 
 /**
  * Play Text-to-Speech for an assistant message using Microsoft Edge TTS.
- * Uses the browser entrypoint from @edge-tts/universal to prevent bundler conflicts.
+ * Uses the browser entrypoint from `@edge-tts/universal` to prevent bundler conflicts.
+ *
+ * Not currently mounted in `MessageButtons` — Edge TTS playback is unreliable in
+ * this deployment. Keep this module so the control can be re-enabled when fixed.
  */
 export function TTSButton({ message, voiceName, elements }: Props) {
   const { config } = useConfig();

@@ -26,6 +26,7 @@ import {
   TooltipProvider,
   TooltipTrigger
 } from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 
 interface FeedbackButtonsProps {
   message: IStep;
@@ -107,13 +108,20 @@ export function FeedbackButtons({ message }: FeedbackButtonsProps) {
               size="icon"
               disabled={isDisabled}
               onClick={() => handleFeedbackClick(1)}
-              className={
-                feedback === 1
-                  ? 'text-green-600 positive-feedback-on'
-                  : 'text-muted-foreground positive-feedback-off'
-              }
+              className={cn(
+                'group/feedback',
+                feedback === 1 ? 'positive-feedback-on' : 'positive-feedback-off'
+              )}
             >
-              <ThumbsUp className="h-4 w-4" />
+              <ThumbsUp
+                className={cn(
+                  'h-4 w-4',
+                  // Color lives on the SVG so Button ghost hover:text-* cannot wash it out.
+                  feedback === 1
+                    ? '!text-[hsl(var(--feedback-positive-strong))]'
+                    : '!text-[hsl(var(--feedback-positive))] group-hover/feedback:!text-[hsl(var(--feedback-positive-strong))] group-focus-visible/feedback:!text-[hsl(var(--feedback-positive-strong))]'
+                )}
+              />
             </Button>
           </TooltipTrigger>
           <TooltipContent>
@@ -128,13 +136,19 @@ export function FeedbackButtons({ message }: FeedbackButtonsProps) {
               size="icon"
               disabled={isDisabled}
               onClick={() => handleFeedbackClick(0)}
-              className={
-                feedback === 0
-                  ? 'text-red-600 negative-feedback-on'
-                  : 'text-muted-foreground negative-feedback-off'
-              }
+              className={cn(
+                'group/feedback',
+                feedback === 0 ? 'negative-feedback-on' : 'negative-feedback-off'
+              )}
             >
-              <ThumbsDown />
+              <ThumbsDown
+                className={cn(
+                  'h-4 w-4',
+                  feedback === 0
+                    ? '!text-[hsl(var(--feedback-negative-strong))]'
+                    : '!text-[hsl(var(--feedback-negative))] group-hover/feedback:!text-[hsl(var(--feedback-negative-strong))] group-focus-visible/feedback:!text-[hsl(var(--feedback-negative-strong))]'
+                )}
+              />
             </Button>
           </TooltipTrigger>
           <TooltipContent>
@@ -149,6 +163,7 @@ export function FeedbackButtons({ message }: FeedbackButtonsProps) {
                 variant="ghost"
                 size="icon"
                 disabled={isDisabled}
+                className="text-muted-foreground"
                 onClick={() => {
                   setShowDialog(feedback);
                   setCommentInput(comment);

@@ -1,4 +1,5 @@
 import { TOptions } from 'i18next';
+import { useCallback } from 'react';
 import { useTranslation as usei18nextTranslation } from 'react-i18next';
 
 import { Skeleton } from '@/components/ui/skeleton';
@@ -47,17 +48,26 @@ const Translator = ({ path, options, suffix }: TranslatorProps) => {
   );
 };
 
+/**
+ * App-facing translator hook. `t` is identity-stable across renders so it is
+ * safe in effect dependency lists; only language / i18n instance changes renew it.
+ */
 export const useTranslation = () => {
   const { t, ready, i18n } = usei18nextTranslation();
 
-  return {
-    t: (path: TranslationKey, options?: TranslationOptions) => {
+  const translate = useCallback(
+    (path: TranslationKey, options?: TranslationOptions) => {
       if (!i18n.exists(path, options)) {
         return '...';
       }
 
       return toText(t(path, options));
     },
+    [i18n, t]
+  );
+
+  return {
+    t: translate,
     ready,
     i18n
   };

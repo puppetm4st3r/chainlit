@@ -483,7 +483,10 @@ class TestAskUserMessage:
 
                     assert result == {"output": "Answer"}
                     assert msg.wait_for_answer is False
+                    assert msg.metadata == {"assistantInteraction": True}
                     ctx.emitter.send_ask_user.assert_called_once()
+                    ask_payload = ctx.emitter.send_ask_user.call_args.args[0]
+                    assert ask_payload["metadata"]["assistantInteraction"] is True
 
 
 class TestAskFileMessage:
@@ -594,6 +597,7 @@ class TestAskActionMessage:
 
                         assert result == {"id": "action_123", "label": "Confirm"}
                         assert msg.content == "**Selected:** Confirm"
+                        assert msg.metadata == {"assistantInteraction": True}
                         action.send.assert_called_once()
                         action.remove.assert_called_once()
 
@@ -728,7 +732,7 @@ class TestAskElementMessage:
             ctx.emitter.delete_step.assert_called_once()
             ask_spec = ctx.emitter.send_ask_user.await_args.args[1]
             assert ask_spec.ephemeral is True
-            assert msg.metadata in (None, {})
+            assert msg.metadata == {"assistantInteraction": True}
 
 
 class TestMessageEdgeCases:

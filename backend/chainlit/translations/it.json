@@ -141,9 +141,8 @@
             "customize": "Personalizza le impostazioni della tua chat qui"
         },
         "workspace": {
-            "activePrimary": "Modifica file",
-            "activeSecondary": "Disponibile",
-            "openEditorWord": "Apri l'editor di file Word"
+            "openEditorWord": "Apri l'editor di file Word",
+            "closeEditorWord": "Chiudi l’editor di file Word"
         },
         "watermark": "Gli LLMS possono commettere errori. Verifica le info importanti.",
         "notifications": {
@@ -155,6 +154,16 @@
             "maximize": "Ingrandisci",
             "restore": "Riduci dimensioni",
             "close": "Vai alla chat"
+        },
+        "userMessage": {
+            "fileCommandChip": "Attività IA sul file"
+        },
+        "customElement": {
+            "errors": {
+                "timeout": "Il caricamento dell'elemento personalizzato '{{name}}' è scaduto prima che il codice sorgente fosse disponibile.",
+                "fetchFailed": "Impossibile recuperare il modulo dell'elemento personalizzato '{{path}}' ({{status}}).",
+                "emptySource": "L'elemento personalizzato '{{name}}' non ha fornito codice sorgente visualizzabile."
+            }
         }
     },
     "threadHistory": {

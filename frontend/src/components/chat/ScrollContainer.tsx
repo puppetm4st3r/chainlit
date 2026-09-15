@@ -142,18 +142,28 @@ export default function ScrollContainer({
     const contentEl = contentRef.current;
     if (!scrollEl || !contentEl) return;
 
-    const observer = new ResizeObserver(() => {
+    let frame = 0;
+    const flushResize = () => {
+      frame = 0;
       if (autoScrollRef?.current) {
         updateSpacerHeight();
         return;
       }
       setShowScrollButton(!isNearBottom(scrollEl));
+    };
+
+    const observer = new ResizeObserver(() => {
+      if (frame) return;
+      frame = requestAnimationFrame(flushResize);
     });
 
     observer.observe(contentEl);
     observer.observe(scrollEl);
 
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      if (frame) cancelAnimationFrame(frame);
+    };
   }, [autoScrollRef, updateSpacerHeight]);
 
   // Check scroll position on mount

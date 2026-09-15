@@ -20,7 +20,7 @@ import { dispatchCanvasShellCloseRequest } from '@/lib/canvas';
 /**
  * Icon-only toggle for the active document workspace editor.
  * Placed to the left of the new-thread action; uses a file icon to stay
- * distinct from the MessageSquarePlus new-chat glyph.
+ * distinct from the ChatCircleText new-chat glyph.
  * Open path posts `canvas:open_active_workspace`; close reuses the side-view
  * X path (dismiss + shell close request) so the widget can flush content.
  */

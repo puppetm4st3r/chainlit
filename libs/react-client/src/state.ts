@@ -18,7 +18,6 @@ import {
   IStep,
   ITasklistElement,
   IUser,
-  IWorkflowHelp,
   ThreadHistory
 } from './types';
 import { groupByDate } from './utils/group';
@@ -330,11 +329,6 @@ export const documentWorkspaceState = atom<
   | undefined
 >({
   key: 'DocumentWorkspaceState',
-  default: undefined
-});
-
-export const workflowHelpState = atom<IWorkflowHelp | undefined>({
-  key: 'WorkflowHelpState',
   default: undefined
 });
 

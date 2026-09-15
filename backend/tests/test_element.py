@@ -13,11 +13,13 @@ from chainlit.element import (
     File,
     Image,
     Pdf,
+    SOCKET_CUSTOM_PROPS_DEFERRED_KEY,
     Task,
     TaskList,
     TaskStatus,
     Text,
     Video,
+    socket_safe_custom_element_props,
 )
 
 
@@ -552,6 +554,50 @@ class TestCustomElement:
             assert custom.start_maximized is True
             assert custom.to_dict()["showReopenChip"] is True
             assert custom.to_dict()["startMaximized"] is True
+
+    async def test_custom_element_keeps_small_props_on_the_socket(
+        self, mock_chainlit_context
+    ):
+        """Small CustomElement props stay inline so Motd and tables do not refetch."""
+        async with mock_chainlit_context:
+            props = {"title": "Informe", "type": "mermaid", "content": "graph TD;"}
+            custom = CustomElement(name="ArtifactPreview", props=props)
+
+            emitted = custom.to_dict()["props"]
+
+            assert emitted == props
+            assert SOCKET_CUSTOM_PROPS_DEFERRED_KEY not in emitted
+
+    async def test_custom_element_defers_oversized_props_from_the_socket(
+        self, mock_chainlit_context
+    ):
+        """PDF data URLs must not ride the element event or the reopen chip is dropped."""
+        async with mock_chainlit_context:
+            body = "data:application/pdf;base64," + ("A" * 250_000)
+            props = {
+                "title": "Informe anual",
+                "type": "pdf",
+                "identifier": "informe",
+                "content": body,
+                "revision": 2,
+            }
+            custom = CustomElement(
+                name="ArtifactPreview",
+                display="floating",
+                show_reopen_chip=True,
+                start_maximized=True,
+                props=props,
+            )
+            emitted = custom.to_dict()["props"]
+
+            assert emitted["title"] == "Informe anual"
+            assert emitted["type"] == "pdf"
+            assert emitted[SOCKET_CUSTOM_PROPS_DEFERRED_KEY] is True
+            assert "content" not in emitted
+            assert custom.props["content"] == body
+            assert socket_safe_custom_element_props(props)[
+                SOCKET_CUSTOM_PROPS_DEFERRED_KEY
+            ]
 
     async def test_custom_element_floating_requires_name(self, mock_chainlit_context):
         """display='floating' requires a non-empty CustomElement name."""

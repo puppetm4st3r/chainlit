@@ -105,17 +105,12 @@ const UserMessage = memo(function UserMessage({
         )}
         <div
           className={cn(
-            'px-5 py-2.5 relative bg-accent dark:bg-card rounded-2xl border',
+            'px-5 py-2.5 relative bg-accent dark:bg-card rounded-2xl',
             inlineElements.length ? 'rounded-tr-lg' : '',
             isEditing ? 'w-full flex-grow' : 'max-w-[70%] flex-grow-0',
             editable ? '' : 'ml-auto',
-            showFileCommandChip && 'px-3 py-2 bg-transparent dark:bg-transparent border-none'
+            showFileCommandChip && 'px-3 py-2 bg-transparent dark:bg-transparent'
           )}
-          style={
-            showFileCommandChip
-              ? undefined
-              : { borderColor: 'hsl(var(--accent-border))' }
-          }
         >
           {isEditing ? (
             <div className="bg-accent flex flex-col">

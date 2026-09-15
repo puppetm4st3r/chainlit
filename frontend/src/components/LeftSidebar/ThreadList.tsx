@@ -503,7 +503,7 @@ export function ThreadList({
         }}
         onMoved={handleThreadMoved}
       />
-      <TooltipProvider delayDuration={300}>
+      <TooltipProvider>
         {sortedTimeGroupKeys.map((group, groupIndex) => {
           const items = filteredTimeGroupedThreads![group];
           const groupCollapsed = isGroupCollapsed(group);
@@ -616,7 +616,7 @@ export function ThreadList({
                                 </SidebarMenuButton>
                               </Link>
                             </TooltipTrigger>
-                            <TooltipContent side="right" align="center">
+                            <TooltipContent side="right" align="center" whenOverflow>
                               <p>{thread.name}</p>
                             </TooltipContent>
                           </Tooltip>

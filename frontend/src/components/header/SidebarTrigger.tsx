@@ -21,7 +21,7 @@ export default function SidebarTrigger() {
   }
 
   return (
-    <TooltipProvider>
+    <TooltipProvider delayDuration={250}>
       <Tooltip>
         <TooltipTrigger asChild>
           <Button

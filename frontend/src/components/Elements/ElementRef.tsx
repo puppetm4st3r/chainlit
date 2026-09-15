@@ -1,9 +1,14 @@
 import { MessageContext } from '@/contexts/MessageContext';
+import { FileSearchCorner } from 'lucide-react';
 import { useContext } from 'react';
 
 import type { IMessageElement } from '@chainlit/react-client';
 
-import { resolveFloatingElementTitle } from '@/lib/floatingElementTitle';
+import { useTranslation } from '@/components/i18n/Translator';
+import {
+  isArtifactPreviewElement,
+  resolveFloatingElementTitle
+} from '@/lib/floatingElementTitle';
 import { shouldShowFloatingReopenChip } from '@/lib/floatingReopenChip';
 import { cn } from '@/lib/utils';
 
@@ -19,6 +24,7 @@ interface ElementRefProps {
 
 const ElementRef = ({ element }: ElementRefProps) => {
   const { onElementRefClick } = useContext(MessageContext);
+  const { t } = useTranslation();
 
   // For inline elements, return a styled span
   if (element.display === 'inline') {
@@ -31,11 +37,16 @@ const ElementRef = ({ element }: ElementRefProps) => {
     if (!shouldShowFloatingReopenChip(element)) {
       return null;
     }
+    const title = resolveFloatingElementTitle(element);
+    const isArtifactPreview = isArtifactPreviewElement(element);
+    const label = isArtifactPreview
+      ? t('chat.artifactPreview.reopenChip', { title })
+      : title;
     return (
       <a
         href="#"
         className={cn(
-          'inline-flex max-w-full items-center rounded-[4px] border border-solid px-2.5 py-1 text-sm font-medium cursor-pointer element-link element-link-floating'
+          'inline-flex max-w-full items-center gap-1.5 rounded-[4px] border border-solid px-2.5 py-1 text-sm font-medium cursor-pointer element-link element-link-floating'
         )}
         style={FLOATING_CHIP_STYLE}
         onClick={(event) => {
@@ -43,7 +54,10 @@ const ElementRef = ({ element }: ElementRefProps) => {
           onElementRefClick?.(element);
         }}
       >
-        {resolveFloatingElementTitle(element)}
+        {isArtifactPreview ? (
+          <FileSearchCorner className="size-3.5 shrink-0" aria-hidden />
+        ) : null}
+        <span className="min-w-0 truncate">{label}</span>
       </a>
     );
   }

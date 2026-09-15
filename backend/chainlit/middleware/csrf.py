@@ -6,6 +6,16 @@ from starlette.responses import Response
 from chainlit.config import config
 from chainlit.logger import logger
 
+# Session file bytes. Office preview/source are POST only because Chainlit's
+# SPA catch-all would swallow a GET. The fullscreen proxy often strips
+# X-Requested-With; /project/file is already exempt for the same reason.
+CSRF_IGNORE_PATH_PREFIXES = (
+    "/project/file",
+    "/project/artifact-preview",
+    "/project/artifact-source",
+)
+
+
 class CSRFMiddleware(BaseHTTPMiddleware):
     """
     CSRF protection middleware for cross-domain requests.
@@ -50,8 +60,7 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         
         # TODO ALL Frontend Chainlit acitivity must be protected with CSRF
         # Check ignore paths first - these are explicitly excluded from CSRF protection
-        ignore_paths = ['/project/file'] 
-        if any(path.startswith(ignore_path) for ignore_path in ignore_paths):
+        if any(path.startswith(prefix) for prefix in CSRF_IGNORE_PATH_PREFIXES):
             return False
         
         # Protect WebSocket connections - always need protection

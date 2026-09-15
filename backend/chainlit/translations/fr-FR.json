@@ -158,12 +158,30 @@
         "userMessage": {
             "fileCommandChip": "Tâche IA sur fichier"
         },
+        "artifactPreview": {
+            "reopenChip": "Aperçu : {{title}}"
+        },
         "customElement": {
             "errors": {
                 "timeout": "Le chargement de l'élément personnalisé '{{name}}' a expiré avant que le code source ne soit disponible.",
                 "fetchFailed": "Échec du chargement du module d'élément personnalisé '{{path}}' ({{status}}).",
                 "emptySource": "L'élément personnalisé '{{name}}' n'a pas fourni de code source affichable."
             }
+        },
+        "fileChip": {
+            "kind": {
+                "presentation": "Présentation",
+                "document": "Document",
+                "spreadsheet": "Feuille de calcul",
+                "pdf": "PDF",
+                "image": "Image",
+                "video": "Vidéo",
+                "audio": "Audio",
+                "archive": "Archive",
+                "text": "Texte",
+                "file": "Fichier"
+            },
+            "meta": "{{kind}} · {{extension}}"
         }
     },
     "threadHistory": {

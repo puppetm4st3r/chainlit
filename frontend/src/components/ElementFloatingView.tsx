@@ -173,7 +173,7 @@ export default function ElementFloatingView() {
               {floatingView.title}
             </DialogTitle>
             <div className="flex shrink-0 items-center gap-2">
-              {/* Slot for CustomElement chrome actions (e.g. DynamicTable export). */}
+              {/* Slot for CustomElement chrome actions (DynamicTable export, ArtifactPreview). */}
               <div
                 id="floating-view-actions"
                 className="flex items-center gap-2"

@@ -1,3 +1,5 @@
+import { readFileSync } from 'fs';
+import path from 'path';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -22,6 +24,24 @@ describe('custom element module loader', () => {
       './canvas-editor/hooks/useCanvasHooks.js',
       './canvas-editor/setup.js',
     ]);
+  });
+
+  it('artifact and dynamic table roots import the shared floating chrome helper', () => {
+    const elementsRoot = path.resolve(
+      __dirname,
+      '../../../../backend/public/elements'
+    );
+    const helper = './floating-chrome-actions.js';
+    const artifact = readFileSync(
+      path.join(elementsRoot, 'ArtifactPreview.jsx'),
+      'utf8'
+    );
+    const table = readFileSync(
+      path.join(elementsRoot, 'DynamicTable.jsx'),
+      'utf8'
+    );
+    expect(extractRelativeImportSpecifiers(artifact)).toContain(helper);
+    expect(extractRelativeImportSpecifiers(table)).toContain(helper);
   });
 
   it('resolves parent-relative imports against nested modules', () => {

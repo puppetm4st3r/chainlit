@@ -104,20 +104,14 @@
   0% {
     left: -50%;
   }
-  85.7% {
-    left: 75%;
-  }
   100% {
-    left: 75%;
+    left: 100%;
   }
 }
 
 @keyframes shimmer-text {
   0% {
     background-position: 200% center;
-  }
-  85.7% {
-    background-position: -200% center;
   }
   100% {
     background-position: -200% center;
@@ -190,6 +184,91 @@
 
 #cl-shadow-root .bulb-off {
   filter: grayscale(100%) opacity(0.85);
+}
+
+#cl-shadow-root .cot-live-window,
+#cl-shadow-root .cot-step-title {
+  font-size: 0.8125rem;
+  font-weight: 400;
+}
+
+#cl-shadow-root .cot-live-window {
+  --cot-live-line-height: 1.35rem;
+  --cot-live-roll-lines: 1;
+  overflow: hidden;
+  margin-top: 0.35rem;
+  color: hsl(var(--muted-foreground));
+}
+
+#cl-shadow-root .cot-live-window.is-rolling {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 18%,
+    #000 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 18%,
+    #000 100%
+  );
+}
+
+#cl-shadow-root .cot-live-track {
+  will-change: transform;
+}
+
+#cl-shadow-root .cot-live-track.is-rolling {
+  animation-name: cot-live-roll;
+  animation-duration: 520ms;
+  animation-fill-mode: forwards;
+}
+
+@keyframes cot-live-roll {
+  0% {
+    transform: translate3d(0, 0, 0);
+    animation-timing-function: cubic-bezier(0.55, 0.06, 0.68, 0.19);
+  }
+  42% {
+    transform: translate3d(
+      0,
+      calc(-0.58 * var(--cot-live-roll-lines) * var(--cot-live-line-height)),
+      0
+    );
+    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  100% {
+    transform: translate3d(
+      0,
+      calc(-1 * var(--cot-live-roll-lines) * var(--cot-live-line-height)),
+      0
+    );
+  }
+}
+
+#cl-shadow-root .cot-live-line {
+  height: var(--cot-live-line-height);
+  line-height: var(--cot-live-line-height);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #cl-shadow-root .cot-live-window.is-rolling {
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+
+  #cl-shadow-root .cot-live-track.is-rolling {
+    animation: none;
+    transform: translate3d(
+      0,
+      calc(-1 * var(--cot-live-roll-lines) * var(--cot-live-line-height)),
+      0
+    );
+  }
 }
 
 /* Avatar alignment parity with web app */

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 
 import { useChatData, useChatInteract, useConfig } from '@chainlit/react-client';
-import { MessageSquarePlus } from 'lucide-react';
+import { ChatCircleText } from '@phosphor-icons/react';
 
 import { Translator } from '@/components/i18n';
 import { Button } from '@/components/ui/button';
@@ -120,7 +120,7 @@ const NewChatButton = ({ navigate, onConfirm, ...buttonProps }: Props) => {
               onClick={handleClickOpen}
               {...buttonProps}
             >
-              <MessageSquarePlus className="!size-6" />
+              <ChatCircleText className="!size-6" weight="regular" />
             </Button>
           </TooltipTrigger>
           <TooltipContent>

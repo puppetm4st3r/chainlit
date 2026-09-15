@@ -9,7 +9,7 @@ const FileElement = ({ element }: { element: IFileElement }) => {
 
   return (
     <a
-      className={`${element.display}-file no-underline`}
+      className={`${element.display}-file block w-full no-underline`}
       download={element.name}
       href={element.url}
       target="_blank"

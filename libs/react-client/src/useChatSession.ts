@@ -42,7 +42,6 @@ import {
   tokenCountState,
   wavRecorderState,
   wavStreamPlayerState,
-  workflowHelpState,
   projectState,
   normalizeComposerInputRestriction
 } from 'src/state';
@@ -55,8 +54,7 @@ import {
   IMode,
   IStep,
   ITasklistElement,
-  IThread,
-  IWorkflowHelp
+  IThread
 } from 'src/types';
 import {
   addMessage,
@@ -145,7 +143,6 @@ const useChatSession = () => {
   const setModes = useSetRecoilState(modesState);
   const setSideView = useSetRecoilState(sideViewState);
   const setDocumentWorkspace = useSetRecoilState(documentWorkspaceState);
-  const setWorkflowHelp = useSetRecoilState(workflowHelpState);
   const setElements = useSetRecoilState(elementState);
   const setTasklists = useSetRecoilState(tasklistState);
   const setActions = useSetRecoilState(actionState);
@@ -408,7 +405,6 @@ const useChatSession = () => {
           socket
         };
       });
-      setWorkflowHelp(undefined);
       setSpontaneousFileUploadEnabled(undefined);
       setConversationHistoryVisible(undefined);
       setConversationHistoryShowNewThread(undefined);
@@ -828,17 +824,6 @@ const useChatSession = () => {
         }
       );
 
-      socket.on(
-        'workflow_help_state',
-        (workflowHelp: IWorkflowHelp | null) => {
-          if (!workflowHelp) {
-            setWorkflowHelp(undefined);
-            return;
-          }
-          setWorkflowHelp(workflowHelp);
-        }
-      );
-
       socket.on('set_sidebar_title', (title: string) => {
         setSideView((prev) => {
           if (prev?.title === title) return prev;
@@ -1016,8 +1001,7 @@ const useChatSession = () => {
       setDocumentWorkspace,
       setElements,
       setSideView,
-      setSpontaneousFileUploadEnabled,
-      setWorkflowHelp
+      setSpontaneousFileUploadEnabled
     ]
   );
 

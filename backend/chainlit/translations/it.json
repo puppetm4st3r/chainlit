@@ -158,12 +158,30 @@
         "userMessage": {
             "fileCommandChip": "Attività IA sul file"
         },
+        "artifactPreview": {
+            "reopenChip": "Anteprima: {{title}}"
+        },
         "customElement": {
             "errors": {
                 "timeout": "Il caricamento dell'elemento personalizzato '{{name}}' è scaduto prima che il codice sorgente fosse disponibile.",
                 "fetchFailed": "Impossibile recuperare il modulo dell'elemento personalizzato '{{path}}' ({{status}}).",
                 "emptySource": "L'elemento personalizzato '{{name}}' non ha fornito codice sorgente visualizzabile."
             }
+        },
+        "fileChip": {
+            "kind": {
+                "presentation": "Presentazione",
+                "document": "Documento",
+                "spreadsheet": "Foglio di calcolo",
+                "pdf": "PDF",
+                "image": "Immagine",
+                "video": "Video",
+                "audio": "Audio",
+                "archive": "Archivio",
+                "text": "Testo",
+                "file": "File"
+            },
+            "meta": "{{kind}} · {{extension}}"
         }
     },
     "threadHistory": {

@@ -3,10 +3,13 @@ import * as PhosphorIcons from '@phosphor-icons/react';
 import React from 'react';
 import * as ReactHookForm from 'react-hook-form';
 import * as Recoil from 'recoil';
+import { Runner } from 'react-runner';
 import * as Sonner from 'sonner';
 import * as XLSX from 'xlsx-js-style';
 import * as Zod from 'zod';
-
+import Plot from 'react-plotly.js';
+import Editor from '@monaco-editor/react';
+import { Document as PdfDocument, Page as PdfPage, pdfjs } from 'react-pdf';
 import * as ChainlitReactClient from '@chainlit/react-client';
 
 import * as Markdown from '@/components/Markdown';
@@ -38,14 +41,26 @@ import * as TableComponents from '@/components/ui/table';
 import * as TabsComponents from '@/components/ui/tabs';
 import * as TextareaComponents from '@/components/ui/textarea';
 import * as TooltipComponents from '@/components/ui/tooltip';
+import mermaid from '@/lib/mermaidSetup';
+import '@/lib/monacoSetup';
+import '@/lib/pdfSetup';
+import 'react-pdf/dist/Page/AnnotationLayer.css';
+import 'react-pdf/dist/Page/TextLayer.css';
 
-const Imports = {
+/**
+ * Packages a `react` artifact may import. Recoil and `@chainlit/react-client`
+ * stay off this list so model JSX cannot touch session atoms or the chat client.
+ * Keep this map aligned with `ARTIFACT_REACT_IMPORT_SPECIFIERS` in the
+ * artifact node plugin.
+ */
+const artifactReactImports = {
   react: React,
   sonner: Sonner,
   zod: Zod,
-  recoil: Recoil,
   xlsx: XLSX,
-  '@chainlit/react-client': ChainlitReactClient,
+  mermaid,
+  'react-plotly.js': Plot,
+  '@monaco-editor/react': Editor,
   '@/components/markdown': Markdown,
   'react-hook-form': ReactHookForm,
   'lucide-react': LucideIcons,
@@ -78,6 +93,17 @@ const Imports = {
   '@/components/ui/table': TableComponents,
   '@/components/ui/textarea': TextareaComponents,
   '@/components/ui/tooltip': TooltipComponents
+};
+
+const Imports = {
+  ...artifactReactImports,
+  recoil: Recoil,
+  '@chainlit/react-client': ChainlitReactClient,
+  'react-runner': { Runner },
+  'dolf-artifact-imports': { artifactReactImports },
+  // Host CustomElements (ArtifactPreview) may import react-pdf. Model-authored
+  // react artifacts cannot: this key stays off artifactReactImports.
+  'react-pdf': { Document: PdfDocument, Page: PdfPage, pdfjs }
 };
 
 export default Imports;

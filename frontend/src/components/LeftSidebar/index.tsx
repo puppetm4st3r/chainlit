@@ -4,6 +4,7 @@ import { useChatData } from '@chainlit/react-client';
 
 import SidebarTrigger from '@/components/header/SidebarTrigger';
 import { Sidebar, SidebarHeader, SidebarRail } from '@/components/ui/sidebar';
+import { wrapWithTooltip } from '@/components/ui/tooltip';
 
 import NewChatButton from '../header/NewChat';
 import WorkspaceEditorButton from '../header/WorkspaceEditorButton';
@@ -21,6 +22,16 @@ export default function LeftSidebar({
     return null;
   }
 
+  const projectLabel = projectId
+    ? wrapWithTooltip(
+        <div className="w-full truncate rounded-md border border-sidebar-border/60 px-2 py-1.5 text-center text-sm font-medium text-sidebar-foreground">
+          {projectId}
+        </div>,
+        projectId,
+        { whenOverflow: true }
+      )
+    : null;
+
   return (
     <Sidebar {...props} className="border-none">
       <SidebarHeader className="flex flex-col gap-2 py-3">
@@ -33,14 +44,7 @@ export default function LeftSidebar({
             <NewChatButton navigate={navigate} />
           </div>
         </div>
-        {projectId ? (
-          <div
-            className="w-full truncate rounded-md border border-sidebar-border/60 px-2 py-1.5 text-center text-sm font-medium text-sidebar-foreground"
-            title={projectId}
-          >
-            {projectId}
-          </div>
-        ) : null}
+        {projectLabel}
       </SidebarHeader>
       <ThreadHistory />
       <SidebarRail />

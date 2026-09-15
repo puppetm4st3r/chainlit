@@ -8,9 +8,8 @@ import {
   ZoomIn,
   ZoomOut
 } from 'lucide-react';
-import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { useEffect, useRef, useState } from 'react';
-import { Document, Page, pdfjs } from 'react-pdf';
+import { Document, Page } from 'react-pdf';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -25,10 +24,9 @@ import {
 
 import { type IPdfElement } from 'client-types/';
 
+import '@/lib/pdfSetup';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
-
-pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 
 interface PDFViewerProps {
   url: string;

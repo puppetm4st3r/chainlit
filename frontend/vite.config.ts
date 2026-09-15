@@ -7,7 +7,10 @@ import tsconfigPaths from 'vite-tsconfig-paths';
 // https://vitejs.dev/config/
 export default defineConfig({
   build: {
-    sourcemap: true
+    // Full production sourcemaps of plotly/monaco/mermaid exceed Node's default
+    // ~4GB heap. Opt in with CHAINLIT_SOURCEMAP=true when debugging a release.
+    sourcemap: process.env.CHAINLIT_SOURCEMAP === 'true',
+    reportCompressedSize: false
   },
   plugins: [react(), tsconfigPaths(), svgr()],
   resolve: {

@@ -39,7 +39,6 @@ import ShareButton from './Share';
 import SidebarTrigger from './SidebarTrigger';
 import { ThemeToggle } from './ThemeToggle';
 import UserNav from './UserNav';
-import WorkflowHelpButton from './WorkflowHelpButton';
 import WorkspaceEditorButton from './WorkspaceEditorButton';
 
 type HeaderProps = {
@@ -95,7 +94,6 @@ const Header = memo(({ sidePanelSize = 30 }: HeaderProps) => {
 
   const actions = (
     <div className="flex items-center gap-1 shrink-0">
-      <WorkflowHelpButton />
       <ShareButton />
       {!hideTopRightBar ? <ReadmeButton /> : null}
       <ApiKeys />

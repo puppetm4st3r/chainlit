@@ -5,7 +5,7 @@
   "scripts": {
     "preinstall": "npx only-allow pnpm",
     "dev": "vite",
-    "build": "vite build",
+    "build": "NODE_OPTIONS=--max-old-space-size=8192 vite build",
     "preview": "vite preview",
     "type-check": "tsc --noemit",
     "test": "vitest run"
@@ -14,6 +14,7 @@
     "@chainlit/react-client": "workspace:^",
     "@edge-tts/universal": "npm:@jsr/edge-tts__universal@1.3.2",
     "@hookform/resolvers": "^3.9.1",
+    "@monaco-editor/react": "^4.7.0",
     "@phosphor-icons/react": "^2.1.10",
     "@radix-ui/react-accordion": "^1.2.2",
     "@radix-ui/react-alert-dialog": "^1.1.4",
@@ -46,6 +47,8 @@
     "i18next": "^23.7.16",
     "lodash": "^4.17.21",
     "lucide-react": "^0.555.0",
+    "mermaid": "^11.4.1",
+    "monaco-editor": "^0.52.2",
     "pdfjs-dist": "5.4.296",
     "plotly.js": "^2.27.0",
     "react": "^18.3.1",

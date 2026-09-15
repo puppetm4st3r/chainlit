@@ -19,15 +19,3 @@ export const dismissedFloatingSignatureState = atom<string | undefined>({
   key: 'dismissedFloatingSignature',
   default: undefined
 });
-
-export const workflowHelpDialogOpenState = atom<boolean>({
-  key: 'workflowHelpDialogOpen',
-  default: false
-});
-
-export const workflowHelpDialogReasonState = atom<
-  'auto' | 'manual' | undefined
->({
-  key: 'workflowHelpDialogReason',
-  default: undefined
-});

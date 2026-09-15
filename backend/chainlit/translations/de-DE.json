@@ -158,12 +158,30 @@
         "userMessage": {
             "fileCommandChip": "KI-Dateiaufgabe"
         },
+        "artifactPreview": {
+            "reopenChip": "Vorschau: {{title}}"
+        },
         "customElement": {
             "errors": {
                 "timeout": "Das Laden des Custom Elements '{{name}}' ist abgelaufen, bevor der Quellcode verfügbar war.",
                 "fetchFailed": "Custom-Element-Modul '{{path}}' konnte nicht geladen werden ({{status}}).",
                 "emptySource": "Custom Element '{{name}}' hat keinen darstellbaren Quellcode bereitgestellt."
             }
+        },
+        "fileChip": {
+            "kind": {
+                "presentation": "Präsentation",
+                "document": "Dokument",
+                "spreadsheet": "Tabelle",
+                "pdf": "PDF",
+                "image": "Bild",
+                "video": "Video",
+                "audio": "Audio",
+                "archive": "Archiv",
+                "text": "Text",
+                "file": "Datei"
+            },
+            "meta": "{{kind}} · {{extension}}"
         }
     },
     "threadHistory": {

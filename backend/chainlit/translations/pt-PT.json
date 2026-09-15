@@ -158,12 +158,30 @@
         "userMessage": {
             "fileCommandChip": "Tarefa de IA no ficheiro"
         },
+        "artifactPreview": {
+            "reopenChip": "Pré-visualizar: {{title}}"
+        },
         "customElement": {
             "errors": {
                 "timeout": "O carregamento do elemento personalizado '{{name}}' excedeu o tempo limite antes de o código-fonte ficar disponível.",
                 "fetchFailed": "Falha ao obter o módulo do elemento personalizado '{{path}}' ({{status}}).",
                 "emptySource": "O elemento personalizado '{{name}}' não forneceu código-fonte renderizável."
             }
+        },
+        "fileChip": {
+            "kind": {
+                "presentation": "Apresentação",
+                "document": "Documento",
+                "spreadsheet": "Folha de cálculo",
+                "pdf": "PDF",
+                "image": "Imagem",
+                "video": "Vídeo",
+                "audio": "Áudio",
+                "archive": "Arquivo",
+                "text": "Texto",
+                "file": "Ficheiro"
+            },
+            "meta": "{{kind}} · {{extension}}"
         }
     },
     "threadHistory": {

@@ -133,10 +133,6 @@ vi.mock('@/components/header/UserNav', () => ({
   default: () => <div data-testid="user-nav" />
 }));
 
-vi.mock('@/components/header/WorkflowHelpButton', () => ({
-  default: () => <div data-testid="workflow-help-button" />
-}));
-
 describe('Header', () => {
   const configureDefaultRecoilValues = () => {
     mockUseRecoilValue.mockImplementation((atom: { key?: string }) => {
@@ -240,7 +236,6 @@ describe('Header', () => {
 
     render(<Header />);
 
-    expect(screen.getByTestId('workflow-help-button')).toBeInTheDocument();
     expect(screen.getByTestId('readme-button')).toBeInTheDocument();
     expect(screen.getByTestId('theme-toggle')).toBeInTheDocument();
     expect(screen.getByTestId('chat-profiles')).toBeInTheDocument();

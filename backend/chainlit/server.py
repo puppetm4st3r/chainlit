@@ -324,7 +324,13 @@ async def serve_public_file(
         raise HTTPException(status_code=400, detail="Invalid filename")
 
     if file_path.is_file():
-        return FileResponse(file_path)
+        headers = {}
+        # CustomElements are compiled live from disk. A cached GET would keep a
+        # stale widget (for example an office preview that still GETs and
+        # receives this SPA shell instead of POST /project/artifact-preview).
+        if filename.replace("\\", "/").startswith("elements/"):
+            headers["Cache-Control"] = "no-store"
+        return FileResponse(file_path, headers=headers)
     else:
         raise HTTPException(status_code=404, detail="File not found")
 

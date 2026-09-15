@@ -78,7 +78,7 @@ const Attachments = () => {
   if (attachments.length === 0) return null;
 
   return (
-    <div id="attachments" className="flex flex-row flex-wrap gap-4 w-fit">
+    <div id="attachments" className="flex w-full flex-col gap-2">
       {attachments.map((attachment) => {
         const showProgress = !attachment.uploaded && attachment.cancel;
 

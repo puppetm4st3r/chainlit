@@ -9,6 +9,7 @@ import {
 } from '@chainlit/react-client';
 
 import { Button } from '@/components/ui/button';
+import { wrapWithTooltip } from '@/components/ui/tooltip';
 import {
   Dialog,
   DialogContent,
@@ -178,12 +179,13 @@ export function ShareDialog({
         </DialogHeader>
         <div className="flex flex-col gap-3 w-full">
           <div className="rounded-md border px-3 py-2 w-full">
-            <span
-              className="text-sm text-muted-foreground overflow-hidden text-ellipsis whitespace-nowrap block"
-              title={shareLink}
-            >
-              {shareLink}
-            </span>
+            {wrapWithTooltip(
+              <span className="text-sm text-muted-foreground overflow-hidden text-ellipsis whitespace-nowrap block">
+                {shareLink}
+              </span>,
+              shareLink,
+              { whenOverflow: true }
+            )}
           </div>
           <div className="flex gap-2 justify-center">
             <Button

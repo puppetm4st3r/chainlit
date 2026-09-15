@@ -75,7 +75,7 @@ const ActionButton = ({ action }: ActionProps) => {
 
   if (action.tooltip) {
     return (
-      <TooltipProvider delayDuration={100}>
+      <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>{button}</TooltipTrigger>
           <TooltipContent>

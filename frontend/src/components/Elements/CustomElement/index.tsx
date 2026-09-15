@@ -28,9 +28,41 @@ import { Loader } from '@/components/Loader';
 import { useDismissFloatingView } from '@/hooks/useDismissFloatingView';
 import { Translator } from 'components/i18n';
 
+import { useFetch } from 'hooks/useFetch';
+
 import Imports from './Imports';
 import { loadCustomElementModuleTree } from './moduleLoader';
 import * as Renderer from './Renderer';
+
+const CONTENT_DEFERRED_KEY = '_contentDeferred';
+const CONTENT_REVISION_KEY = '_contentRevision';
+
+/**
+ * True when the socket event omitted oversized props (e.g. a PDF data URL).
+ */
+function isDeferredCustomElementProps(
+  props: Record<string, unknown> | undefined
+): boolean {
+  return Boolean(props && props[CONTENT_DEFERRED_KEY] === true);
+}
+
+/**
+ * Build the blob URL used to hydrate deferred CustomElement props.
+ *
+ * The revision query busts SWR when ArtifactPreview (or any host) updates
+ * the persisted JSON behind a stable chainlit key.
+ */
+function deferredPropsUrl(
+  url: string | undefined,
+  revision: unknown
+): string | null {
+  if (!url) {
+    return null;
+  }
+  const token = typeof revision === 'string' ? revision : '';
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}_cr=${encodeURIComponent(token)}`;
+}
 
 const CustomElement = memo(function ({ element }: { element: ICustomElement }) {
   const apiClient = useContext(ChainlitContext);
@@ -202,12 +234,29 @@ const CustomElement = memo(function ({ element }: { element: ICustomElement }) {
     }
   }, []);
 
+  const socketProps = (element.props || {}) as Record<string, unknown>;
+  const deferredProps = isDeferredCustomElementProps(socketProps);
+  const {
+    data: hydratedProps,
+    error: propsLoadError,
+    isLoading: isLoadingProps
+  } = useFetch(
+    deferredProps
+      ? deferredPropsUrl(element.url, socketProps[CONTENT_REVISION_KEY])
+      : null
+  );
+
   // react-runner remounts the entire tree whenever `scope` identity changes.
   // Stabilize props by value so equivalent element.props object replacements do
   // not tear down long-lived editors (canvas sidebar shells).
+  const resolvedProps = deferredProps
+    ? hydratedProps && typeof hydratedProps === 'object' && !Array.isArray(hydratedProps)
+      ? (hydratedProps as Record<string, unknown>)
+      : null
+    : socketProps;
   const propsSignature = useMemo(
-    () => JSON.stringify(element.props ?? {}),
-    [element.props]
+    () => JSON.stringify(resolvedProps ?? {}),
+    [resolvedProps]
   );
   const props = useMemo(() => {
     try {
@@ -245,6 +294,36 @@ const CustomElement = memo(function ({ element }: { element: ICustomElement }) {
     ]
   );
 
+  if (deferredProps && !element.url) {
+    return (
+      <Alert variant="error">
+        {t('chat.customElement.errors.fetchFailed', {
+          path: element.name,
+          status: 0
+        })}
+      </Alert>
+    );
+  }
+  if (deferredProps && propsLoadError) {
+    return (
+      <Alert variant="error">
+        {t('chat.customElement.errors.fetchFailed', {
+          path: element.name,
+          status: 0
+        })}
+      </Alert>
+    );
+  }
+  if (deferredProps && (isLoadingProps || !resolvedProps)) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-2 py-6">
+        <Loader className="!size-6" />
+        <span className="text-sm text-muted-foreground">
+          <Translator path="common.status.loading" />
+        </span>
+      </div>
+    );
+  }
   if (error) return <Alert variant="error">{error}</Alert>;
   if (!sourceCode) {
     // Only treat empty source as a hard failure after the fetch settled.

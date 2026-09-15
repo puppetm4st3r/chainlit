@@ -1,13 +1,21 @@
 import React, { useEffect, useMemo } from 'react';
 import { DefaultExtensionType, FileIcon, defaultStyles } from 'react-file-icon';
 
+import { useTranslation } from '@/components/i18n/Translator';
 import { Card } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger
 } from '@/components/ui/tooltip';
+
+import { resolveFileChipKind, splitFileChipName } from './fileChip';
+
+/** Horizontal file chip: muted fill, hairline stroke, hover lifts the fill. */
+const attachmentCardClassName =
+  'border-border/50 shadow-none transition-colors duration-150 hover:bg-accent dark:hover:bg-muted';
 
 interface AttachmentProps {
   name: string;
@@ -22,6 +30,7 @@ const Attachment: React.FC<AttachmentProps> = ({
   children,
   file
 }) => {
+  const { t } = useTranslation();
   const isImage = useMemo(() => mime.startsWith('image/'), [mime]);
   const imageUrl = useMemo(() => {
     if (isImage && file) {
@@ -29,8 +38,19 @@ const Attachment: React.FC<AttachmentProps> = ({
     }
     return undefined;
   }, [isImage, file]);
+  const { title, extension } = useMemo(() => splitFileChipName(name), [name]);
+  const kind = useMemo(
+    () => resolveFileChipKind(mime, extension),
+    [mime, extension]
+  );
+  const kindLabel = t(`chat.fileChip.kind.${kind}`);
+  const meta = extension
+    ? t('chat.fileChip.meta', {
+        kind: kindLabel,
+        extension: extension.toUpperCase()
+      })
+    : kindLabel;
 
-  // Cleanup Object URL on unmount or when imageUrl changes
   useEffect(() => {
     return () => {
       if (imageUrl) {
@@ -39,27 +59,23 @@ const Attachment: React.FC<AttachmentProps> = ({
     };
   }, [imageUrl]);
 
-  let extension: DefaultExtensionType;
-  if (name.includes('.')) {
-    extension = name.split('.').pop()!.toLowerCase() as DefaultExtensionType;
-  } else {
-    extension = mime
-      ? ((mime.split('/').pop() || 'txt') as DefaultExtensionType)
-      : ('txt' as DefaultExtensionType);
-  }
-
   if (isImage && imageUrl) {
     return (
-      <TooltipProvider delayDuration={100}>
+      <TooltipProvider delayDuration={200}>
         <Tooltip>
           <TooltipTrigger asChild>
             <div className="relative h-[58px] w-[58px]">
               {children}
-              <Card className="h-full p-1 flex items-center justify-center rounded-lg border overflow-hidden">
+              <Card
+                className={cn(
+                  'group h-full p-1 flex items-center justify-center rounded-xl overflow-hidden',
+                  attachmentCardClassName
+                )}
+              >
                 <img
                   src={imageUrl}
                   alt={name}
-                  className="h-full w-full object-cover"
+                  className="h-full w-full object-cover transition-[filter] duration-150 group-hover:brightness-95 dark:group-hover:brightness-110"
                 />
               </Card>
             </div>
@@ -73,18 +89,33 @@ const Attachment: React.FC<AttachmentProps> = ({
   }
 
   return (
-    <TooltipProvider delayDuration={100}>
+    <TooltipProvider delayDuration={200}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <div className="relative h-[70px]">
+          <div className="relative w-full">
             {children}
-            <Card className="h-full p-2 flex flex-row items-center gap-3 rounded-lg w-full max-w-[200px] border">
-              <div className="w-10">
-                <FileIcon {...defaultStyles[extension]} extension={extension} />
+            <Card
+              className={cn(
+                'flex w-full flex-row items-center gap-3 rounded-xl px-3 py-2.5',
+                attachmentCardClassName
+              )}
+            >
+              <div className="w-10 shrink-0" aria-hidden>
+                <FileIcon
+                  {...(defaultStyles[extension as DefaultExtensionType] || {})}
+                  extension={extension || 'file'}
+                />
               </div>
-              <span className="w-[80%] text-xs font-medium line-clamp-2 leading-tight">
-                {name}
-              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium leading-tight text-foreground">
+                  {title || name}
+                </p>
+                {meta ? (
+                  <p className="mt-0.5 truncate text-xs leading-tight text-muted-foreground">
+                    {meta}
+                  </p>
+                ) : null}
+              </div>
             </Card>
           </div>
         </TooltipTrigger>

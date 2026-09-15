@@ -8,7 +8,6 @@ import { useAuth, useChatSession, useConfig } from '@chainlit/react-client';
 
 import ChatSettingsModal from './components/ChatSettings';
 import { ThemeProvider } from './components/ThemeProvider';
-import WorkflowHelpDialog from './components/workflow-help/WorkflowHelpDialog';
 import { Loader } from '@/components/Loader';
 import { Toaster } from '@/components/ui/sonner';
 import { useHumanInteractionNotification } from '@/hooks/useHumanInteractionNotification';
@@ -118,7 +117,6 @@ function App() {
       <Toaster richColors className="toast" position="top-right" />
 
       <ChatSettingsModal />
-      <WorkflowHelpDialog />
       <RouterProvider router={router} />
 
       <div

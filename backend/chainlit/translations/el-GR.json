@@ -158,12 +158,30 @@
         "userMessage": {
             "fileCommandChip": "Εργασία AI αρχείου"
         },
+        "artifactPreview": {
+            "reopenChip": "Προεπισκόπηση: {{title}}"
+        },
         "customElement": {
             "errors": {
                 "timeout": "Loading custom element '{{name}}' timed out before the source code became available.",
                 "fetchFailed": "Failed to fetch custom element module '{{path}}' ({{status}}).",
                 "emptySource": "Custom element '{{name}}' did not provide renderable source code."
             }
+        },
+        "fileChip": {
+            "kind": {
+                "presentation": "Presentation",
+                "document": "Document",
+                "spreadsheet": "Spreadsheet",
+                "pdf": "PDF",
+                "image": "Image",
+                "video": "Video",
+                "audio": "Audio",
+                "archive": "Archive",
+                "text": "Text",
+                "file": "File"
+            },
+            "meta": "{{kind}} · {{extension}}"
         }
     },
     "threadHistory": {

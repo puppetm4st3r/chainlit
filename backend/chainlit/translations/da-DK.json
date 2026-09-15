@@ -157,12 +157,30 @@
         "userMessage": {
             "fileCommandChip": "AI-filopgave"
         },
+        "artifactPreview": {
+            "reopenChip": "Forhåndsvis: {{title}}"
+        },
         "customElement": {
             "errors": {
                 "timeout": "Loading custom element '{{name}}' timed out before the source code became available.",
                 "fetchFailed": "Failed to fetch custom element module '{{path}}' ({{status}}).",
                 "emptySource": "Custom element '{{name}}' did not provide renderable source code."
             }
+        },
+        "fileChip": {
+            "kind": {
+                "presentation": "Præsentation",
+                "document": "Dokument",
+                "spreadsheet": "Regneark",
+                "pdf": "PDF",
+                "image": "Billede",
+                "video": "Video",
+                "audio": "Lyd",
+                "archive": "Arkiv",
+                "text": "Tekst",
+                "file": "Fil"
+            },
+            "meta": "{{kind}} · {{extension}}"
         }
     },
     "threadHistory": {

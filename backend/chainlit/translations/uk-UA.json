@@ -141,12 +141,30 @@
         "userMessage": {
             "fileCommandChip": "AI-завдання для файлу"
         },
+        "artifactPreview": {
+            "reopenChip": "Попередній перегляд: {{title}}"
+        },
         "customElement": {
             "errors": {
                 "timeout": "Loading custom element '{{name}}' timed out before the source code became available.",
                 "fetchFailed": "Failed to fetch custom element module '{{path}}' ({{status}}).",
                 "emptySource": "Custom element '{{name}}' did not provide renderable source code."
             }
+        },
+        "fileChip": {
+            "kind": {
+                "presentation": "Презентація",
+                "document": "Документ",
+                "spreadsheet": "Таблиця",
+                "pdf": "PDF",
+                "image": "Зображення",
+                "video": "Відео",
+                "audio": "Аудіо",
+                "archive": "Архів",
+                "text": "Текст",
+                "file": "Файл"
+            },
+            "meta": "{{kind}} · {{extension}}"
         }
     },
     "threadHistory": {

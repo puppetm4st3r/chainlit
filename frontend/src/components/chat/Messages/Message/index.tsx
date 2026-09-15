@@ -16,6 +16,8 @@ import { AskFileButton } from './AskFileButton';
 import { MessageAvatar } from './Avatar';
 import { MessageButtons } from './Buttons';
 import { MessageContent } from './Content';
+import CotLiveWindow from './CotLiveWindow';
+import { isCotRollingWindowStep } from './cotLiveLines';
 import Step from './Step';
 import UserMessage from './UserMessage';
 
@@ -159,15 +161,22 @@ const Message = memo(
                         />
                       ) : null}
                       {shouldRenderOutput ? (
-                        <MessageContent
-                          ref={contentRef}
-                          elements={elements}
-                          message={message}
-                          allowHtml={allowHtml}
-                          latex={latex}
-                          renderMarkdown={true}
-                          sections={showInputSection ? ['output'] : undefined}
-                        />
+                        isCotRollingWindowStep(message) ? (
+                          <CotLiveWindow
+                            output={message.output}
+                            contentRef={contentRef}
+                          />
+                        ) : (
+                          <MessageContent
+                            ref={contentRef}
+                            elements={elements}
+                            message={message}
+                            allowHtml={allowHtml}
+                            latex={latex}
+                            renderMarkdown={true}
+                            sections={showInputSection ? ['output'] : undefined}
+                          />
+                        )
                       ) : null}
                       <MessageButtons
                         message={message}

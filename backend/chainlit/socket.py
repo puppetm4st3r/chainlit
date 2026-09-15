@@ -508,6 +508,8 @@ async def connection_successful(sid):
                 context.session.chat_started = True
                 context.session.mark_thread_persistence_ready()
                 await config.code.on_chat_resume(thread)
+                # Composer unlocks here: on_chat_resume is wrapped with_task=True,
+                # so task_end runs in the wrapper finally after this await.
 
                 for step in thread.get("steps", []):
                     if "message" in step["type"]:

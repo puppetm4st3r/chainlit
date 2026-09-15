@@ -167,12 +167,30 @@
         "userMessage": {
             "fileCommandChip": "AI file task"
         },
+        "artifactPreview": {
+            "reopenChip": "Preview: {{title}}"
+        },
         "customElement": {
             "errors": {
                 "timeout": "Loading custom element '{{name}}' timed out before the source code became available.",
                 "fetchFailed": "Failed to fetch custom element module '{{path}}' ({{status}}).",
                 "emptySource": "Custom element '{{name}}' did not provide renderable source code."
             }
+        },
+        "fileChip": {
+            "kind": {
+                "presentation": "Presentation",
+                "document": "Document",
+                "spreadsheet": "Spreadsheet",
+                "pdf": "PDF",
+                "image": "Image",
+                "video": "Video",
+                "audio": "Audio",
+                "archive": "Archive",
+                "text": "Text",
+                "file": "File"
+            },
+            "meta": "{{kind}} · {{extension}}"
         }
     },
     "threadHistory": {
@@ -298,18 +316,6 @@
         "success": {
             "saved": "Saved successfully"
         }
-    },
-    "workflowHelp": {
-        "button": "Usage guide",
-        "titleFallback": "Usage guide",
-        "openInNewTab": "Open in new tab",
-        "embedHint": "Review this usage guide before continuing.",
-        "fallbackNotice": "If the page does not render correctly inside the dialog, use \"Open in new tab\".",
-        "doNotShowAutomatically": "Do not show automatically again",
-        "scrollRequirement": "Scroll through the guide to enable the continue action.",
-        "scrollToContinue": "Scroll to continue",
-        "continueCountdown": "Continue ({{count}}s)",
-        "close": "Close"
     },
     "alerts": {
         "info": "Info",

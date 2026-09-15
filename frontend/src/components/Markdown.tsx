@@ -23,6 +23,7 @@ import { ChainlitContext, type IMessageElement } from '@chainlit/react-client';
 
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { Card } from '@/components/ui/card';
+import { wrapWithTooltip } from '@/components/ui/tooltip';
 import { Separator } from '@/components/ui/separator';
 import {
   Table,
@@ -329,31 +330,36 @@ function ReferenceTooltipBody({
                   target={referenceTarget === 'new' ? '_blank' : undefined}
                   rel={referenceTarget === 'new' ? 'noopener noreferrer' : undefined}
                   className="group -mx-1 block rounded-md px-1 py-1 transition-colors hover:bg-black/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-stone-500/40 dark:hover:bg-white/5 dark:focus-visible:ring-zinc-300/30"
-                  title={reference.documentName || reference.label}
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <div
-                      className="min-w-0 flex-1 truncate text-[12px] font-bold leading-[1.15] text-stone-800 underline-offset-2 group-hover:underline dark:text-zinc-100"
-                    >
-                      {reference.documentName || reference.label}
-                    </div>
+                    {wrapWithTooltip(
+                      <div
+                        className="min-w-0 flex-1 truncate text-[12px] font-bold leading-[1.15] text-stone-800 underline-offset-2 group-hover:underline dark:text-zinc-100"
+                      >
+                        {reference.documentName || reference.label}
+                      </div>,
+                      reference.documentName || reference.label,
+                      { whenOverflow: true }
+                    )}
                   </div>
-                  {reference.path ? (
-                    <div
-                      className="mt-1 truncate text-[12px] leading-[1.15] text-stone-600 dark:text-zinc-300"
-                      title={reference.path}
-                    >
-                      {reference.path}
-                    </div>
-                  ) : null}
-                  {reference.chunkName ? (
-                    <div
-                      className="mt-1 truncate text-[12px] font-bold leading-[1.15] text-stone-700 dark:text-zinc-200"
-                      title={reference.chunkName}
-                    >
-                      {reference.chunkName}
-                    </div>
-                  ) : null}
+                  {reference.path
+                    ? wrapWithTooltip(
+                      <div className="mt-1 truncate text-[12px] leading-[1.15] text-stone-600 dark:text-zinc-300">
+                        {reference.path}
+                      </div>,
+                      reference.path,
+                      { whenOverflow: true }
+                    )
+                    : null}
+                  {reference.chunkName
+                    ? wrapWithTooltip(
+                      <div className="mt-1 truncate text-[12px] font-bold leading-[1.15] text-stone-700 dark:text-zinc-200">
+                        {reference.chunkName}
+                      </div>,
+                      reference.chunkName,
+                      { whenOverflow: true }
+                    )
+                    : null}
                   {reference.relevanceScore !== null ? (
                     <div className="mt-1.5 flex items-center gap-2">
                       <div
@@ -388,29 +394,32 @@ function ReferenceTooltipBody({
               ) : (
                 <>
                   <div className="flex items-start justify-between gap-3">
-                    <div
-                      className="min-w-0 flex-1 truncate text-[12px] font-bold leading-[1.15] text-stone-800 dark:text-zinc-100"
-                      title={reference.documentName || reference.label}
-                    >
-                      {reference.documentName || reference.label}
-                    </div>
+                    {wrapWithTooltip(
+                      <div className="min-w-0 flex-1 truncate text-[12px] font-bold leading-[1.15] text-stone-800 dark:text-zinc-100">
+                        {reference.documentName || reference.label}
+                      </div>,
+                      reference.documentName || reference.label,
+                      { whenOverflow: true }
+                    )}
                   </div>
-                  {reference.path ? (
-                    <div
-                      className="mt-1 truncate text-[12px] leading-[1.15] text-stone-600 dark:text-zinc-300"
-                      title={reference.path}
-                    >
-                      {reference.path}
-                    </div>
-                  ) : null}
-                  {reference.chunkName ? (
-                    <div
-                      className="mt-1 truncate text-[12px] font-bold leading-[1.15] text-stone-700 dark:text-zinc-200"
-                      title={reference.chunkName}
-                    >
-                      {reference.chunkName}
-                    </div>
-                  ) : null}
+                  {reference.path
+                    ? wrapWithTooltip(
+                      <div className="mt-1 truncate text-[12px] leading-[1.15] text-stone-600 dark:text-zinc-300">
+                        {reference.path}
+                      </div>,
+                      reference.path,
+                      { whenOverflow: true }
+                    )
+                    : null}
+                  {reference.chunkName
+                    ? wrapWithTooltip(
+                      <div className="mt-1 truncate text-[12px] font-bold leading-[1.15] text-stone-700 dark:text-zinc-200">
+                        {reference.chunkName}
+                      </div>,
+                      reference.chunkName,
+                      { whenOverflow: true }
+                    )
+                    : null}
                   {reference.relevanceScore !== null ? (
                     <div className="mt-1.5 flex items-center gap-2">
                       <div

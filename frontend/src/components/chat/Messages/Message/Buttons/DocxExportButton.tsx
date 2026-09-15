@@ -49,7 +49,7 @@ const DocxExportButton = ({ contentRef }: Props) => {
   };
 
   return (
-    <TooltipProvider delayDuration={100}>
+    <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
           <Button

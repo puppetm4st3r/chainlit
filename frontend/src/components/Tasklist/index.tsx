@@ -121,7 +121,7 @@ const Header = ({
         </div>
         <StatusLine label={statusLabel} processing={processing} />
       </div>
-      <TooltipProvider delayDuration={300}>
+      <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
             {/* Span keeps tooltip usable while the button is disabled. */}

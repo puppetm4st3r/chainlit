@@ -6,6 +6,19 @@ import type { IMessageElement } from '@chainlit/react-client';
 import { ElementRef } from '@/components/Elements/ElementRef';
 import { MessageContext } from '@/contexts/MessageContext';
 
+vi.mock('@/components/i18n/Translator', () => ({
+  useTranslation: () => ({
+    t: (key: string, options?: { title?: string }) => {
+      if (key === 'chat.artifactPreview.reopenChip') {
+        return `Preview: ${options?.title ?? ''}`;
+      }
+      return key;
+    },
+    ready: true,
+    i18n: { exists: () => true }
+  })
+}));
+
 const renderWithContext = (
   element: IMessageElement,
   onElementRefClick = vi.fn()
@@ -39,7 +52,7 @@ describe('ElementRef', () => {
     } as IMessageElement;
 
     const { onElementRefClick } = renderWithContext(element);
-    const chip = screen.getByText('MyWidget');
+    const chip = screen.getByRole('link', { name: 'MyWidget' });
 
     expect(chip).toHaveClass('element-link-floating');
     expect(chip).toHaveStyle({
@@ -65,8 +78,28 @@ describe('ElementRef', () => {
     } as IMessageElement;
 
     renderWithContext(element);
-    expect(screen.getByText('Sample people')).toBeInTheDocument();
+    const chip = screen.getByRole('link', { name: 'Sample people' });
+    expect(chip).toBeInTheDocument();
+    expect(chip.querySelector('svg')).toBeNull();
     expect(screen.queryByText('DynamicTable')).not.toBeInTheDocument();
+  });
+
+  it('prefixes ArtifactPreview chips with a preview icon and localized label', () => {
+    const element = {
+      id: 'c4',
+      type: 'custom',
+      name: 'ArtifactPreview',
+      display: 'floating',
+      forId: 'm1',
+      showReopenChip: true,
+      props: { title: 'msg actual' }
+    } as IMessageElement;
+
+    renderWithContext(element);
+    const chip = screen.getByRole('link', { name: 'Preview: msg actual' });
+    expect(chip).toHaveClass('element-link-floating');
+    expect(chip.querySelector('svg')).not.toBeNull();
+    expect(screen.queryByText('ArtifactPreview')).not.toBeInTheDocument();
   });
 
   it('does not render a floating chip when showReopenChip is false', () => {

@@ -45,7 +45,7 @@ const AskActionButton = ({ action }: { action: IAction }) => {
 
   if (action.tooltip) {
     return (
-      <TooltipProvider delayDuration={100}>
+      <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>{button}</TooltipTrigger>
           <TooltipContent>

@@ -1,3 +1,4 @@
+import hashlib
 import json
 import mimetypes
 import uuid
@@ -24,6 +25,15 @@ from syncer import asyncio
 from chainlit.context import context
 from chainlit.data import get_data_layer
 from chainlit.logger import logger
+
+# Socket.IO clients drop events above maxHttpBufferSize (1MB by default).
+# ArtifactPreview puts a PDF data URL in props; that payload must not ride the
+# `element` event or the reopen chip never attaches and the chat shows the
+# raw match token. Heavy props stay on the blob URL (same as File/PDF).
+_SOCKET_CUSTOM_PROPS_MAX_BYTES = 200_000
+_SOCKET_CUSTOM_PROPS_LARGE_STRING = 2048
+SOCKET_CUSTOM_PROPS_DEFERRED_KEY = "_contentDeferred"
+SOCKET_CUSTOM_PROPS_REVISION_KEY = "_contentRevision"
 
 mime_types = {
     "text": "text/plain",
@@ -637,6 +647,40 @@ class Dataframe(Element):
         super().__post_init__()
 
 
+def socket_safe_custom_element_props(props: Any) -> Dict[str, Any]:
+    """
+    Return CustomElement props that are safe to emit on the websocket.
+
+    Identity fields (title, type, revision) stay on the event so ElementRef
+    can render the reopen chip. Oversized bodies are loaded later from the
+    persisted ``/project/file`` URL.
+    """
+    if not isinstance(props, dict):
+        return {}
+    encoded = json.dumps(props, default=str)
+    encoded_bytes = encoded.encode("utf-8")
+    if len(encoded_bytes) <= _SOCKET_CUSTOM_PROPS_MAX_BYTES:
+        return props
+
+    slim: Dict[str, Any] = {}
+    for key, value in props.items():
+        if isinstance(value, str) and len(value) > _SOCKET_CUSTOM_PROPS_LARGE_STRING:
+            continue
+        slim[key] = value
+    slim[SOCKET_CUSTOM_PROPS_DEFERRED_KEY] = True
+    slim[SOCKET_CUSTOM_PROPS_REVISION_KEY] = hashlib.sha256(encoded_bytes).hexdigest()[
+        :16
+    ]
+    if len(json.dumps(slim, default=str).encode("utf-8")) > _SOCKET_CUSTOM_PROPS_MAX_BYTES:
+        title = props.get("title")
+        return {
+            "title": title if isinstance(title, str) else "",
+            SOCKET_CUSTOM_PROPS_DEFERRED_KEY: True,
+            SOCKET_CUSTOM_PROPS_REVISION_KEY: slim[SOCKET_CUSTOM_PROPS_REVISION_KEY],
+        }
+    return slim
+
+
 @dataclass
 class CustomElement(Element):
     """Useful to send a custom JSX element to the UI.
@@ -660,6 +704,12 @@ class CustomElement(Element):
         self.content = json.dumps(self.props)
         super().__post_init__()
         self.updatable = True
+
+    def to_dict(self) -> ElementDict:
+        """Emit identity props on the socket; defer oversized bodies to the blob URL."""
+        payload = super().to_dict()
+        payload["props"] = socket_safe_custom_element_props(self.props)
+        return payload
 
     async def update(self):
         await super().send(self.for_id)

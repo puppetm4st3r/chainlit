@@ -326,10 +326,7 @@ export default function MessageComposer({
     <div
       id="message-composer"
       data-input-restriction={inputRestrictionMode}
-      className="bg-accent dark:bg-card rounded-2xl border p-3 px-4 w-full min-h-24 flex flex-col"
-      style={{
-        borderColor: 'hsl(var(--accent-border))'
-      }}
+      className="bg-accent dark:bg-card rounded-2xl p-3 px-4 w-full min-h-24 flex flex-col"
     >
       {attachments.length > 0 ? (
         <div className="mb-1">

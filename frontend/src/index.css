@@ -58,11 +58,34 @@ code {
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
     --message-first-item-padding: 0.7em;
-    /* Pastel feedback icons: idle soft, strong on hover/selected (light). */
-    --feedback-positive: 142 38% 52%;
-    --feedback-positive-strong: 142 52% 36%;
-    --feedback-negative: 350 48% 62%;
-    --feedback-negative-strong: 350 68% 48%;
+    /* Dusty feedback icons: low-chroma sage/rose, slightly stronger on hover/selected. */
+    --feedback-positive: 142 16% 48%;
+    --feedback-positive-strong: 142 26% 40%;
+    --feedback-negative: 350 18% 56%;
+    --feedback-negative-strong: 350 28% 48%;
+
+    /* Official tooltip tokens mapped to the Chainlit light palette. */
+    --ui-rgb-bg-surface-1: 255 255 255;
+    --ui-rgb-bg-surface-2: 230 230 230;
+    --ui-rgb-text-primary: 13 13 13;
+    --ui-rgb-text-accent: 245 20 95;
+    --ui-color-bg-surface-1: rgb(var(--ui-rgb-bg-surface-1));
+    --ui-color-bg-surface-2: rgb(var(--ui-rgb-bg-surface-2));
+    --ui-color-text-primary: rgb(var(--ui-rgb-text-primary));
+    --ui-color-text-accent: rgb(var(--ui-rgb-text-accent));
+    --ui-tooltip-max-width: 21.25rem;
+    --ui-tooltip-radius: 4px;
+    --ui-tooltip-padding-block: 0.75rem;
+    --ui-tooltip-padding-inline: 0.9rem;
+    --ui-tooltip-font-size: 0.8125rem;
+    --ui-tooltip-font-weight: 700;
+    --ui-tooltip-border-width: 1px;
+    --ui-tooltip-ring: rgb(var(--ui-rgb-text-accent) / 0.28);
+    --ui-tooltip-lift: 0 10px 28px rgb(0 0 0 / 0.18);
+    --ui-shadow-flyout: 0 14px 34px rgb(15 23 42 / 0.12);
+    --ui-z-dropdown: 2147483646;
+    --ui-tooltip-bg: color-mix(in srgb, var(--ui-color-bg-surface-1) 78%, rgb(var(--ui-rgb-text-accent)) 22%);
+    --ui-tooltip-border: rgb(var(--ui-rgb-text-accent) / 0.88);
   }
   .dark {
     --background: 0 0% 13%;
@@ -102,11 +125,24 @@ code {
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
-    /* Pastel feedback icons: lighter pastels on dark backgrounds. */
-    --feedback-positive: 142 36% 58%;
-    --feedback-positive-strong: 142 48% 68%;
-    --feedback-negative: 350 42% 68%;
-    --feedback-negative-strong: 350 58% 74%;
+    /* Dusty feedback icons: muted sage/rose on dark backgrounds. */
+    --feedback-positive: 142 14% 58%;
+    --feedback-positive-strong: 142 22% 64%;
+    --feedback-negative: 350 16% 64%;
+    --feedback-negative-strong: 350 24% 70%;
+
+    /* Official tooltip tokens mapped to the Chainlit dark palette. */
+    --ui-rgb-bg-surface-1: 33 33 33;
+    --ui-rgb-bg-surface-2: 46 46 46;
+    --ui-rgb-text-primary: 237 237 237;
+    --ui-rgb-text-accent: 245 20 95;
+    --ui-color-bg-surface-1: rgb(var(--ui-rgb-bg-surface-1));
+    --ui-color-bg-surface-2: rgb(var(--ui-rgb-bg-surface-2));
+    --ui-color-text-primary: rgb(var(--ui-rgb-text-primary));
+    --ui-color-text-accent: rgb(var(--ui-rgb-text-accent));
+    --ui-shadow-flyout: 0 14px 34px rgb(0 0 0 / 0.24);
+    --ui-tooltip-bg: color-mix(in srgb, var(--ui-color-bg-surface-2) 70%, rgb(var(--ui-rgb-text-accent)) 30%);
+    --ui-tooltip-border: rgb(var(--ui-rgb-text-accent) / 0.92);
   }
 }
 
@@ -122,7 +158,7 @@ code {
 /**
  * Assistant message action row (copy / docx / feedback / TTS).
  * Idle: subdued transparency on pointer devices. Hover/focus: full opacity.
- * Feedback thumbs keep pastel green / rose and intensify on hover.
+ * Feedback thumbs keep dusty sage / rose and intensify slightly on hover.
  * `!important` is required so Button ghost `hover:text-accent-foreground`
  * cannot replace the feedback colors (utilities otherwise win the cascade).
  */
@@ -211,20 +247,14 @@ code {
   0% {
     left: -50%;
   }
-  85.7% {
-    left: 75%;
-  }
   100% {
-    left: 75%;
+    left: 100%;
   }
 }
 
 @keyframes shimmer-text {
   0% {
     background-position: 200% center;
-  }
-  85.7% {
-    background-position: -200% center;
   }
   100% {
     background-position: -200% center;
@@ -303,6 +333,96 @@ code {
 
 .bulb-off {
   filter: grayscale(100%) opacity(0.85);
+}
+
+/*
+ * Ambient live CoT: compact 3-line viewport. The track rolls one line with
+ * acceleration then a long settle; no JS timers. Title and body share the
+ * same type so the accordion label matches the live lines.
+ */
+.cot-live-window,
+.cot-step-title {
+  font-size: 0.8125rem;
+  font-weight: 400;
+}
+
+.cot-live-window {
+  --cot-live-line-height: 1.35rem;
+  --cot-live-roll-lines: 1;
+  overflow: hidden;
+  margin-top: 0.35rem;
+  color: hsl(var(--muted-foreground));
+}
+
+.cot-live-window.is-rolling {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 18%,
+    #000 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 18%,
+    #000 100%
+  );
+}
+
+.cot-live-track {
+  will-change: transform;
+}
+
+.cot-live-track.is-rolling {
+  animation-name: cot-live-roll;
+  animation-duration: 520ms;
+  animation-fill-mode: forwards;
+}
+
+@keyframes cot-live-roll {
+  0% {
+    transform: translate3d(0, 0, 0);
+    animation-timing-function: cubic-bezier(0.55, 0.06, 0.68, 0.19);
+  }
+  42% {
+    transform: translate3d(
+      0,
+      calc(-0.58 * var(--cot-live-roll-lines) * var(--cot-live-line-height)),
+      0
+    );
+    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  100% {
+    transform: translate3d(
+      0,
+      calc(-1 * var(--cot-live-roll-lines) * var(--cot-live-line-height)),
+      0
+    );
+  }
+}
+
+.cot-live-line {
+  height: var(--cot-live-line-height);
+  line-height: var(--cot-live-line-height);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cot-live-window.is-rolling {
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+
+  .cot-live-track.is-rolling {
+    animation: none;
+    transform: translate3d(
+      0,
+      calc(-1 * var(--cot-live-roll-lines) * var(--cot-live-line-height)),
+      0
+    );
+  }
 }
 
 /* TaskList status line: braille spinner + ellipsis (CSS-only, no timers). */

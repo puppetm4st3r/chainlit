@@ -8,19 +8,12 @@ interface Props {
 
 const InlinedFileList = ({ items }: Props) => {
   return (
-    <div 
-      className="grid w-full gap-2"
-      style={{
-        gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))'
-      }}
-    >
-      {items.map((file, i) => {
-        return (
-          <div key={i}>
-            <FileElement element={file} />
-          </div>
-        );
-      })}
+    <div className="flex w-full flex-col gap-2">
+      {items.map((file, i) => (
+        <div key={file.id || `${file.name}-${i}`} className="w-full">
+          <FileElement element={file} />
+        </div>
+      ))}
     </div>
   );
 };
